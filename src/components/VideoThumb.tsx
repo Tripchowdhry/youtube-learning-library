@@ -1,7 +1,12 @@
 import { thumbnailUrl } from "@/lib/youtube";
 
 type Props = {
-  video: { url: string; youtube_id: string; title: string | null; thumbnail_url: string | null };
+  video: {
+    url: string;
+    youtube_id: string;
+    title: string | null;
+    thumbnail_url: string | null;
+  };
   // Where clicking goes. Defaults to the video on YouTube.
   href?: string;
 };
