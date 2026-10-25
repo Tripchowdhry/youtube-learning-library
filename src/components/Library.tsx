@@ -122,10 +122,14 @@ export default function Library({ userEmail }: { userEmail: string }) {
       return false;
     }
 
+    // A video that's already saved isn't added twice: it gets today's date and moves to the top of its folder.
     const existing = videos.find((v) => v.youtube_id === info.youtube_id);
     if (existing) {
-      notify(`Already saved in ${existing.folder_id ? folderPath(existing.folder_id) : "Unsorted"}.`, true);
-      return false;
+      const siblings = videos.filter((v) => v.folder_id === existing.folder_id && v.id !== existing.id);
+      const position = siblings.length ? Math.min(...siblings.map((v) => v.position)) - 1 : 0;
+      updateVideo(existing.id, { created_at: new Date().toISOString(), position });
+      notify(`Already saved in ${existing.folder_id ? folderPath(existing.folder_id) : "Unsorted"}. Moved it to the top.`);
+      return true;
     }
 
     // Inside a folder, the video goes there. Otherwise it goes into its channel's folder.

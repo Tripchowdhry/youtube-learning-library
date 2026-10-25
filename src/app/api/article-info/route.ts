@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { parseHTML } from "linkedom";
 import { fetchPage } from "@/lib/fetch-page";
-import { parseLink, siteName, xPostId } from "@/lib/links";
+import { cleanLink, parseLink, siteName, xPostId } from "@/lib/links";
 import { isSignedIn } from "@/lib/require-user";
 
 const clean = (text: string | null | undefined, max = 200) => {
@@ -48,5 +48,5 @@ export async function GET(request: Request) {
     }
   }
 
-  return NextResponse.json({ url: url.href, title, site, author });
+  return NextResponse.json({ url: cleanLink(url), title, site, author });
 }

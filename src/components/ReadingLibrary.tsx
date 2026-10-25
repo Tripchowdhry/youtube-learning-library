@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { linkKey } from "@/lib/links";
 import { createClient } from "@/lib/supabase/client";
 import type { Article, ArticleCategory } from "@/lib/types";
 
@@ -38,6 +39,7 @@ export default function ReadingLibrary({ userEmail }: { userEmail: string }) {
   const [period, setPeriod] = useState<Period>("any");
   const [readFilter, setReadFilter] = useState<ReadFilter>("all");
   const [showCategories, setShowCategories] = useState(false);
+  const [draggingId, setDraggingId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ text: string; isError?: boolean } | null>(null);
 
   const notify = useCallback((text: string, isError = false) => {
@@ -106,12 +108,14 @@ export default function ReadingLibrary({ userEmail }: { userEmail: string }) {
   // ---------- Which articles to show ----------
 
   const searching = query.trim().length > 0;
+  // Inside a category your own order applies; All reading and search show the newest first.
+  const canReorder = !searching && view.kind !== "all";
 
   const visibleArticles = useMemo(() => {
     const q = query.trim().toLowerCase();
     const days = PERIODS.find((p) => p.value === period)!.days;
     const since = days ? Date.now() - days * 86_400_000 : 0;
-    return articles.filter((a) => {
+    const shown = articles.filter((a) => {
       if (since && new Date(a.created_at).getTime() < since) return false;
       if (readFilter === "read" && !a.read_at) return false;
       if (readFilter === "unread" && a.read_at) return false;
@@ -120,13 +124,41 @@ export default function ReadingLibrary({ userEmail }: { userEmail: string }) {
       if (view.kind === "category") return inCategory(a, view.id);
       return true;
     });
-  }, [articles, query, period, readFilter, view, categoryPath, inCategory]);
+    const newestFirst = (a: Article, b: Article) => b.created_at.localeCompare(a.created_at);
+    return shown.sort(canReorder ? (a, b) => a.position - b.position || newestFirst(a, b) : newestFirst);
+  }, [articles, query, period, readFilter, view, categoryPath, inCategory, canReorder]);
 
   const countIn = (id: string) => articles.filter((a) => inCategory(a, id)).length;
 
   // ---------- Article actions ----------
 
+  // The position that puts an article first in a category.
+  const topPosition = (categoryId: string | null, exceptId?: string) => {
+    const siblings = articles.filter((a) => a.category_id === categoryId && a.id !== exceptId);
+    return siblings.length ? Math.min(...siblings.map((a) => a.position)) - 1 : 0;
+  };
+
+  const findSaved = (link: string) => {
+    const key = linkKey(link);
+    return key ? articles.find((a) => linkKey(a.url) === key) : undefined;
+  };
+
+  // A link that's already saved isn't added twice: it gets today's date and moves to the top of its category.
+  function bringToTop(existing: Article) {
+    updateArticle(existing.id, {
+      created_at: new Date().toISOString(),
+      position: topPosition(existing.category_id, existing.id),
+    });
+    notify(`Already saved in ${categoryPath(existing.category_id) || "Uncategorized"}. Moved it to the top.`);
+  }
+
   async function addArticle(link: string, categoryId: string | null) {
+    const saved = findSaved(link);
+    if (saved) {
+      bringToTop(saved);
+      return true;
+    }
+
     const res = await fetch(`/api/article-info?url=${encodeURIComponent(link)}`);
     const info = await res.json();
     if (!res.ok) {
@@ -134,10 +166,11 @@ export default function ReadingLibrary({ userEmail }: { userEmail: string }) {
       return false;
     }
 
-    const existing = articles.find((a) => a.url === info.url);
+    // The site may have redirected to a link that's already saved.
+    const existing = findSaved(info.url);
     if (existing) {
-      notify(`Already saved in ${existing.category_id ? categoryPath(existing.category_id) : "Uncategorized"}.`, true);
-      return false;
+      bringToTop(existing);
+      return true;
     }
 
     let title: string | null = info.title;
@@ -148,7 +181,14 @@ export default function ReadingLibrary({ userEmail }: { userEmail: string }) {
 
     const { data, error } = await supabase
       .from("articles")
-      .insert({ url: info.url, title, site: info.site, author: info.author, category_id: categoryId })
+      .insert({
+        url: info.url,
+        title,
+        site: info.site,
+        author: info.author,
+        category_id: categoryId,
+        position: topPosition(categoryId),
+      })
       .select()
       .single();
     if (error) {
@@ -167,6 +207,39 @@ export default function ReadingLibrary({ userEmail }: { userEmail: string }) {
       notify(error.message, true);
       load();
     }
+  }
+
+  function moveArticle(id: string, categoryId: string | null) {
+    const article = articles.find((a) => a.id === id);
+    if (!article || article.category_id === categoryId) return;
+    updateArticle(id, { category_id: categoryId, position: topPosition(categoryId) });
+    notify(`Moved to ${categoryPath(categoryId) || "Uncategorized"}`);
+  }
+
+  // Drop one article onto another: it takes the target's place in the list.
+  function reorderArticle(draggedId: string, targetId: string) {
+    if (draggedId === targetId) return;
+    const list = visibleArticles.filter((a) => a.id !== draggedId);
+    const index = list.findIndex((a) => a.id === targetId);
+    if (index === -1) return;
+    const target = list[index];
+    const before = list[index - 1];
+    updateArticle(draggedId, { position: before ? (before.position + target.position) / 2 : target.position - 1 });
+  }
+
+  // Swap an article with its neighbor: -1 moves it up, +1 down.
+  function shiftArticle(id: string, step: -1 | 1) {
+    const index = visibleArticles.findIndex((a) => a.id === id);
+    const neighbor = visibleArticles[index + step];
+    if (index === -1 || !neighbor) return;
+    const article = visibleArticles[index];
+    if (article.position === neighbor.position) {
+      // Equal positions can't be swapped, so nudge just past the neighbor instead.
+      updateArticle(article.id, { position: neighbor.position + step * 0.5 });
+      return;
+    }
+    updateArticle(article.id, { position: neighbor.position });
+    updateArticle(neighbor.id, { position: article.position });
   }
 
   function toggleRead(article: Article) {
@@ -291,6 +364,7 @@ export default function ReadingLibrary({ userEmail }: { userEmail: string }) {
             count={articles.filter((a) => !a.category_id).length}
             active={view.kind === "uncategorized" && !searching}
             onClick={() => openView({ kind: "uncategorized" })}
+            onDropArticle={draggingId ? () => moveArticle(draggingId, null) : undefined}
           />
 
           <div className="mt-4 mb-1 flex items-center justify-between px-2 text-xs font-semibold tracking-wide text-slate-500 uppercase">
@@ -309,6 +383,7 @@ export default function ReadingLibrary({ userEmail }: { userEmail: string }) {
                 count={countIn(cat.id)}
                 active={!searching && view.kind === "category" && view.id === cat.id}
                 onClick={() => openView({ kind: "category", id: cat.id })}
+                onDropArticle={draggingId ? () => moveArticle(draggingId, cat.id) : undefined}
               />
               {subcategories(cat.id).map((sub) => (
                 <NavItem
@@ -318,6 +393,7 @@ export default function ReadingLibrary({ userEmail }: { userEmail: string }) {
                   indent={1}
                   active={!searching && view.kind === "category" && view.id === sub.id}
                   onClick={() => openView({ kind: "category", id: sub.id })}
+                  onDropArticle={draggingId ? () => moveArticle(draggingId, sub.id) : undefined}
                 />
               ))}
             </div>
@@ -387,21 +463,38 @@ export default function ReadingLibrary({ userEmail }: { userEmail: string }) {
                       : "Your reading list is empty. Paste a link above, like an X post or a blog article."}
                 </div>
               ) : (
+                <>
+                {visibleArticles.length > 1 && (
+                  <p className="mb-3 text-xs text-slate-500">
+                    {canReorder
+                      ? "Tip: drag an article onto another, or use ▲ ▼, to change the order. Drop it on a category to move it."
+                      : `${searching ? "Search results" : "All reading"} show the newest first. To change the order, open a category on the left.`}
+                  </p>
+                )}
                 <ul className="flex flex-col gap-2">
-                  {visibleArticles.map((article) => (
+                  {visibleArticles.map((article, index) => (
                     <ArticleRow
                       key={article.id}
                       article={article}
                       categoryLabel={categoryPath(article.category_id) || "Uncategorized"}
                       categoryOptions={categoryOptions}
                       onToggleRead={() => toggleRead(article)}
-                      onMove={(categoryId) => updateArticle(article.id, { category_id: categoryId })}
+                      onMove={(categoryId) => moveArticle(article.id, categoryId)}
+                      canReorder={canReorder}
+                      dragging={draggingId === article.id}
+                      onDragStart={() => setDraggingId(article.id)}
+                      onDragEnd={() => setDraggingId(null)}
+                      onDropOnto={() => draggingId && reorderArticle(draggingId, article.id)}
+                      onShift={canReorder ? (step) => shiftArticle(article.id, step) : null}
+                      isFirst={index === 0}
+                      isLast={index === visibleArticles.length - 1}
                       onRename={() => renameArticle(article)}
                       onSaveNote={(note) => updateArticle(article.id, { note })}
                       onDelete={() => deleteArticle(article)}
                     />
                   ))}
                 </ul>
+                </>
               )}
             </>
           )}
@@ -457,14 +550,43 @@ function ArticleRow(props: {
   categoryOptions: { id: string; label: string }[];
   onToggleRead: () => void;
   onMove: (categoryId: string | null) => void;
+  canReorder: boolean;
+  dragging: boolean;
+  onDragStart: () => void;
+  onDragEnd: () => void;
+  onDropOnto: () => void;
+  onShift: ((step: -1 | 1) => void) | null;
+  isFirst: boolean;
+  isLast: boolean;
   onRename: () => void;
   onSaveNote: (note: string) => void;
   onDelete: () => void;
 }) {
   const { article } = props;
   const [editingNote, setEditingNote] = useState(false);
+  const [over, setOver] = useState(false);
   return (
-    <li className="flex items-start gap-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+    <li
+      draggable={!editingNote}
+      onDragStart={(e) => {
+        e.dataTransfer.effectAllowed = "move";
+        e.dataTransfer.setData("text/plain", article.id);
+        props.onDragStart();
+      }}
+      onDragEnd={props.onDragEnd}
+      onDragOver={(e) => {
+        if (!props.canReorder) return;
+        e.preventDefault();
+        setOver(true);
+      }}
+      onDragLeave={() => setOver(false)}
+      onDrop={(e) => {
+        e.preventDefault();
+        setOver(false);
+        props.onDropOnto();
+      }}
+      className={`flex cursor-grab items-start gap-3 rounded-xl border bg-white p-3 shadow-sm transition ${props.dragging ? "opacity-40" : ""} ${over ? "border-blue-500 ring-2 ring-blue-500" : "border-slate-200"}`}
+    >
       <ReadCheck read={Boolean(article.read_at)} onClick={props.onToggleRead} />
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <Link href={`/read/${article.id}`} className={`line-clamp-2 font-medium hover:underline ${article.read_at ? "text-slate-500" : ""}`}>
@@ -504,6 +626,16 @@ function ArticleRow(props: {
           >
             Original ↗
           </a>
+          {props.onShift && (
+            <>
+              <SmallButton onClick={() => props.onShift!(-1)} disabled={props.isFirst} title="Move up">
+                ▲
+              </SmallButton>
+              <SmallButton onClick={() => props.onShift!(1)} disabled={props.isLast} title="Move down">
+                ▼
+              </SmallButton>
+            </>
+          )}
           {!article.note && !editingNote && <SmallButton onClick={() => setEditingNote(true)}>📝 Add note</SmallButton>}
           <SmallButton onClick={props.onRename}>Edit title</SmallButton>
           <SmallButton onClick={props.onDelete} danger title="Delete">
@@ -652,11 +784,30 @@ function Pills<T extends string>(props: {
   );
 }
 
-function NavItem(props: { label: string; count?: number; active: boolean; onClick: () => void; indent?: number }) {
+function NavItem(props: {
+  label: string;
+  count?: number;
+  active: boolean;
+  onClick: () => void;
+  indent?: number;
+  onDropArticle?: () => void;
+}) {
+  const [over, setOver] = useState(false);
   return (
     <button
       onClick={props.onClick}
-      className={`flex w-full items-center gap-2 rounded-md py-1.5 pr-2 text-left text-sm ${props.active ? "bg-slate-900 text-white" : "hover:bg-slate-100"}`}
+      onDragOver={(e) => {
+        if (!props.onDropArticle) return;
+        e.preventDefault();
+        setOver(true);
+      }}
+      onDragLeave={() => setOver(false)}
+      onDrop={(e) => {
+        e.preventDefault();
+        setOver(false);
+        props.onDropArticle?.();
+      }}
+      className={`flex w-full items-center gap-2 rounded-md py-1.5 pr-2 text-left text-sm ${props.active ? "bg-slate-900 text-white" : "hover:bg-slate-100"} ${over ? "ring-2 ring-blue-500" : ""}`}
       style={{ paddingLeft: 8 + (props.indent ?? 0) * 22 }}
     >
       <span className="truncate">{props.label}</span>
@@ -671,18 +822,22 @@ function SmallButton({
   children,
   onClick,
   danger,
+  disabled,
   title,
 }: {
   children: React.ReactNode;
   onClick: () => void;
   danger?: boolean;
+  disabled?: boolean;
   title?: string;
 }) {
   return (
     <button
       onClick={onClick}
+      disabled={disabled}
       title={title}
-      className={`rounded-md border px-2 py-1 text-xs ${danger ? "border-red-200 text-red-600 hover:bg-red-50" : "border-slate-300 text-slate-700 hover:bg-slate-100"}`}
+      aria-label={title}
+      className={`rounded-md border px-2 py-1 text-xs disabled:opacity-30 ${danger ? "border-red-200 text-red-600 hover:bg-red-50" : "border-slate-300 text-slate-700 hover:bg-slate-100"}`}
     >
       {children}
     </button>

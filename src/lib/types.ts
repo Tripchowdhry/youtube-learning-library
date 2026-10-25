@@ -82,6 +82,7 @@ export type Article = {
   site: string | null;
   author: string | null;
   note: string;
+  position: number;
   read_at: string | null;
   created_at: string;
 };

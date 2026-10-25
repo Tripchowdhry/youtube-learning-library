@@ -24,11 +24,15 @@ create table if not exists public.articles (
   author text,
   note text not null default '' check (char_length(note) <= 280),
   read_at timestamptz,
+  position double precision not null default 0,
   created_at timestamptz not null default now()
 );
 
 -- Personal notes were added later; this adds the column to existing setups.
 alter table public.articles add column if not exists note text not null default '' check (char_length(note) <= 280);
+
+-- Your own order inside a category (drag and drop) was added later too.
+alter table public.articles add column if not exists position double precision not null default 0;
 
 create index if not exists article_categories_user_idx on public.article_categories (user_id);
 create index if not exists articles_user_idx on public.articles (user_id);
