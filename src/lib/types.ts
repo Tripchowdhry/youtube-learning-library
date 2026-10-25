@@ -45,4 +45,19 @@ export type NoteStroke = {
 // A video time (in seconds) pinned onto the page; tapping it jumps the video there.
 export type NoteStamp = { id: string; t: number; x: number; y: number };
 
-export type NotePage = { strokes: NoteStroke[]; stamps: NoteStamp[] };
+export type NotePage = {
+  strokes: NoteStroke[];
+  stamps: NoteStamp[];
+  images?: NoteImage[];
+};
+
+// A pasted picture on a handwriting page (t is the video time when it was added).
+export type NoteImage = {
+  id: string;
+  path: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  t: number;
+};

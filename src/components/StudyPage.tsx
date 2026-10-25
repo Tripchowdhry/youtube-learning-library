@@ -3,9 +3,11 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import NotePageCanvas, { PAGE_HEIGHT, type Tool } from "@/components/NotePageCanvas";
+import { DeleteClipButton } from "@/components/ClipButtons";
+import { clipUrl, compressImage, uploadClip, type ClipImage } from "@/lib/clips";
 import { createClient } from "@/lib/supabase/client";
 import { formatTime, loadYouTubeApi, type YouTubePlayer } from "@/lib/youtube-player";
-import type { NotePage, NoteStroke, Video } from "@/lib/types";
+import type { NoteImage, NotePage, NoteStroke, Video } from "@/lib/types";
 
 const PEN_COLORS = ["#111827", "#2563eb", "#dc2626", "#16a34a"];
 const HIGHLIGHT_COLORS = ["#facc15", "#4ade80", "#f472b6", "#60a5fa"];
@@ -36,6 +38,11 @@ function preferredMode(): Mode {
 // Typed notes mark video times as [m:ss] or [h:mm:ss].
 const TIME_PATTERN = /\[(\d+):(\d{2})(?::(\d{2}))?\]/g;
 
+function toSeconds(time: string) {
+  const parts = time.split(":").map(Number);
+  return parts.reduce((total, n) => total * 60 + n, 0);
+}
+
 function timesIn(text: string) {
   const seen = new Set<number>();
   for (const m of text.matchAll(TIME_PATTERN)) {
@@ -51,6 +58,7 @@ export default function StudyPage({ videoId }: { videoId: string }) {
   const [missing, setMissing] = useState(false);
   const [pages, setPages] = useState<NotePage[]>([emptyPage()]);
   const [typed, setTyped] = useState("");
+  const [typedClips, setTypedClips] = useState<TypedClip[]>([]);
   const [mode, setMode] = useState<Mode>("write");
   const typedBox = useRef<HTMLTextAreaElement>(null);
   const [loaded, setLoaded] = useState(false);
@@ -66,6 +74,10 @@ export default function StudyPage({ videoId }: { videoId: string }) {
   const history = useRef<NotePage[][]>([]);
   const [canUndo, setCanUndo] = useState(false);
   const lastSpot = useRef<{ page: number; y: number }>({ page: 0, y: 40 });
+
+  const [clipBusy, setClipBusy] = useState(false);
+  const pictureInput = useRef<HTMLInputElement>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const playerHost = useRef<HTMLDivElement>(null);
   const player = useRef<YouTubePlayer | null>(null);
@@ -86,7 +98,9 @@ export default function StudyPage({ videoId }: { videoId: string }) {
       const saved = (n.data?.pages ?? []) as NotePage[];
       const savedText = (n.data?.text ?? "") as string;
       if (saved.length) setPages(saved);
-      setTyped(savedText);
+      const { text, clips } = splitTypedClips(savedText);
+      setTyped(text);
+      setTypedClips(clips);
       setMode(preferredMode());
       setLoaded(true);
     })();
@@ -122,15 +136,20 @@ export default function StudyPage({ videoId }: { videoId: string }) {
   pagesRef.current = pages;
   const typedRef = useRef(typed);
   typedRef.current = typed;
+  const typedClipsRef = useRef(typedClips);
+  typedClipsRef.current = typedClips;
 
   const save = useCallback(async () => {
     setSaveState("saving");
-    const { error } = await supabase
-      .from("notes")
-      .upsert(
-        { video_id: videoId, pages: pagesRef.current, text: typedRef.current, updated_at: new Date().toISOString() },
-        { onConflict: "video_id" },
-      );
+    const { error } = await supabase.from("notes").upsert(
+      {
+        video_id: videoId,
+        pages: pagesRef.current,
+        text: joinTypedClips(typedRef.current, typedClipsRef.current),
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "video_id" },
+    );
     setSaveState(error ? "error" : "saved");
   }, [supabase, videoId]);
 
@@ -138,7 +157,7 @@ export default function StudyPage({ videoId }: { videoId: string }) {
     if (saveState !== "unsaved") return;
     const timer = setTimeout(save, 1200);
     return () => clearTimeout(timer);
-  }, [pages, typed, saveState, save]);
+  }, [pages, typed, typedClips, saveState, save]);
 
   // Save right away if the person switches apps or closes the tab.
   useEffect(() => {
@@ -150,7 +169,7 @@ export default function StudyPage({ videoId }: { videoId: string }) {
   }, [saveState, save]);
 
   function change(next: NotePage[]) {
-    history.current.push(pages);
+    history.current.push(pagesRef.current);
     if (history.current.length > 100) history.current.shift();
     setCanUndo(true);
     setPages(next);
@@ -230,13 +249,118 @@ export default function StudyPage({ videoId }: { videoId: string }) {
     change(next.map((p, i) => (i === page ? { ...p, stamps: [...p.stamps, stamp] } : p)));
   }
 
-  function tapStamp(pageIndex: number, stampId: string, seconds: number) {
+  function tapStamp(pageIndex: number, id: string, seconds: number) {
     if (tool === "eraser") {
-      change(pages.map((p, i) => (i === pageIndex ? { ...p, stamps: p.stamps.filter((s) => s.id !== stampId) } : p)));
+      change(
+        pages.map((p, i) =>
+          i === pageIndex
+            ? {
+                ...p,
+                stamps: p.stamps.filter((s) => s.id !== id),
+                images: (p.images ?? []).filter((im) => im.id !== id),
+              }
+            : p,
+        ),
+      );
       return;
     }
     jumpTo(seconds);
   }
+
+  function changeTypedClips(clips: TypedClip[]) {
+    setTypedClips(clips);
+    setSaveState("unsaved");
+  }
+
+  function deleteImage(pageIndex: number, imageId: string) {
+    change(
+      pages.map((p, i) => (i === pageIndex ? { ...p, images: (p.images ?? []).filter((im) => im.id !== imageId) } : p)),
+    );
+  }
+
+  // ---------- Pictures (screenshots pasted into notes) ----------
+
+  const flash = useCallback((text: string) => {
+    setNotice(text);
+    setTimeout(() => setNotice(null), 4000);
+  }, []);
+
+  async function addClip(source: Blob, seconds: number) {
+    setClipBusy(true);
+    try {
+      const image = await compressImage(source);
+      const path = await uploadClip(supabase, image);
+      if (mode === "type") insertTypedClip(path);
+      else placeImage(image, path, seconds);
+    } catch (error) {
+      flash(`Couldn't save the picture: ${error instanceof Error ? error.message : "unknown error"}`);
+    } finally {
+      setClipBusy(false);
+    }
+  }
+
+  function placeImage(image: ClipImage, path: string, seconds: number) {
+    const current = pagesRef.current;
+    const w = 640;
+    const h = Math.round((w * image.height) / image.width);
+    let { page, y } = lastSpot.current;
+    y += 30;
+    let next = current;
+    if (y + h > PAGE_HEIGHT - 20) {
+      page += 1;
+      y = 60;
+      if (page >= current.length) next = [...current, emptyPage()];
+    }
+    const im: NoteImage = {
+      id: crypto.randomUUID(),
+      path,
+      x: 100,
+      y,
+      w,
+      h,
+      t: Math.round(seconds),
+    };
+    lastSpot.current = { page, y: y + h };
+    change(next.map((p, i) => (i === page ? { ...p, images: [...(p.images ?? []), im] } : p)));
+  }
+
+  function insertTypedClip(path: string) {
+    changeTypedClips([...typedClipsRef.current, { path, t: null }]);
+  }
+
+  // The Paste picture button (handy on iPad). If the clipboard can't be read, pick a picture instead.
+  async function pastePicture() {
+    const seconds = player.current?.getCurrentTime?.() ?? 0;
+    try {
+      const items = await navigator.clipboard.read();
+      for (const item of items) {
+        const type = item.types.find((t) => t.startsWith("image/"));
+        if (type) {
+          await addClip(await item.getType(type), seconds);
+          return;
+        }
+      }
+      flash("No picture copied yet. Take a screenshot of the video and copy it first.");
+    } catch {
+      pictureInput.current?.click();
+    }
+  }
+
+  // Pasting a picture anywhere on the page (Ctrl+V / Cmd+V / long-press Paste) adds it as a clip.
+  const addClipRef = useRef(addClip);
+  addClipRef.current = addClip;
+  useEffect(() => {
+    const onPaste = (e: ClipboardEvent) => {
+      const file = Array.from(e.clipboardData?.files ?? []).find((f) => f.type.startsWith("image/"));
+      if (!file) return;
+      e.preventDefault();
+      addClipRef.current(file, player.current?.getCurrentTime?.() ?? 0);
+    };
+    window.addEventListener("paste", onPaste);
+    return () => window.removeEventListener("paste", onPaste);
+  }, []);
+
+  const imageUrl = useCallback((path: string) => clipUrl(supabase, path), [supabase]);
 
   function addPage() {
     change([...pages, emptyPage()]);
@@ -280,6 +404,8 @@ export default function StudyPage({ videoId }: { videoId: string }) {
       canUndo={canUndo}
       onUndo={undo}
       onStamp={stampTime}
+      onPaste={pastePicture}
+      clipBusy={clipBusy}
       fingerDraws={fingerDraws}
       setFingerDraws={setFingerDraws}
     />
@@ -334,7 +460,16 @@ export default function StudyPage({ videoId }: { videoId: string }) {
           {!loaded ? (
             <p className="text-slate-500">Loading your notes…</p>
           ) : mode === "type" ? (
-            <TypedNotes text={typed} onChange={changeTyped} onJump={jumpTo} boxRef={typedBox} onStamp={stampTyped} />
+            <TypedNotes
+              text={typed}
+              onChange={changeTyped}
+              onJump={jumpTo}
+              boxRef={typedBox}
+              onStamp={stampTyped}
+              imageUrl={imageUrl}
+              clips={typedClips}
+              onClipsChange={changeTypedClips}
+            />
           ) : (
             <>
               {pages.map((page, i) => (
@@ -354,6 +489,8 @@ export default function StudyPage({ videoId }: { videoId: string }) {
                     onAddStroke={(stroke) => addStroke(i, stroke)}
                     onEraseStrokes={(indexes) => eraseStrokes(i, indexes)}
                     onStampTap={(id, t) => tapStamp(i, id, t)}
+                    imageUrl={imageUrl}
+                    onDeleteImage={(id) => deleteImage(i, id)}
                   />
                 </div>
               ))}
@@ -367,8 +504,52 @@ export default function StudyPage({ videoId }: { videoId: string }) {
           )}
         </div>
       </div>
+
+      <input
+        ref={pictureInput}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          e.target.value = "";
+          if (file) addClip(file, player.current?.getCurrentTime?.() ?? 0);
+        }}
+      />
+      {(notice || clipBusy) && (
+        <div className="fixed bottom-4 left-1/2 z-40 -translate-x-1/2 rounded-lg bg-slate-900 px-4 py-2 text-sm text-white shadow-lg">
+          {clipBusy ? "Saving picture…" : notice}
+        </div>
+      )}
     </div>
   );
+}
+
+// Typed notes store clips as "[12:34] ![clip](path)".
+const CLIP_PATTERN = /(?:\[([\d:]+)\]\s*)?!\[clip\]\(([^)\s]+)\)/g;
+
+// A clip in typed notes. t is null when its time was removed.
+type TypedClip = { path: string; t: number | null };
+
+// Typed clips are saved after the notes, below this line, so they never show in the text box.
+const CLIPS_MARKER = "\n\n--- clips ---\n";
+
+function splitTypedClips(saved: string) {
+  const clips: TypedClip[] = Array.from(saved.matchAll(CLIP_PATTERN), (m) => ({
+    path: m[2],
+    t: m[1] ? toSeconds(m[1]) : null,
+  }));
+  // Older notes had clips mixed into the text; take them out of it.
+  const text = saved.includes(CLIPS_MARKER)
+    ? saved.split(CLIPS_MARKER)[0]
+    : saved.replace(new RegExp(`${CLIP_PATTERN.source}\\n?`, "g"), "");
+  return { text, clips };
+}
+
+function joinTypedClips(text: string, clips: TypedClip[]) {
+  if (!clips.length) return text;
+  const lines = clips.map((c) => `${c.t === null ? "" : `[${formatTime(c.t)}] `}![clip](${c.path})`);
+  return text + CLIPS_MARKER + lines.join("\n");
 }
 
 function TypedNotes(props: {
@@ -377,10 +558,34 @@ function TypedNotes(props: {
   onJump: (seconds: number) => void;
   onStamp: () => void;
   boxRef: React.RefObject<HTMLTextAreaElement | null>;
+  imageUrl: (path: string) => string;
+  clips: TypedClip[];
+  onClipsChange: (clips: TypedClip[]) => void;
 }) {
   const times = timesIn(props.text);
+  const clips = props.clips;
+  const remove = (index: number) => props.onClipsChange(clips.filter((_, i) => i !== index));
   return (
     <div className="flex flex-col gap-2">
+      {clips.length > 0 && (
+        <div className="flex gap-2 overflow-x-auto pb-1">
+          {clips.map((c, i) => (
+            <div
+              key={`${c.path}-${i}`}
+              className="relative w-48 shrink-0 overflow-hidden rounded-md bg-white ring-1 ring-slate-200"
+            >
+              <a href={props.imageUrl(c.path)} target="_blank" rel="noreferrer" title="Open full size">
+                <img src={props.imageUrl(c.path)} alt="Picture from the video" className="block w-full" />
+              </a>
+              <DeleteClipButton
+                onClick={() => {
+                  if (window.confirm("Delete this picture?")) remove(i);
+                }}
+              />
+            </div>
+          ))}
+        </div>
+      )}
       {times.length > 0 && (
         <div className="flex flex-wrap items-center gap-1.5 text-xs text-slate-500">
           Jump to:
@@ -408,7 +613,7 @@ function TypedNotes(props: {
           }
         }}
         placeholder={
-          "Type your notes here…\n\nTip: press ⏱ Stamp time (or Ctrl+Shift+S) to add the video's current time, like [12:34]. Click a time above to jump back to it."
+          "Type your notes here…\n\nTip: press ⏱ Stamp time (or Ctrl+Shift+S) to add the video's current time, like [12:34]. Click a time above to jump back to it. To add a picture, take a screenshot of the video and paste it here (Ctrl+V or Cmd+V)."
         }
         className="min-h-[65vh] w-full resize-y rounded-lg bg-white p-4 text-base leading-relaxed shadow-sm ring-1 ring-slate-200 outline-none focus:ring-2 focus:ring-slate-400"
       />
@@ -429,6 +634,8 @@ function Toolbar(props: {
   canUndo: boolean;
   onUndo: () => void;
   onStamp: () => void;
+  onPaste: () => void;
+  clipBusy: boolean;
   fingerDraws: boolean;
   setFingerDraws: (v: boolean) => void;
 }) {
@@ -511,6 +718,14 @@ function Toolbar(props: {
         title="Pin the video's current time onto your notes"
       >
         ⏱ Stamp time
+      </button>
+      <button
+        onClick={props.onPaste}
+        disabled={props.clipBusy}
+        className="rounded-lg px-3 py-1.5 text-sm font-semibold ring-1 ring-slate-300 hover:bg-slate-100 disabled:opacity-50"
+        title="Take a screenshot of the video first, then press this (or Ctrl+V / Cmd+V) to put it in your notes"
+      >
+        🖼 Paste picture
       </button>
       {props.mode === "write" && (
         <label className="ml-auto flex items-center gap-1.5 text-xs text-slate-600">
