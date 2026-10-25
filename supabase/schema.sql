@@ -30,6 +30,9 @@ create table if not exists public.videos (
   created_at timestamptz not null default now()
 );
 
+-- A short personal note on each video (added later; see video-note.sql).
+alter table public.videos add column if not exists note text not null default '' check (char_length(note) <= 280);
+
 create index if not exists folders_user_idx on public.folders (user_id);
 create index if not exists folders_parent_idx on public.folders (parent_id);
 create index if not exists videos_user_idx on public.videos (user_id);
