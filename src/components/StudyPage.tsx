@@ -604,7 +604,7 @@ function TypedNotes(props: {
   return (
     <div className="flex flex-col gap-2">
       {clips.length > 0 && (
-        <div className="flex gap-2 overflow-x-auto pb-1">
+        <div className="flex flex-wrap gap-2">
           {clips.map((c, i) => (
             <div
               key={`${c.path}-${i}`}
