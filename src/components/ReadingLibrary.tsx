@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import ContextMenu, { type MenuState } from "@/components/ContextMenu";
 import { linkKey } from "@/lib/links";
 import { createClient } from "@/lib/supabase/client";
 import type { Article, ArticleCategory, SectionKind } from "@/lib/types";
@@ -66,6 +67,9 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
   const [readFilter, setReadFilter] = useState<ReadFilter>("all");
   const [showCategories, setShowCategories] = useState(false);
   const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [draggingCategoryId, setDraggingCategoryId] = useState<string | null>(null);
+  const [menu, setMenu] = useState<MenuState | null>(null);
+  const closeMenu = useCallback(() => setMenu(null), []);
   const [toast, setToast] = useState<{ text: string; isError?: boolean } | null>(null);
 
   const notify = useCallback((text: string, isError = false) => {
@@ -311,12 +315,16 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
     openView({ kind: "category", id: (data as ArticleCategory).id });
   }
 
-  // Moves a category up (-1) or down (+1) among the ones next to it, renumbering them so the order sticks.
-  async function shiftCategory(category: ArticleCategory, step: -1 | 1) {
-    const siblings = [...categorySiblings(category)];
-    const index = siblings.findIndex((c) => c.id === category.id);
-    if (index === -1 || !siblings[index + step]) return;
-    [siblings[index], siblings[index + step]] = [siblings[index + step], siblings[index]];
+  // Drop one category onto another next to it: it takes that one's place, and the rest are renumbered so the order sticks.
+  async function moveCategoryTo(draggedId: string, targetId: string) {
+    const dragged = categories.find((c) => c.id === draggedId);
+    const target = categories.find((c) => c.id === targetId);
+    if (!dragged || !target || dragged.id === target.id || dragged.parent_id !== target.parent_id) return;
+    const all = categorySiblings(dragged);
+    const siblings = all.filter((c) => c.id !== dragged.id);
+    const index = siblings.findIndex((c) => c.id === target.id);
+    // Dragging down puts it after the target; dragging up puts it before.
+    siblings.splice(all.indexOf(dragged) <= index ? index + 1 : index, 0, dragged);
     const changed = siblings.map((c, position) => ({ id: c.id, position })).filter((c, i) => siblings[i].position !== c.position);
     setCategories((prev) => prev.map((c) => ({ ...c, position: changed.find((x) => x.id === c.id)?.position ?? c.position })));
     const results = await Promise.all(
@@ -328,6 +336,30 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
       load();
     }
   }
+
+  function openCategoryMenu(category: ArticleCategory, e: React.MouseEvent) {
+    e.preventDefault();
+    setMenu({
+      x: e.clientX,
+      y: e.clientY,
+      items: [
+        { label: "✏️ Rename", onClick: () => renameCategory(category) },
+        ...(category.parent_id ? [] : [{ label: "🏷️ New subcategory", onClick: () => createCategory(category.id) }]),
+        { label: "🗑 Delete", onClick: () => deleteCategory(category), danger: true },
+      ],
+    });
+  }
+
+  // What happens when something is dropped on a category: an article moves into it,
+  // a category next to it takes its place.
+  const dropOnCategory = (category: ArticleCategory) => {
+    if (draggingId) return () => moveArticle(draggingId, category.id);
+    const dragged = categories.find((c) => c.id === draggingCategoryId);
+    if (dragged && dragged.id !== category.id && dragged.parent_id === category.parent_id) {
+      return () => moveCategoryTo(dragged.id, category.id);
+    }
+    return undefined;
+  };
 
   async function renameCategory(category: ArticleCategory) {
     const name = window.prompt("Rename:", category.name)?.trim();
@@ -431,7 +463,10 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
                 count={countIn(cat.id)}
                 active={!searching && view.kind === "category" && view.id === cat.id}
                 onClick={() => openView({ kind: "category", id: cat.id })}
-                onDropArticle={draggingId ? () => moveArticle(draggingId, cat.id) : undefined}
+                onDropArticle={dropOnCategory(cat)}
+                onDragStart={() => setDraggingCategoryId(cat.id)}
+                onDragEnd={() => setDraggingCategoryId(null)}
+                onContextMenu={(e) => openCategoryMenu(cat, e)}
               />
               {subcategories(cat.id).map((sub) => (
                 <NavItem
@@ -441,11 +476,17 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
                   indent={1}
                   active={!searching && view.kind === "category" && view.id === sub.id}
                   onClick={() => openView({ kind: "category", id: sub.id })}
-                  onDropArticle={draggingId ? () => moveArticle(draggingId, sub.id) : undefined}
+                  onDropArticle={dropOnCategory(sub)}
+                  onDragStart={() => setDraggingCategoryId(sub.id)}
+                  onDragEnd={() => setDraggingCategoryId(null)}
+                  onContextMenu={(e) => openCategoryMenu(sub, e)}
                 />
               ))}
             </div>
           ))}
+          {topCategories.length > 1 && (
+            <p className="mt-3 px-2 text-xs text-slate-400">Drag categories to reorder. Right-click one to rename.</p>
+          )}
 
           <button onClick={signOut} className="mt-6 px-2 text-sm text-slate-500 underline sm:hidden">
             Sign out
@@ -464,20 +505,6 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
                     {!currentCategory.parent_id && (
                       <SmallButton onClick={() => createCategory(currentCategory.id)}>+ Subcategory</SmallButton>
                     )}
-                    <SmallButton
-                      onClick={() => shiftCategory(currentCategory, -1)}
-                      disabled={categorySiblings(currentCategory)[0]?.id === currentCategory.id}
-                      title="Move up"
-                    >
-                      ▲
-                    </SmallButton>
-                    <SmallButton
-                      onClick={() => shiftCategory(currentCategory, 1)}
-                      disabled={categorySiblings(currentCategory).at(-1)?.id === currentCategory.id}
-                      title="Move down"
-                    >
-                      ▼
-                    </SmallButton>
                     <SmallButton onClick={() => renameCategory(currentCategory)}>Rename</SmallButton>
                     <SmallButton onClick={() => deleteCategory(currentCategory)} danger>
                       Delete
@@ -563,6 +590,8 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
           )}
         </main>
       </div>
+
+      {menu && <ContextMenu menu={menu} onClose={closeMenu} />}
 
       {toast && (
         <div
@@ -858,11 +887,23 @@ function NavItem(props: {
   onClick: () => void;
   indent?: number;
   onDropArticle?: () => void;
+  onDragStart?: () => void;
+  onDragEnd?: () => void;
+  onContextMenu?: (e: React.MouseEvent) => void;
 }) {
   const [over, setOver] = useState(false);
   return (
     <button
       onClick={props.onClick}
+      draggable={Boolean(props.onDragStart)}
+      onDragStart={(e) => {
+        if (!props.onDragStart) return;
+        e.dataTransfer.effectAllowed = "move";
+        e.dataTransfer.setData("text/plain", props.label);
+        props.onDragStart();
+      }}
+      onDragEnd={props.onDragEnd}
+      onContextMenu={props.onContextMenu}
       onDragOver={(e) => {
         if (!props.onDropArticle) return;
         e.preventDefault();

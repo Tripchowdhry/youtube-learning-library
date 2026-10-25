@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArticleNote, SectionSwitch, formatDate } from "@/components/ReadingLibrary";
+import ContextMenu, { type MenuState } from "@/components/ContextMenu";
 import VideoThumb from "@/components/VideoThumb";
 import { createClient } from "@/lib/supabase/client";
 import type { Folder, Video } from "@/lib/types";
@@ -24,6 +25,9 @@ export default function Library({ userEmail }: { userEmail: string }) {
   const [query, setQuery] = useState("");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [draggingFolderId, setDraggingFolderId] = useState<string | null>(null);
+  const [menu, setMenu] = useState<MenuState | null>(null);
+  const closeMenu = useCallback(() => setMenu(null), []);
   const [showFolders, setShowFolders] = useState(false);
   const [toast, setToast] = useState<{ text: string; isError?: boolean } | null>(null);
 
@@ -255,12 +259,16 @@ export default function Library({ userEmail }: { userEmail: string }) {
     setView({ kind: "folder", id: (data as Folder).id });
   }
 
-  // Moves a folder up (-1) or down (+1) among the folders next to it, renumbering them so the order sticks.
-  async function shiftFolder(folder: Folder, step: -1 | 1) {
-    const siblings = childFolders(folder.parent_id);
-    const index = siblings.findIndex((f) => f.id === folder.id);
-    if (index === -1 || !siblings[index + step]) return;
-    [siblings[index], siblings[index + step]] = [siblings[index + step], siblings[index]];
+  // Drop one folder onto another next to it: it takes that folder's place, and the rest are renumbered so the order sticks.
+  async function moveFolderTo(draggedId: string, targetId: string) {
+    const dragged = folders.find((f) => f.id === draggedId);
+    const target = folders.find((f) => f.id === targetId);
+    if (!dragged || !target || dragged.id === target.id || dragged.parent_id !== target.parent_id) return;
+    const siblings = childFolders(dragged.parent_id).filter((f) => f.id !== dragged.id);
+    const index = siblings.findIndex((f) => f.id === target.id);
+    const draggedIndex = childFolders(dragged.parent_id).findIndex((f) => f.id === dragged.id);
+    // Dragging down puts it after the target; dragging up puts it before.
+    siblings.splice(draggedIndex <= index ? index + 1 : index, 0, dragged);
     const changed = siblings.map((f, position) => ({ id: f.id, position })).filter((f, i) => siblings[i].position !== f.position);
     setFolders((prev) => prev.map((f) => ({ ...f, position: changed.find((c) => c.id === f.id)?.position ?? f.position })));
     const results = await Promise.all(
@@ -271,6 +279,19 @@ export default function Library({ userEmail }: { userEmail: string }) {
       notify(failed.error!.message, true);
       load();
     }
+  }
+
+  function openFolderMenu(folder: Folder, e: React.MouseEvent) {
+    e.preventDefault();
+    setMenu({
+      x: e.clientX,
+      y: e.clientY,
+      items: [
+        { label: "✏️ Rename", onClick: () => renameFolder(folder) },
+        { label: "📁 New subfolder", onClick: () => createFolder(folder.id) },
+        { label: "🗑 Delete", onClick: () => deleteFolder(folder), danger: true },
+      ],
+    });
   }
 
   async function renameFolder(folder: Folder) {
@@ -386,7 +407,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
             active={view.kind === "unsorted" && !searching}
             onClick={() => openView({ kind: "unsorted" })}
             dropTarget={draggingId !== null}
-            onDropVideo={() => draggingId && moveVideo(draggingId, null)}
+            onDrop={() => draggingId && moveVideo(draggingId, null)}
           />
 
           <div className="mt-4 mb-1 flex items-center justify-between px-2 text-xs font-semibold tracking-wide text-slate-500 uppercase">
@@ -409,7 +430,15 @@ export default function Library({ userEmail }: { userEmail: string }) {
             onOpen={(id) => openView({ kind: "folder", id })}
             draggingId={draggingId}
             onDropVideo={(folderId) => draggingId && moveVideo(draggingId, folderId)}
+            draggingFolder={folders.find((f) => f.id === draggingFolderId) ?? null}
+            onFolderDragStart={setDraggingFolderId}
+            onFolderDragEnd={() => setDraggingFolderId(null)}
+            onDropFolder={(targetId) => draggingFolderId && moveFolderTo(draggingFolderId, targetId)}
+            onFolderMenu={openFolderMenu}
           />
+          {childFolders(null).length > 1 && (
+            <p className="mt-3 px-2 text-xs text-slate-400">Drag folders to reorder. Right-click one to rename.</p>
+          )}
 
           <button onClick={signOut} className="mt-6 px-2 text-sm text-slate-500 underline sm:hidden">
             Sign out
@@ -422,20 +451,6 @@ export default function Library({ userEmail }: { userEmail: string }) {
             {currentFolder && !searching && (
               <>
                 <SmallButton onClick={() => createFolder(currentFolder.id)}>+ Subfolder</SmallButton>
-                <SmallButton
-                  onClick={() => shiftFolder(currentFolder, -1)}
-                  disabled={childFolders(currentFolder.parent_id)[0]?.id === currentFolder.id}
-                  title="Move folder up"
-                >
-                  ▲
-                </SmallButton>
-                <SmallButton
-                  onClick={() => shiftFolder(currentFolder, 1)}
-                  disabled={childFolders(currentFolder.parent_id).at(-1)?.id === currentFolder.id}
-                  title="Move folder down"
-                >
-                  ▼
-                </SmallButton>
                 <SmallButton onClick={() => renameFolder(currentFolder)}>Rename</SmallButton>
                 <SmallButton onClick={() => toggleShare(currentFolder)}>
                   {currentFolder.share_token ? "Stop sharing" : "Share"}
@@ -516,6 +531,8 @@ export default function Library({ userEmail }: { userEmail: string }) {
         </main>
       </div>
 
+      {menu && <ContextMenu menu={menu} onClose={closeMenu} />}
+
       {toast && (
         <div
           className={`fixed bottom-4 left-1/2 z-30 -translate-x-1/2 rounded-lg px-4 py-2 text-sm text-white shadow-lg ${toast.isError ? "bg-red-600" : "bg-slate-900"}`}
@@ -535,13 +552,25 @@ function NavItem(props: {
   active: boolean;
   onClick: () => void;
   dropTarget?: boolean;
-  onDropVideo?: () => void;
+  onDrop?: () => void;
   indent?: number;
   leading?: React.ReactNode;
+  onDragStart?: () => void;
+  onDragEnd?: () => void;
+  onContextMenu?: (e: React.MouseEvent) => void;
 }) {
   const [over, setOver] = useState(false);
   return (
     <div
+      draggable={Boolean(props.onDragStart)}
+      onDragStart={(e) => {
+        if (!props.onDragStart) return;
+        e.dataTransfer.effectAllowed = "move";
+        e.dataTransfer.setData("text/plain", props.label);
+        props.onDragStart();
+      }}
+      onDragEnd={props.onDragEnd}
+      onContextMenu={props.onContextMenu}
       className={`flex items-center rounded-md text-sm ${props.active ? "bg-slate-900 text-white" : "hover:bg-slate-100"} ${over ? "ring-2 ring-blue-500" : ""}`}
       style={{ paddingLeft: (props.indent ?? 0) * 14 }}
       onDragOver={(e) => {
@@ -553,7 +582,7 @@ function NavItem(props: {
       onDrop={(e) => {
         e.preventDefault();
         setOver(false);
-        props.onDropVideo?.();
+        props.onDrop?.();
       }}
     >
       {props.leading}
@@ -578,7 +607,13 @@ function FolderTree(props: {
   onOpen: (id: string) => void;
   draggingId: string | null;
   onDropVideo: (folderId: string) => void;
+  draggingFolder: Folder | null;
+  onFolderDragStart: (id: string) => void;
+  onFolderDragEnd: () => void;
+  onDropFolder: (targetId: string) => void;
+  onFolderMenu: (folder: Folder, e: React.MouseEvent) => void;
 }) {
+  const { draggingFolder } = props;
   return (
     <>
       {props.childFolders(props.parentId).map((folder) => {
@@ -599,8 +634,15 @@ function FolderTree(props: {
               active={props.activeId === folder.id}
               onClick={() => props.onOpen(folder.id)}
               indent={props.depth}
-              dropTarget={props.draggingId !== null}
-              onDropVideo={() => props.onDropVideo(folder.id)}
+              // A dragged video drops into the folder; a dragged folder reorders among folders next to it.
+              dropTarget={
+                props.draggingId !== null ||
+                (draggingFolder !== null && draggingFolder.id !== folder.id && draggingFolder.parent_id === folder.parent_id)
+              }
+              onDrop={() => (draggingFolder ? props.onDropFolder(folder.id) : props.onDropVideo(folder.id))}
+              onDragStart={() => props.onFolderDragStart(folder.id)}
+              onDragEnd={props.onFolderDragEnd}
+              onContextMenu={(e) => props.onFolderMenu(folder, e)}
               leading={
                 <button
                   onClick={toggle}
