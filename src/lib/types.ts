@@ -66,6 +66,9 @@ export type NoteImage = {
 // The Reading and Tutorials sections share the same tables, told apart by kind.
 export type SectionKind = "reading" | "tutorial";
 
+// Categories also belong to the ScrapBook, which keeps your own pages instead of links.
+export type CategoryKind = SectionKind | "scrap";
+
 // Reading section: categories are two levels deep (parent_id is null or a top-level category).
 export type ArticleCategory = {
   id: string;
@@ -73,7 +76,7 @@ export type ArticleCategory = {
   parent_id: string | null;
   name: string;
   position: number;
-  kind: SectionKind;
+  kind: CategoryKind;
   created_at: string;
 };
 
@@ -99,3 +102,16 @@ export type ArticleContent =
   | { kind: "x"; postId: string }
   | { kind: "text"; blocks: ArticleBlock[] }
   | { kind: "none" };
+
+// A ScrapBook page: typed text (simple HTML) and/or handwriting pages.
+export type Scrap = {
+  id: string;
+  user_id: string;
+  category_id: string | null;
+  title: string;
+  body: string;
+  pages: NotePage[];
+  position: number;
+  created_at: string;
+  updated_at: string;
+};

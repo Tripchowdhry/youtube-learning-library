@@ -9,10 +9,10 @@ import { createClient } from "@/lib/supabase/client";
 import type { Article, ArticleCategory, SectionKind } from "@/lib/types";
 
 type View = { kind: "all" } | { kind: "uncategorized" } | { kind: "category"; id: string };
-type Period = "any" | "week" | "month" | "year";
+export type Period = "any" | "week" | "month" | "year";
 type ReadFilter = "all" | "unread" | "read";
 
-const PERIODS: { value: Period; label: string; days: number }[] = [
+export const PERIODS: { value: Period; label: string; days: number }[] = [
   { value: "any", label: "Any time", days: 0 },
   { value: "week", label: "Past week", days: 7 },
   { value: "month", label: "Past month", days: 31 },
@@ -22,7 +22,7 @@ const PERIODS: { value: Period; label: string; days: number }[] = [
 // Longest personal note on an article: about the length of an X post.
 export const NOTE_MAX = 280;
 
-const byPosition = (a: ArticleCategory, b: ArticleCategory) => a.position - b.position || a.name.localeCompare(b.name);
+export const byPosition = (a: ArticleCategory, b: ArticleCategory) => a.position - b.position || a.name.localeCompare(b.name);
 
 export const formatDate = (iso: string) =>
   new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
@@ -606,8 +606,8 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
 
 // ---------- Pieces ----------
 
-// The Videos | Reading | Tutorials switch in the header of every section.
-export function SectionSwitch({ active }: { active: "videos" | SectionKind }) {
+// The Videos | Reading | Tutorials | ScrapBook switch in the header of every section.
+export function SectionSwitch({ active }: { active: "videos" | SectionKind | "scrap" }) {
   const tab = (on: boolean) =>
     `rounded-md px-2.5 py-1 text-sm font-medium ${on ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:text-slate-900"}`;
   return (
@@ -621,6 +621,9 @@ export function SectionSwitch({ active }: { active: "videos" | SectionKind }) {
           <span className="hidden sm:inline"> {SECTIONS[k].name}</span>
         </Link>
       ))}
+      <Link href="/scrapbook" className={tab(active === "scrap")} title="ScrapBook">
+        📒<span className="hidden sm:inline"> ScrapBook</span>
+      </Link>
     </nav>
   );
 }
@@ -858,7 +861,7 @@ function AddArticleForm(props: {
   );
 }
 
-function Pills<T extends string>(props: {
+export function Pills<T extends string>(props: {
   value: T;
   onChange: (value: T) => void;
   options: { value: T; label: string }[];
@@ -880,7 +883,7 @@ function Pills<T extends string>(props: {
   );
 }
 
-function NavItem(props: {
+export function NavItem(props: {
   label: string;
   count?: number;
   active: boolean;
@@ -926,7 +929,7 @@ function NavItem(props: {
   );
 }
 
-function SmallButton({
+export function SmallButton({
   children,
   onClick,
   danger,
@@ -952,13 +955,13 @@ function SmallButton({
   );
 }
 
-function SetupNotice() {
+export function SetupNotice({ file = "articles.sql" }: { file?: string }) {
   return (
     <div className="max-w-xl rounded-xl border border-amber-300 bg-amber-50 p-5 text-slate-800">
       <h2 className="mb-2 text-lg font-semibold">One quick setup step</h2>
       <p>
         This section needs the latest database setup. In Supabase, open <b>SQL Editor</b> → <b>New query</b>, paste the
-        whole <code>supabase/articles.sql</code> file, and click <b>Run</b>. Then reload this page.
+        whole <code>supabase/{file}</code> file, and click <b>Run</b>. Then reload this page.
       </p>
     </div>
   );
