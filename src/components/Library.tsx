@@ -255,6 +255,24 @@ export default function Library({ userEmail }: { userEmail: string }) {
     setView({ kind: "folder", id: (data as Folder).id });
   }
 
+  // Moves a folder up (-1) or down (+1) among the folders next to it, renumbering them so the order sticks.
+  async function shiftFolder(folder: Folder, step: -1 | 1) {
+    const siblings = childFolders(folder.parent_id);
+    const index = siblings.findIndex((f) => f.id === folder.id);
+    if (index === -1 || !siblings[index + step]) return;
+    [siblings[index], siblings[index + step]] = [siblings[index + step], siblings[index]];
+    const changed = siblings.map((f, position) => ({ id: f.id, position })).filter((f, i) => siblings[i].position !== f.position);
+    setFolders((prev) => prev.map((f) => ({ ...f, position: changed.find((c) => c.id === f.id)?.position ?? f.position })));
+    const results = await Promise.all(
+      changed.map((c) => supabase.from("folders").update({ position: c.position }).eq("id", c.id)),
+    );
+    const failed = results.find((r) => r.error);
+    if (failed) {
+      notify(failed.error!.message, true);
+      load();
+    }
+  }
+
   async function renameFolder(folder: Folder) {
     const name = window.prompt("Rename folder:", folder.name);
     if (!name?.trim() || name.trim() === folder.name) return;
@@ -404,6 +422,20 @@ export default function Library({ userEmail }: { userEmail: string }) {
             {currentFolder && !searching && (
               <>
                 <SmallButton onClick={() => createFolder(currentFolder.id)}>+ Subfolder</SmallButton>
+                <SmallButton
+                  onClick={() => shiftFolder(currentFolder, -1)}
+                  disabled={childFolders(currentFolder.parent_id)[0]?.id === currentFolder.id}
+                  title="Move folder up"
+                >
+                  ▲
+                </SmallButton>
+                <SmallButton
+                  onClick={() => shiftFolder(currentFolder, 1)}
+                  disabled={childFolders(currentFolder.parent_id).at(-1)?.id === currentFolder.id}
+                  title="Move folder down"
+                >
+                  ▼
+                </SmallButton>
                 <SmallButton onClick={() => renameFolder(currentFolder)}>Rename</SmallButton>
                 <SmallButton onClick={() => toggleShare(currentFolder)}>
                   {currentFolder.share_token ? "Stop sharing" : "Share"}
