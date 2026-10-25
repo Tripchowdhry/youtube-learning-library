@@ -6,13 +6,9 @@ import VideoThumb from "@/components/VideoThumb";
 import { createClient } from "@/lib/supabase/client";
 import type { Folder, Video } from "@/lib/types";
 
-type View =
-  | { kind: "all" }
-  | { kind: "unsorted" }
-  | { kind: "folder"; id: string };
+type View = { kind: "all" } | { kind: "unsorted" } | { kind: "folder"; id: string };
 
-const byPosition = <T extends { position: number }>(a: T, b: T) =>
-  a.position - b.position;
+const byPosition = <T extends { position: number }>(a: T, b: T) => a.position - b.position;
 
 export default function Library({ userEmail }: { userEmail: string }) {
   const supabase = useMemo(() => createClient(), []);
@@ -27,10 +23,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [showFolders, setShowFolders] = useState(false);
-  const [toast, setToast] = useState<{
-    text: string;
-    isError?: boolean;
-  } | null>(null);
+  const [toast, setToast] = useState<{ text: string; isError?: boolean } | null>(null);
 
   const notify = useCallback((text: string, isError = false) => {
     setToast({ text, isError });
@@ -44,8 +37,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
       supabase.from("notes").select("video_id"),
     ]);
     // Notes are optional: ignore errors so the library still loads before the notes table exists.
-    if (!n.error)
-      setNotedVideoIds(new Set(n.data.map((row) => row.video_id as string)));
+    if (!n.error) setNotedVideoIds(new Set(n.data.map((row) => row.video_id as string)));
     if (f.error || v.error) {
       notify((f.error ?? v.error)!.message, true);
     } else {
@@ -63,9 +55,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
 
   const childFolders = useCallback(
     (parentId: string | null) =>
-      folders
-        .filter((f) => f.parent_id === parentId)
-        .sort((a, b) => byPosition(a, b) || a.name.localeCompare(b.name)),
+      folders.filter((f) => f.parent_id === parentId).sort((a, b) => byPosition(a, b) || a.name.localeCompare(b.name)),
     [folders],
   );
 
@@ -95,10 +85,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
     return out;
   }, [childFolders]);
 
-  const currentFolder =
-    view.kind === "folder"
-      ? (folders.find((f) => f.id === view.id) ?? null)
-      : null;
+  const currentFolder = view.kind === "folder" ? folders.find((f) => f.id === view.id) ?? null : null;
   const currentFolderId = view.kind === "folder" ? view.id : null;
 
   // ---------- Which videos to show ----------
@@ -110,24 +97,17 @@ export default function Library({ userEmail }: { userEmail: string }) {
     const q = query.trim().toLowerCase();
     if (q) {
       return videos.filter((v) =>
-        [v.title, v.channel, folderPath(v.folder_id), ...v.tags].some((s) =>
-          s?.toLowerCase().includes(q),
-        ),
+        [v.title, v.channel, folderPath(v.folder_id), ...v.tags].some((s) => s?.toLowerCase().includes(q)),
       );
     }
-    if (view.kind === "all")
-      return [...videos].sort((a, b) =>
-        b.created_at.localeCompare(a.created_at),
-      );
+    if (view.kind === "all") return [...videos].sort((a, b) => b.created_at.localeCompare(a.created_at));
     const folderId = view.kind === "folder" ? view.id : null;
     return videos.filter((v) => v.folder_id === folderId).sort(byPosition);
   }, [videos, view, query, folderPath]);
 
   const nextPosition = (folderId: string | null) => {
     const siblings = videos.filter((v) => v.folder_id === folderId);
-    return siblings.length
-      ? Math.max(...siblings.map((v) => v.position)) + 1
-      : 0;
+    return siblings.length ? Math.max(...siblings.map((v) => v.position)) + 1 : 0;
   };
 
   // ---------- Video actions ----------
@@ -142,10 +122,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
 
     const existing = videos.find((v) => v.youtube_id === info.youtube_id);
     if (existing) {
-      notify(
-        `Already saved in ${existing.folder_id ? folderPath(existing.folder_id) : "Unsorted"}.`,
-        true,
-      );
+      notify(`Already saved in ${existing.folder_id ? folderPath(existing.folder_id) : "Unsorted"}.`, true);
       return false;
     }
 
@@ -161,11 +138,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
 
     const { data, error } = await supabase
       .from("videos")
-      .insert({
-        ...info,
-        folder_id: folderId,
-        position: nextPosition(folderId),
-      })
+      .insert({ ...info, folder_id: folderId, position: nextPosition(folderId) })
       .select()
       .single();
     if (error) {
@@ -174,27 +147,18 @@ export default function Library({ userEmail }: { userEmail: string }) {
     }
     if (newFolder) setFolders((prev) => [...prev, newFolder!]);
     setVideos((prev) => [...prev, data as Video]);
-    notify(
-      folderId && !currentFolderId
-        ? `Saved to ${info.channel}`
-        : `Saved "${info.title}"`,
-    );
+    notify(folderId && !currentFolderId ? `Saved to ${info.channel}` : `Saved "${info.title}"`);
     return true;
   }
 
   // Finds the top-level folder named after a channel, creating it the first time.
   async function channelFolder(channel: string): Promise<Folder | null> {
     const name = channel.trim().slice(0, 100);
-    const existing = folders.find(
-      (f) =>
-        f.parent_id === null && f.name.toLowerCase() === name.toLowerCase(),
-    );
+    const existing = folders.find((f) => f.parent_id === null && f.name.toLowerCase() === name.toLowerCase());
     if (existing) return existing;
 
     const topLevel = folders.filter((f) => f.parent_id === null);
-    const position = topLevel.length
-      ? Math.max(...topLevel.map((f) => f.position)) + 1
-      : 0;
+    const position = topLevel.length ? Math.max(...topLevel.map((f) => f.position)) + 1 : 0;
     const { data, error } = await supabase
       .from("folders")
       .insert({ name, parent_id: null, position })
@@ -208,13 +172,8 @@ export default function Library({ userEmail }: { userEmail: string }) {
   }
 
   async function updateVideo(id: string, changes: Partial<Video>) {
-    setVideos((prev) =>
-      prev.map((v) => (v.id === id ? { ...v, ...changes } : v)),
-    );
-    const { error } = await supabase
-      .from("videos")
-      .update(changes)
-      .eq("id", id);
+    setVideos((prev) => prev.map((v) => (v.id === id ? { ...v, ...changes } : v)));
+    const { error } = await supabase.from("videos").update(changes).eq("id", id);
     if (error) {
       notify(error.message, true);
       load();
@@ -236,9 +195,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
     if (index === -1) return;
     const target = list[index];
     const before = list[index - 1];
-    const position = before
-      ? (before.position + target.position) / 2
-      : target.position - 1;
+    const position = before ? (before.position + target.position) / 2 : target.position - 1;
     updateVideo(draggedId, { position, folder_id: target.folder_id });
   }
 
@@ -258,19 +215,9 @@ export default function Library({ userEmail }: { userEmail: string }) {
   }
 
   function editTags(video: Video) {
-    const answer = window.prompt(
-      "Tags, separated by commas:",
-      video.tags.join(", "),
-    );
+    const answer = window.prompt("Tags, separated by commas:", video.tags.join(", "));
     if (answer === null) return;
-    const tags = Array.from(
-      new Set(
-        answer
-          .split(",")
-          .map((t) => t.trim())
-          .filter(Boolean),
-      ),
-    );
+    const tags = Array.from(new Set(answer.split(",").map((t) => t.trim()).filter(Boolean)));
     updateVideo(video.id, { tags });
   }
 
@@ -287,16 +234,10 @@ export default function Library({ userEmail }: { userEmail: string }) {
   // ---------- Folder actions ----------
 
   async function createFolder(parentId: string | null) {
-    const name = window.prompt(
-      parentId
-        ? `New folder inside "${folderPath(parentId)}":`
-        : "New folder name:",
-    );
+    const name = window.prompt(parentId ? `New folder inside "${folderPath(parentId)}":` : "New folder name:");
     if (!name?.trim()) return;
     const siblings = folders.filter((f) => f.parent_id === parentId);
-    const position = siblings.length
-      ? Math.max(...siblings.map((f) => f.position)) + 1
-      : 0;
+    const position = siblings.length ? Math.max(...siblings.map((f) => f.position)) + 1 : 0;
     const { data, error } = await supabase
       .from("folders")
       .insert({ name: name.trim(), parent_id: parentId, position })
@@ -311,13 +252,8 @@ export default function Library({ userEmail }: { userEmail: string }) {
   async function renameFolder(folder: Folder) {
     const name = window.prompt("Rename folder:", folder.name);
     if (!name?.trim() || name.trim() === folder.name) return;
-    setFolders((prev) =>
-      prev.map((f) => (f.id === folder.id ? { ...f, name: name.trim() } : f)),
-    );
-    const { error } = await supabase
-      .from("folders")
-      .update({ name: name.trim() })
-      .eq("id", folder.id);
+    setFolders((prev) => prev.map((f) => (f.id === folder.id ? { ...f, name: name.trim() } : f)));
+    const { error } = await supabase.from("folders").update({ name: name.trim() }).eq("id", folder.id);
     if (error) {
       notify(error.message, true);
       load();
@@ -329,10 +265,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
       `Delete "${folder.name}" and any folders inside it?\nThe videos inside will move to Unsorted, not be deleted.`,
     );
     if (!ok) return;
-    const { error } = await supabase
-      .from("folders")
-      .delete()
-      .eq("id", folder.id);
+    const { error } = await supabase.from("folders").delete().eq("id", folder.id);
     if (error) return notify(error.message, true);
     setView({ kind: "all" });
     load();
@@ -340,32 +273,17 @@ export default function Library({ userEmail }: { userEmail: string }) {
 
   async function toggleShare(folder: Folder) {
     if (folder.share_token) {
-      if (
-        !window.confirm(
-          "Turn off the share link? People with the old link won't be able to see it anymore.",
-        )
-      )
-        return;
-      const { error } = await supabase
-        .from("folders")
-        .update({ share_token: null })
-        .eq("id", folder.id);
+      if (!window.confirm("Turn off the share link? People with the old link won't be able to see it anymore.")) return;
+      const { error } = await supabase.from("folders").update({ share_token: null }).eq("id", folder.id);
       if (error) return notify(error.message, true);
-      setFolders((prev) =>
-        prev.map((f) => (f.id === folder.id ? { ...f, share_token: null } : f)),
-      );
+      setFolders((prev) => prev.map((f) => (f.id === folder.id ? { ...f, share_token: null } : f)));
       notify("Sharing turned off");
       return;
     }
     const token = crypto.randomUUID();
-    const { error } = await supabase
-      .from("folders")
-      .update({ share_token: token })
-      .eq("id", folder.id);
+    const { error } = await supabase.from("folders").update({ share_token: token }).eq("id", folder.id);
     if (error) return notify(error.message, true);
-    setFolders((prev) =>
-      prev.map((f) => (f.id === folder.id ? { ...f, share_token: token } : f)),
-    );
+    setFolders((prev) => prev.map((f) => (f.id === folder.id ? { ...f, share_token: token } : f)));
     copyShareLink(token);
   }
 
@@ -419,10 +337,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
         />
         <div className="hidden items-center gap-2 text-sm text-slate-500 sm:flex">
           <span className="max-w-40 truncate">{userEmail}</span>
-          <button
-            onClick={signOut}
-            className="rounded-md px-2 py-1 hover:bg-slate-100"
-          >
+          <button onClick={signOut} className="rounded-md px-2 py-1 hover:bg-slate-100">
             Sign out
           </button>
         </div>
@@ -432,12 +347,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
         <aside
           className={`${showFolders ? "fixed inset-x-0 top-[57px] bottom-0 z-10 block" : "hidden"} w-full overflow-y-auto border-r border-slate-200 bg-white p-3 md:sticky md:top-[57px] md:block md:h-[calc(100vh-57px)] md:w-72`}
         >
-          <NavItem
-            label="🗂️ All videos"
-            count={videos.length}
-            active={view.kind === "all" && !searching}
-            onClick={() => openView({ kind: "all" })}
-          />
+          <NavItem label="🗂️ All videos" count={videos.length} active={view.kind === "all" && !searching} onClick={() => openView({ kind: "all" })} />
           <NavItem
             label="📥 Unsorted"
             count={videos.filter((v) => !v.folder_id).length}
@@ -449,19 +359,12 @@ export default function Library({ userEmail }: { userEmail: string }) {
 
           <div className="mt-4 mb-1 flex items-center justify-between px-2 text-xs font-semibold tracking-wide text-slate-500 uppercase">
             Folders
-            <button
-              onClick={() => createFolder(null)}
-              className="rounded px-1.5 text-base text-slate-700 hover:bg-slate-100"
-              title="New folder"
-            >
+            <button onClick={() => createFolder(null)} className="rounded px-1.5 text-base text-slate-700 hover:bg-slate-100" title="New folder">
               +
             </button>
           </div>
           {childFolders(null).length === 0 && (
-            <p className="px-2 text-sm text-slate-500">
-              No folders yet. Click + to make one, like &quot;LLMs&quot; or
-              &quot;Agents&quot;.
-            </p>
+            <p className="px-2 text-sm text-slate-500">No folders yet. Click + to make one, like &quot;LLMs&quot; or &quot;Agents&quot;.</p>
           )}
           <FolderTree
             parentId={null}
@@ -473,15 +376,10 @@ export default function Library({ userEmail }: { userEmail: string }) {
             activeId={!searching && view.kind === "folder" ? view.id : null}
             onOpen={(id) => openView({ kind: "folder", id })}
             draggingId={draggingId}
-            onDropVideo={(folderId) =>
-              draggingId && moveVideo(draggingId, folderId)
-            }
+            onDropVideo={(folderId) => draggingId && moveVideo(draggingId, folderId)}
           />
 
-          <button
-            onClick={signOut}
-            className="mt-6 px-2 text-sm text-slate-500 underline sm:hidden"
-          >
+          <button onClick={signOut} className="mt-6 px-2 text-sm text-slate-500 underline sm:hidden">
             Sign out
           </button>
         </aside>
@@ -491,21 +389,13 @@ export default function Library({ userEmail }: { userEmail: string }) {
             <h1 className="mr-auto text-2xl font-bold">{title}</h1>
             {currentFolder && !searching && (
               <>
-                <SmallButton onClick={() => createFolder(currentFolder.id)}>
-                  + Subfolder
-                </SmallButton>
-                <SmallButton onClick={() => renameFolder(currentFolder)}>
-                  Rename
-                </SmallButton>
+                <SmallButton onClick={() => createFolder(currentFolder.id)}>+ Subfolder</SmallButton>
+                <SmallButton onClick={() => renameFolder(currentFolder)}>Rename</SmallButton>
                 <SmallButton onClick={() => toggleShare(currentFolder)}>
                   {currentFolder.share_token ? "Stop sharing" : "Share"}
                 </SmallButton>
                 {currentFolder.share_token && (
-                  <SmallButton
-                    onClick={() => copyShareLink(currentFolder.share_token!)}
-                  >
-                    Copy link
-                  </SmallButton>
+                  <SmallButton onClick={() => copyShareLink(currentFolder.share_token!)}>Copy link</SmallButton>
                 )}
                 <SmallButton onClick={() => deleteFolder(currentFolder)} danger>
                   Delete
@@ -521,21 +411,19 @@ export default function Library({ userEmail }: { userEmail: string }) {
             />
           )}
 
-          {currentFolder &&
-            !searching &&
-            childFolders(currentFolder.id).length > 0 && (
-              <div className="mb-4 flex flex-wrap gap-2">
-                {childFolders(currentFolder.id).map((f) => (
-                  <button
-                    key={f.id}
-                    onClick={() => openView({ kind: "folder", id: f.id })}
-                    className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm hover:bg-slate-50"
-                  >
-                    📁 {f.name}
-                  </button>
-                ))}
-              </div>
-            )}
+          {currentFolder && !searching && childFolders(currentFolder.id).length > 0 && (
+            <div className="mb-4 flex flex-wrap gap-2">
+              {childFolders(currentFolder.id).map((f) => (
+                <button
+                  key={f.id}
+                  onClick={() => openView({ kind: "folder", id: f.id })}
+                  className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm hover:bg-slate-50"
+                >
+                  📁 {f.name}
+                </button>
+              ))}
+            </div>
+          )}
 
           {loading ? (
             <p className="text-slate-500">Loading your library…</p>
@@ -545,14 +433,13 @@ export default function Library({ userEmail }: { userEmail: string }) {
             <>
               {canReorder && visibleVideos.length > 1 && (
                 <p className="mb-3 text-xs text-slate-500">
-                  Tip: use ◀ ▶ on a video, or drag it onto another, to change
-                  the order. Drop it on a folder to move it.
+                  Tip: use ◀ ▶ on a video, or drag it onto another, to change the order. Drop it on a folder to move it.
                 </p>
               )}
               {!canReorder && visibleVideos.length > 1 && (
                 <p className="mb-3 text-xs text-slate-500">
-                  {searching ? "Search results" : "All videos"} show the newest
-                  first. To change the order, open a folder on the left.
+                  {searching ? "Search results" : "All videos"} show the newest first. To change the order, open a folder
+                  on the left.
                 </p>
               )}
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -560,23 +447,15 @@ export default function Library({ userEmail }: { userEmail: string }) {
                   <VideoCard
                     key={video.id}
                     video={video}
-                    folderLabel={
-                      view.kind === "all" || searching
-                        ? folderPath(video.folder_id) || "Unsorted"
-                        : null
-                    }
+                    folderLabel={view.kind === "all" || searching ? folderPath(video.folder_id) || "Unsorted" : null}
                     folderOptions={folderOptions}
                     hasNotes={notedVideoIds.has(video.id)}
                     canReorder={canReorder}
                     dragging={draggingId === video.id}
                     onDragStart={() => setDraggingId(video.id)}
                     onDragEnd={() => setDraggingId(null)}
-                    onDropOnto={() =>
-                      draggingId && reorderVideo(draggingId, video.id)
-                    }
-                    onShift={
-                      canReorder ? (step) => shiftVideo(video.id, step) : null
-                    }
+                    onDropOnto={() => draggingId && reorderVideo(draggingId, video.id)}
+                    onShift={canReorder ? (step) => shiftVideo(video.id, step) : null}
                     isFirst={index === 0}
                     isLast={index === visibleVideos.length - 1}
                     onMove={(folderId) => moveVideo(video.id, folderId)}
@@ -632,17 +511,10 @@ function NavItem(props: {
       }}
     >
       {props.leading}
-      <button
-        onClick={props.onClick}
-        className="flex min-w-0 flex-1 items-center gap-2 px-2 py-1.5 text-left"
-      >
+      <button onClick={props.onClick} className="flex min-w-0 flex-1 items-center gap-2 px-2 py-1.5 text-left">
         <span className="truncate">{props.label}</span>
         {props.count !== undefined && (
-          <span
-            className={`ml-auto text-xs ${props.active ? "text-slate-300" : "text-slate-400"}`}
-          >
-            {props.count}
-          </span>
+          <span className={`ml-auto text-xs ${props.active ? "text-slate-300" : "text-slate-400"}`}>{props.count}</span>
         )}
       </button>
     </div>
@@ -677,9 +549,7 @@ function FolderTree(props: {
           <div key={folder.id}>
             <NavItem
               label={`${folder.share_token ? "🔗" : "📁"} ${folder.name}`}
-              count={
-                props.videos.filter((v) => v.folder_id === folder.id).length
-              }
+              count={props.videos.filter((v) => v.folder_id === folder.id).length}
               active={props.activeId === folder.id}
               onClick={() => props.onOpen(folder.id)}
               indent={props.depth}
@@ -695,13 +565,7 @@ function FolderTree(props: {
                 </button>
               }
             />
-            {hasChildren && isOpen && (
-              <FolderTree
-                {...props}
-                parentId={folder.id}
-                depth={props.depth + 1}
-              />
-            )}
+            {hasChildren && isOpen && <FolderTree {...props} parentId={folder.id} depth={props.depth + 1} />}
           </div>
         );
       })}
@@ -709,13 +573,7 @@ function FolderTree(props: {
   );
 }
 
-function AddVideoForm({
-  onAdd,
-  destination,
-}: {
-  onAdd: (link: string) => Promise<boolean>;
-  destination: string | null;
-}) {
+function AddVideoForm({ onAdd, destination }: { onAdd: (link: string) => Promise<boolean>; destination: string | null }) {
   const [link, setLink] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -790,37 +648,19 @@ function VideoCard(props: {
     >
       <VideoThumb video={video} href={`/video/${video.id}`} />
       <div className="flex flex-1 flex-col gap-2 p-3">
-        <a
-          href={`/video/${video.id}`}
-          className="line-clamp-2 font-medium hover:underline"
-          draggable={false}
-        >
+        <a href={`/video/${video.id}`} className="line-clamp-2 font-medium hover:underline" draggable={false}>
           {video.title}
         </a>
-        {video.channel && (
-          <p className="-mt-1 text-sm text-slate-500">{video.channel}</p>
-        )}
+        {video.channel && <p className="-mt-1 text-sm text-slate-500">{video.channel}</p>}
         <div className="flex flex-wrap items-center gap-3 text-xs">
-          <a
-            href={`/video/${video.id}`}
-            className="font-medium text-slate-700 hover:underline"
-            draggable={false}
-          >
+          <a href={`/video/${video.id}`} className="font-medium text-slate-700 hover:underline" draggable={false}>
             ✏️ {props.hasNotes ? "Open notes" : "Take notes"}
           </a>
-          <a
-            href={video.url}
-            target="_blank"
-            rel="noreferrer"
-            className="text-slate-500 hover:underline"
-            draggable={false}
-          >
+          <a href={video.url} target="_blank" rel="noreferrer" className="text-slate-500 hover:underline" draggable={false}>
             YouTube ↗
           </a>
         </div>
-        {props.folderLabel && (
-          <p className="text-xs text-slate-500">📁 {props.folderLabel}</p>
-        )}
+        {props.folderLabel && <p className="text-xs text-slate-500">📁 {props.folderLabel}</p>}
         {video.tags.length > 0 && (
           <div className="flex flex-wrap gap-1">
             {video.tags.map((tag) => (
@@ -850,18 +690,10 @@ function VideoCard(props: {
           </select>
           {props.onShift && (
             <>
-              <SmallButton
-                onClick={() => props.onShift!(-1)}
-                disabled={props.isFirst}
-                title="Move earlier"
-              >
+              <SmallButton onClick={() => props.onShift!(-1)} disabled={props.isFirst} title="Move earlier">
                 ◀
               </SmallButton>
-              <SmallButton
-                onClick={() => props.onShift!(1)}
-                disabled={props.isLast}
-                title="Move later"
-              >
+              <SmallButton onClick={() => props.onShift!(1)} disabled={props.isLast} title="Move later">
                 ▶
               </SmallButton>
             </>
@@ -902,13 +734,7 @@ function SmallButton({
   );
 }
 
-function EmptyState({
-  searching,
-  hasVideos,
-}: {
-  searching: boolean;
-  hasVideos: boolean;
-}) {
+function EmptyState({ searching, hasVideos }: { searching: boolean; hasVideos: boolean }) {
   return (
     <div className="rounded-xl border border-dashed border-slate-300 p-10 text-center text-slate-500">
       {searching

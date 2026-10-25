@@ -1,7 +1,6 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useRef } from "react";
-import { ClipTime, DeleteClipButton } from "@/components/ClipButtons";
+import { useCallback, useEffect, useRef } from "react";
 import { formatTime } from "@/lib/youtube-player";
 import type { NoteImage, NotePage, NotePoint, NoteStroke } from "@/lib/types";
 
@@ -24,18 +23,13 @@ type Props = {
   onStampTap: (stampId: string, seconds: number) => void;
   imageUrl: (path: string) => string;
   onDeleteImage: (imageId: string) => void;
-  onHideImageTime: (imageId: string) => void;
 };
 
 // Pictures are loaded once and shared by every page.
 const imageCache = new Map<string, HTMLImageElement>();
 
 function hitImage(images: NoteImage[], x: number, y: number) {
-  return [...images]
-    .reverse()
-    .find(
-      (im) => x >= im.x && x <= im.x + im.w && y >= im.y && y <= im.y + im.h,
-    );
+  return [...images].reverse().find((im) => x >= im.x && x <= im.x + im.w && y >= im.y && y <= im.y + im.h);
 }
 
 function drawStroke(ctx: CanvasRenderingContext2D, stroke: NoteStroke) {
@@ -62,13 +56,7 @@ function drawStroke(ctx: CanvasRenderingContext2D, stroke: NoteStroke) {
   if (pts.length === 1) {
     ctx.fillStyle = stroke.color;
     ctx.beginPath();
-    ctx.arc(
-      pts[0][0],
-      pts[0][1],
-      (stroke.size * (0.5 + pts[0][2])) / 2,
-      0,
-      Math.PI * 2,
-    );
+    ctx.arc(pts[0][0], pts[0][1], (stroke.size * (0.5 + pts[0][2])) / 2, 0, Math.PI * 2);
     ctx.fill();
     return;
   }
@@ -102,16 +90,11 @@ function drawPaper(ctx: CanvasRenderingContext2D) {
 }
 
 function nearStroke(stroke: NoteStroke, x: number, y: number) {
-  const reach =
-    ERASER_RADIUS +
-    (stroke.tool === "highlighter" ? stroke.size * 2.5 : stroke.size);
-  return stroke.points.some(
-    ([px, py]) => (px - x) ** 2 + (py - y) ** 2 <= reach * reach,
-  );
+  const reach = ERASER_RADIUS + (stroke.tool === "highlighter" ? stroke.size * 2.5 : stroke.size);
+  return stroke.points.some(([px, py]) => (px - x) ** 2 + (py - y) ** 2 <= reach * reach);
 }
 
-const round = (n: number, places: number) =>
-  Math.round(n * 10 ** places) / 10 ** places;
+const round = (n: number, places: number) => Math.round(n * 10 ** places) / 10 ** places;
 
 export default function NotePageCanvas(props: Props) {
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -202,8 +185,7 @@ export default function NotePageCanvas(props: Props) {
     const rect = canvasRef.current!.getBoundingClientRect();
     const x = ((e.clientX - rect.left) / rect.width) * PAGE_WIDTH;
     const y = ((e.clientY - rect.top) / rect.height) * PAGE_HEIGHT;
-    const pressure =
-      e.pointerType === "pen" && e.pressure > 0 ? e.pressure : 0.5;
+    const pressure = e.pointerType === "pen" && e.pressure > 0 ? e.pressure : 0.5;
     return [round(x, 1), round(y, 1), round(pressure, 2)];
   }
 
@@ -228,22 +210,12 @@ export default function NotePageCanvas(props: Props) {
     e.currentTarget.setPointerCapture(e.pointerId);
     const point = toPoint(e);
     if (props.tool === "eraser") {
-      current.current = {
-        pointerId: e.pointerId,
-        stroke: null,
-        erased: new Set(),
-        start: point,
-      };
+      current.current = { pointerId: e.pointerId, stroke: null, erased: new Set(), start: point };
       eraseAt(point);
     } else {
       current.current = {
         pointerId: e.pointerId,
-        stroke: {
-          tool: props.tool,
-          color: props.color,
-          size: props.size,
-          points: [point],
-        },
+        stroke: { tool: props.tool, color: props.color, size: props.size, points: [point] },
         erased: new Set(),
         start: point,
       };
@@ -284,21 +256,14 @@ export default function NotePageCanvas(props: Props) {
       props.onEraseStrokes(Array.from(state.erased));
     } else {
       // An eraser tap on a picture (without erasing any ink) removes the picture.
-      const image = hitImage(
-        props.page.images ?? [],
-        state.start[0],
-        state.start[1],
-      );
+      const image = hitImage(props.page.images ?? [], state.start[0], state.start[1]);
       if (image) props.onDeleteImage(image.id);
       else redraw();
     }
   }
 
   return (
-    <div
-      ref={wrapRef}
-      className="relative w-full overflow-hidden rounded-lg bg-white shadow-sm ring-1 ring-slate-200"
-    >
+    <div ref={wrapRef} className="relative w-full overflow-hidden rounded-lg bg-white shadow-sm ring-1 ring-slate-200">
       <canvas
         ref={canvasRef}
         className="block w-full select-none"
@@ -314,30 +279,17 @@ export default function NotePageCanvas(props: Props) {
         onPointerUp={finish}
         onPointerCancel={finish}
       />
-      {(props.page.images ?? []).map((im) => {
-        const left = (im.x / PAGE_WIDTH) * 100;
-        const top = (im.y / PAGE_HEIGHT) * 100;
-        const right = 100 - ((im.x + im.w) / PAGE_WIDTH) * 100;
-        return (
-          <Fragment key={im.id}>
-            {!im.hideTime && (
-              <ClipTime
-                seconds={im.t}
-                onJump={() => props.onStampTap(im.id, im.t)}
-                onHide={() => props.onHideImageTime(im.id)}
-                style={{ left: `${left}%`, top: `${top}%` }}
-              />
-            )}
-            <DeleteClipButton
-              onClick={() => props.onDeleteImage(im.id)}
-              style={{
-                top: `calc(${top}% + 4px)`,
-                right: `calc(${right}% + 4px)`,
-              }}
-            />
-          </Fragment>
-        );
-      })}
+      {(props.page.images ?? []).map((im) => (
+        <button
+          key={im.id}
+          onClick={() => props.onStampTap(im.id, im.t)}
+          className="absolute rounded-br-md bg-red-600 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-white hover:bg-red-700"
+          style={{ left: `${(im.x / PAGE_WIDTH) * 100}%`, top: `${(im.y / PAGE_HEIGHT) * 100}%` }}
+          title="Jump the video to this moment"
+        >
+          ▶ {formatTime(im.t)}
+        </button>
+      ))}
       {props.page.stamps.map((stamp) => (
         <button
           key={stamp.id}
@@ -347,15 +299,8 @@ export default function NotePageCanvas(props: Props) {
               ? "bg-red-100 text-red-700 ring-1 ring-red-300"
               : "bg-red-600 text-white hover:bg-red-700"
           }`}
-          style={{
-            left: `${(stamp.x / PAGE_WIDTH) * 100}%`,
-            top: `${(stamp.y / PAGE_HEIGHT) * 100}%`,
-          }}
-          title={
-            props.tool === "eraser"
-              ? "Remove this time stamp"
-              : "Jump the video to this moment"
-          }
+          style={{ left: `${(stamp.x / PAGE_WIDTH) * 100}%`, top: `${(stamp.y / PAGE_HEIGHT) * 100}%` }}
+          title={props.tool === "eraser" ? "Remove this time stamp" : "Jump the video to this moment"}
         >
           {props.tool === "eraser" ? "✕ " : "▶ "}
           {formatTime(stamp.t)}

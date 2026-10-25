@@ -2,25 +2,10 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import NotePageCanvas, {
-  PAGE_HEIGHT,
-  type Tool,
-} from "@/components/NotePageCanvas";
-import { ClipTime, DeleteClipButton } from "@/components/ClipButtons";
-import {
-  canCaptureScreen,
-  clipUrl,
-  compressImage,
-  TabCapture,
-  uploadClip,
-  type ClipImage,
-} from "@/lib/clips";
+import NotePageCanvas, { PAGE_HEIGHT, type Tool } from "@/components/NotePageCanvas";
+import { canCaptureScreen, clipUrl, compressImage, TabCapture, uploadClip, type ClipImage } from "@/lib/clips";
 import { createClient } from "@/lib/supabase/client";
-import {
-  formatTime,
-  loadYouTubeApi,
-  type YouTubePlayer,
-} from "@/lib/youtube-player";
+import { formatTime, loadYouTubeApi, type YouTubePlayer } from "@/lib/youtube-player";
 import type { NoteImage, NotePage, NoteStroke, Video } from "@/lib/types";
 
 const PEN_COLORS = ["#111827", "#2563eb", "#dc2626", "#16a34a"];
@@ -52,19 +37,10 @@ function preferredMode(): Mode {
 // Typed notes mark video times as [m:ss] or [h:mm:ss].
 const TIME_PATTERN = /\[(\d+):(\d{2})(?::(\d{2}))?\]/g;
 
-function toSeconds(time: string) {
-  const parts = time.split(":").map(Number);
-  return parts.reduce((total, n) => total * 60 + n, 0);
-}
-
 function timesIn(text: string) {
   const seen = new Set<number>();
   for (const m of text.matchAll(TIME_PATTERN)) {
-    const [a, b, c] = [
-      Number(m[1]),
-      Number(m[2]),
-      m[3] === undefined ? null : Number(m[3]),
-    ];
+    const [a, b, c] = [Number(m[1]), Number(m[2]), m[3] === undefined ? null : Number(m[3])];
     seen.add(c === null ? a * 60 + b : a * 3600 + b * 60 + c);
   }
   return Array.from(seen);
@@ -76,7 +52,6 @@ export default function StudyPage({ videoId }: { videoId: string }) {
   const [missing, setMissing] = useState(false);
   const [pages, setPages] = useState<NotePage[]>([emptyPage()]);
   const [typed, setTyped] = useState("");
-  const [typedClips, setTypedClips] = useState<TypedClip[]>([]);
   const [mode, setMode] = useState<Mode>("write");
   const typedBox = useRef<HTMLTextAreaElement>(null);
   const [loaded, setLoaded] = useState(false);
@@ -107,11 +82,7 @@ export default function StudyPage({ videoId }: { videoId: string }) {
     (async () => {
       const [v, n] = await Promise.all([
         supabase.from("videos").select("*").eq("id", videoId).maybeSingle(),
-        supabase
-          .from("notes")
-          .select("*")
-          .eq("video_id", videoId)
-          .maybeSingle(),
+        supabase.from("notes").select("*").eq("video_id", videoId).maybeSingle(),
       ]);
       if (!v.data) {
         setMissing(true);
@@ -121,9 +92,7 @@ export default function StudyPage({ videoId }: { videoId: string }) {
       const saved = (n.data?.pages ?? []) as NotePage[];
       const savedText = (n.data?.text ?? "") as string;
       if (saved.length) setPages(saved);
-      const { text, clips } = splitTypedClips(savedText);
-      setTyped(text);
-      setTypedClips(clips);
+      setTyped(savedText);
       setMode(preferredMode());
       setLoaded(true);
     })();
@@ -159,20 +128,13 @@ export default function StudyPage({ videoId }: { videoId: string }) {
   pagesRef.current = pages;
   const typedRef = useRef(typed);
   typedRef.current = typed;
-  const typedClipsRef = useRef(typedClips);
-  typedClipsRef.current = typedClips;
 
   const save = useCallback(async () => {
     setSaveState("saving");
     const { error } = await supabase
       .from("notes")
       .upsert(
-        {
-          video_id: videoId,
-          pages: pagesRef.current,
-          text: joinTypedClips(typedRef.current, typedClipsRef.current),
-          updated_at: new Date().toISOString(),
-        },
+        { video_id: videoId, pages: pagesRef.current, text: typedRef.current, updated_at: new Date().toISOString() },
         { onConflict: "video_id" },
       );
     setSaveState(error ? "error" : "saved");
@@ -182,13 +144,12 @@ export default function StudyPage({ videoId }: { videoId: string }) {
     if (saveState !== "unsaved") return;
     const timer = setTimeout(save, 1200);
     return () => clearTimeout(timer);
-  }, [pages, typed, typedClips, saveState, save]);
+  }, [pages, typed, saveState, save]);
 
   // Save right away if the person switches apps or closes the tab.
   useEffect(() => {
     const flush = () => {
-      if (document.visibilityState === "hidden" && saveState === "unsaved")
-        save();
+      if (document.visibilityState === "hidden" && saveState === "unsaved") save();
     };
     document.addEventListener("visibilitychange", flush);
     return () => document.removeEventListener("visibilitychange", flush);
@@ -215,22 +176,12 @@ export default function StudyPage({ videoId }: { videoId: string }) {
   function addStroke(pageIndex: number, stroke: NoteStroke) {
     const bottom = Math.max(...stroke.points.map((p) => p[1]));
     lastSpot.current = { page: pageIndex, y: bottom };
-    change(
-      pages.map((p, i) =>
-        i === pageIndex ? { ...p, strokes: [...p.strokes, stroke] } : p,
-      ),
-    );
+    change(pages.map((p, i) => (i === pageIndex ? { ...p, strokes: [...p.strokes, stroke] } : p)));
   }
 
   function eraseStrokes(pageIndex: number, indexes: number[]) {
     const gone = new Set(indexes);
-    change(
-      pages.map((p, i) =>
-        i === pageIndex
-          ? { ...p, strokes: p.strokes.filter((_, j) => !gone.has(j)) }
-          : p,
-      ),
-    );
+    change(pages.map((p, i) => (i === pageIndex ? { ...p, strokes: p.strokes.filter((_, j) => !gone.has(j)) } : p)));
   }
 
   function chooseMode(next: Mode) {
@@ -282,11 +233,7 @@ export default function StudyPage({ videoId }: { videoId: string }) {
     }
     lastSpot.current = { page, y };
     const stamp = { id: crypto.randomUUID(), t: Math.round(seconds), x: 95, y };
-    change(
-      next.map((p, i) =>
-        i === page ? { ...p, stamps: [...p.stamps, stamp] } : p,
-      ),
-    );
+    change(next.map((p, i) => (i === page ? { ...p, stamps: [...p.stamps, stamp] } : p)));
   }
 
   function tapStamp(pageIndex: number, id: string, seconds: number) {
@@ -307,33 +254,9 @@ export default function StudyPage({ videoId }: { videoId: string }) {
     jumpTo(seconds);
   }
 
-  function hideImageTime(pageIndex: number, imageId: string) {
-    change(
-      pages.map((p, i) =>
-        i === pageIndex
-          ? {
-              ...p,
-              images: (p.images ?? []).map((im) =>
-                im.id === imageId ? { ...im, hideTime: true } : im,
-              ),
-            }
-          : p,
-      ),
-    );
-  }
-
-  function changeTypedClips(clips: TypedClip[]) {
-    setTypedClips(clips);
-    setSaveState("unsaved");
-  }
-
   function deleteImage(pageIndex: number, imageId: string) {
     change(
-      pages.map((p, i) =>
-        i === pageIndex
-          ? { ...p, images: (p.images ?? []).filter((im) => im.id !== imageId) }
-          : p,
-      ),
+      pages.map((p, i) => (i === pageIndex ? { ...p, images: (p.images ?? []).filter((im) => im.id !== imageId) } : p)),
     );
   }
 
@@ -354,9 +277,7 @@ export default function StudyPage({ videoId }: { videoId: string }) {
       if (mode === "type") insertTypedClip(path, seconds);
       else placeImage(image, path, seconds);
     } catch (error) {
-      flash(
-        `Couldn't save the clip: ${error instanceof Error ? error.message : "unknown error"}`,
-      );
+      flash(`Couldn't save the clip: ${error instanceof Error ? error.message : "unknown error"}`);
     } finally {
       setClipBusy(false);
     }
@@ -374,28 +295,18 @@ export default function StudyPage({ videoId }: { videoId: string }) {
       y = 60;
       if (page >= current.length) next = [...current, emptyPage()];
     }
-    const im: NoteImage = {
-      id: crypto.randomUUID(),
-      path,
-      x: 100,
-      y,
-      w,
-      h,
-      t: Math.round(seconds),
-    };
+    const im: NoteImage = { id: crypto.randomUUID(), path, x: 100, y, w, h, t: Math.round(seconds) };
     lastSpot.current = { page, y: y + h };
-    change(
-      next.map((p, i) =>
-        i === page ? { ...p, images: [...(p.images ?? []), im] } : p,
-      ),
-    );
+    change(next.map((p, i) => (i === page ? { ...p, images: [...(p.images ?? []), im] } : p)));
   }
 
   function insertTypedClip(path: string, seconds: number) {
-    changeTypedClips([
-      ...typedClipsRef.current,
-      { path, t: Math.round(seconds) },
-    ]);
+    const text = typedRef.current;
+    const box = typedBox.current;
+    const at = box && document.activeElement === box ? box.selectionStart : text.length;
+    const before = text.slice(0, at);
+    const insert = `${before && !before.endsWith("\n") ? "\n" : ""}[${formatTime(seconds)}] ![clip](${path})\n`;
+    changeTyped(before + insert + text.slice(at));
   }
 
   // On computers, grab the video frame straight from the screen. Elsewhere (iPad),
@@ -427,9 +338,7 @@ export default function StudyPage({ videoId }: { videoId: string }) {
           return;
         }
       }
-      flash(
-        "There's no picture on your clipboard. Take a screenshot first, then copy it.",
-      );
+      flash("There's no picture on your clipboard. Take a screenshot first, then copy it.");
     } catch {
       flash("Couldn't read the clipboard. Try Choose picture instead.");
     }
@@ -440,9 +349,7 @@ export default function StudyPage({ videoId }: { videoId: string }) {
   addClipRef.current = addClip;
   useEffect(() => {
     const onPaste = (e: ClipboardEvent) => {
-      const file = Array.from(e.clipboardData?.files ?? []).find((f) =>
-        f.type.startsWith("image/"),
-      );
+      const file = Array.from(e.clipboardData?.files ?? []).find((f) => f.type.startsWith("image/"));
       if (!file) return;
       e.preventDefault();
       setClipPanel(null);
@@ -452,10 +359,7 @@ export default function StudyPage({ videoId }: { videoId: string }) {
     return () => window.removeEventListener("paste", onPaste);
   }, []);
 
-  const imageUrl = useCallback(
-    (path: string) => clipUrl(supabase, path),
-    [supabase],
-  );
+  const imageUrl = useCallback((path: string) => clipUrl(supabase, path), [supabase]);
 
   function addPage() {
     change([...pages, emptyPage()]);
@@ -477,9 +381,7 @@ export default function StudyPage({ videoId }: { videoId: string }) {
     return (
       <main className="mx-auto max-w-xl px-4 py-16 text-center">
         <h1 className="mb-2 text-2xl font-bold">Video not found</h1>
-        <p className="mb-6 text-slate-600">
-          It may have been removed from your library.
-        </p>
+        <p className="mb-6 text-slate-600">It may have been removed from your library.</p>
         <Link href="/" className="underline">
           Back to your library
         </Link>
@@ -511,15 +413,10 @@ export default function StudyPage({ videoId }: { videoId: string }) {
   return (
     <div className="min-h-screen bg-slate-100">
       <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-slate-200 bg-white px-4">
-        <Link
-          href="/"
-          className="shrink-0 rounded-md px-2 py-1 text-sm hover:bg-slate-100"
-        >
+        <Link href="/" className="shrink-0 rounded-md px-2 py-1 text-sm hover:bg-slate-100">
           ← Library
         </Link>
-        <h1 className="min-w-0 flex-1 truncate font-semibold">
-          {video?.title ?? "Loading…"}
-        </h1>
+        <h1 className="min-w-0 flex-1 truncate font-semibold">{video?.title ?? "Loading…"}</h1>
         <SaveBadge state={saveState} onRetry={save} />
         <button
           onClick={() => setNotesHidden((h) => !h)}
@@ -529,9 +426,7 @@ export default function StudyPage({ videoId }: { videoId: string }) {
         </button>
       </header>
 
-      <div
-        className={`gap-5 p-3 md:p-5 ${notesHidden ? "" : "lg:grid lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]"}`}
-      >
+      <div className={`gap-5 p-3 md:p-5 ${notesHidden ? "" : "lg:grid lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]"}`}>
         {/* Video: sticky on top in portrait, sticky on the left in landscape. */}
         <div
           className={
@@ -545,39 +440,22 @@ export default function StudyPage({ videoId }: { videoId: string }) {
             className="relative mx-auto aspect-video overflow-hidden rounded-lg bg-black [&_iframe]:absolute [&_iframe]:inset-0 [&_iframe]:h-full [&_iframe]:w-full"
             // The player keeps the same element when notes are hidden, so playback isn't interrupted.
             style={{
-              width: notesHidden
-                ? "min(100%, calc((100vh - 110px) * 16 / 9))"
-                : "min(100%, calc(34vh * 16 / 9))",
+              width: notesHidden ? "min(100%, calc((100vh - 110px) * 16 / 9))" : "min(100%, calc(34vh * 16 / 9))",
             }}
           />
           <div className={notesHidden ? "hidden" : "mt-2 hidden lg:block"}>
-            {video?.channel && (
-              <p className="text-sm text-slate-500">{video.channel}</p>
-            )}
+            {video?.channel && <p className="text-sm text-slate-500">{video.channel}</p>}
             {video && (
-              <a
-                href={video.url}
-                target="_blank"
-                rel="noreferrer"
-                className="text-sm text-slate-500 underline"
-              >
+              <a href={video.url} target="_blank" rel="noreferrer" className="text-sm text-slate-500 underline">
                 Open on YouTube
               </a>
             )}
           </div>
-          <div className={notesHidden ? "hidden" : "mt-2 lg:hidden"}>
-            {toolbar}
-          </div>
+          <div className={notesHidden ? "hidden" : "mt-2 lg:hidden"}>{toolbar}</div>
         </div>
 
-        <div
-          className={
-            notesHidden ? "hidden" : "mt-2 flex min-w-0 flex-col gap-4 lg:mt-0"
-          }
-        >
-          <div className="sticky top-[76px] z-20 hidden lg:block">
-            {toolbar}
-          </div>
+        <div className={notesHidden ? "hidden" : "mt-2 flex min-w-0 flex-col gap-4 lg:mt-0"}>
+          <div className="sticky top-[76px] z-20 hidden lg:block">{toolbar}</div>
           {!loaded ? (
             <p className="text-slate-500">Loading your notes…</p>
           ) : mode === "type" ? (
@@ -588,8 +466,6 @@ export default function StudyPage({ videoId }: { videoId: string }) {
               boxRef={typedBox}
               onStamp={stampTyped}
               imageUrl={imageUrl}
-              clips={typedClips}
-              onClipsChange={changeTypedClips}
             />
           ) : (
             <>
@@ -597,13 +473,8 @@ export default function StudyPage({ videoId }: { videoId: string }) {
                 <div key={i} className="flex flex-col gap-1">
                   <div className="flex items-center justify-between px-1 text-xs text-slate-500">
                     <span>Page {i + 1}</span>
-                    <button
-                      onClick={() => clearPage(i)}
-                      className="rounded px-1.5 py-0.5 hover:bg-slate-200"
-                    >
-                      {pages.length > 1 && i === pages.length - 1
-                        ? "Delete page"
-                        : "Clear page"}
+                    <button onClick={() => clearPage(i)} className="rounded px-1.5 py-0.5 hover:bg-slate-200">
+                      {pages.length > 1 && i === pages.length - 1 ? "Delete page" : "Clear page"}
                     </button>
                   </div>
                   <NotePageCanvas
@@ -617,7 +488,6 @@ export default function StudyPage({ videoId }: { videoId: string }) {
                     onStampTap={(id, t) => tapStamp(i, id, t)}
                     imageUrl={imageUrl}
                     onDeleteImage={(id) => deleteImage(i, id)}
-                    onHideImageTime={(id) => hideImageTime(i, id)}
                   />
                 </div>
               ))}
@@ -651,16 +521,9 @@ export default function StudyPage({ videoId }: { videoId: string }) {
   );
 }
 
-function ClipPanel(props: {
-  onPaste: () => void;
-  onPick: (file: File) => void;
-  onClose: () => void;
-}) {
+function ClipPanel(props: { onPaste: () => void; onPick: (file: File) => void; onClose: () => void }) {
   return (
-    <div
-      className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4"
-      onClick={props.onClose}
-    >
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4" onClick={props.onClose}>
       <div
         className="flex w-full max-w-md flex-col gap-4 rounded-xl bg-white p-5 shadow-xl"
         onClick={(e) => e.stopPropagation()}
@@ -668,17 +531,13 @@ function ClipPanel(props: {
         <h2 className="text-lg font-semibold">Clip the video</h2>
         <ol className="list-decimal space-y-1 pl-5 text-sm text-slate-700">
           <li>
-            Take a screenshot. On iPad, swipe up from a bottom corner with your
-            Pencil, or press the top button and volume up together.
+            Take a screenshot. On iPad, swipe up from a bottom corner with your Pencil, or press the top button and
+            volume up together.
           </li>
-          <li>
-            Crop it to the part you want, then tap Copy (or Save to Photos).
-          </li>
+          <li>Crop it to the part you want, then tap Copy (or Save to Photos).</li>
           <li>Come back here and tap Paste picture (or Choose picture).</li>
         </ol>
-        <p className="text-xs text-slate-500">
-          The clip is saved with the video time from when you tapped Clip.
-        </p>
+        <p className="text-xs text-slate-500">The clip is saved with the video time from when you tapped Clip.</p>
         <div className="flex flex-wrap gap-2">
           <button
             onClick={props.onPaste}
@@ -714,30 +573,8 @@ function ClipPanel(props: {
 // Typed notes store clips as "[12:34] ![clip](path)".
 const CLIP_PATTERN = /(?:\[([\d:]+)\]\s*)?!\[clip\]\(([^)\s]+)\)/g;
 
-// A clip in typed notes. t is null when its time was removed.
-type TypedClip = { path: string; t: number | null };
-
-// Typed clips are saved after the notes, below this line, so they never show in the text box.
-const CLIPS_MARKER = "\n\n--- clips ---\n";
-
-function splitTypedClips(saved: string) {
-  const clips: TypedClip[] = Array.from(saved.matchAll(CLIP_PATTERN), (m) => ({
-    path: m[2],
-    t: m[1] ? toSeconds(m[1]) : null,
-  }));
-  // Older notes had clips mixed into the text; take them out of it.
-  const text = saved.includes(CLIPS_MARKER)
-    ? saved.split(CLIPS_MARKER)[0]
-    : saved.replace(new RegExp(`${CLIP_PATTERN.source}\\n?`, "g"), "");
-  return { text, clips };
-}
-
-function joinTypedClips(text: string, clips: TypedClip[]) {
-  if (!clips.length) return text;
-  const lines = clips.map(
-    (c) => `${c.t === null ? "" : `[${formatTime(c.t)}] `}![clip](${c.path})`,
-  );
-  return text + CLIPS_MARKER + lines.join("\n");
+function clipsIn(text: string) {
+  return Array.from(text.matchAll(CLIP_PATTERN)).map((m) => ({ time: m[1] ?? null, path: m[2] }));
 }
 
 function TypedNotes(props: {
@@ -747,51 +584,29 @@ function TypedNotes(props: {
   onStamp: () => void;
   boxRef: React.RefObject<HTMLTextAreaElement | null>;
   imageUrl: (path: string) => string;
-  clips: TypedClip[];
-  onClipsChange: (clips: TypedClip[]) => void;
 }) {
   const times = timesIn(props.text);
-  const clips = props.clips;
-  const update = (index: number, clip: TypedClip | null) =>
-    props.onClipsChange(
-      clip
-        ? clips.map((c, i) => (i === index ? clip : c))
-        : clips.filter((_, i) => i !== index),
-    );
+  const clips = clipsIn(props.text);
   return (
     <div className="flex flex-col gap-2">
       {clips.length > 0 && (
         <div className="flex gap-2 overflow-x-auto pb-1">
           {clips.map((c, i) => (
-            <div
+            <a
               key={`${c.path}-${i}`}
-              className="relative w-48 shrink-0 overflow-hidden rounded-md bg-white ring-1 ring-slate-200"
+              href={props.imageUrl(c.path)}
+              target="_blank"
+              rel="noreferrer"
+              className="relative block w-48 shrink-0 overflow-hidden rounded-md ring-1 ring-slate-200"
+              title="Open full size"
             >
-              <a
-                href={props.imageUrl(c.path)}
-                target="_blank"
-                rel="noreferrer"
-                title="Open full size"
-              >
-                <img
-                  src={props.imageUrl(c.path)}
-                  alt="Clip from the video"
-                  className="block w-full"
-                />
-              </a>
-              {c.t !== null && (
-                <ClipTime
-                  seconds={c.t}
-                  onJump={() => props.onJump(c.t!)}
-                  onHide={() => update(i, { ...c, t: null })}
-                />
+              <img src={props.imageUrl(c.path)} alt="Clip from the video" className="block w-full" />
+              {c.time && (
+                <span className="absolute top-0 left-0 rounded-br-md bg-red-600 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-white">
+                  {c.time}
+                </span>
               )}
-              <DeleteClipButton
-                onClick={() => {
-                  if (window.confirm("Delete this clip?")) update(i, null);
-                }}
-              />
-            </div>
+            </a>
           ))}
         </div>
       )}
@@ -816,11 +631,7 @@ function TypedNotes(props: {
         onChange={(e) => props.onChange(e.target.value)}
         onKeyDown={(e) => {
           // Ctrl/Cmd + Shift + S stamps the current video time while typing.
-          if (
-            (e.ctrlKey || e.metaKey) &&
-            e.shiftKey &&
-            e.key.toLowerCase() === "s"
-          ) {
+          if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === "s") {
             e.preventDefault();
             props.onStamp();
           }
@@ -955,19 +766,10 @@ function Toolbar(props: {
   );
 }
 
-function SaveBadge({
-  state,
-  onRetry,
-}: {
-  state: SaveState;
-  onRetry: () => void;
-}) {
+function SaveBadge({ state, onRetry }: { state: SaveState; onRetry: () => void }) {
   if (state === "error") {
     return (
-      <button
-        onClick={onRetry}
-        className="shrink-0 text-xs text-red-600 underline"
-      >
+      <button onClick={onRetry} className="shrink-0 text-xs text-red-600 underline">
         Not saved. Tap to retry
       </button>
     );

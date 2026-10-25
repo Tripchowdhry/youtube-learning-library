@@ -27,15 +27,7 @@ export type SharedFolder = {
   folders: Pick<Folder, "id" | "name" | "parent_id" | "position">[];
   videos: Pick<
     Video,
-    | "id"
-    | "folder_id"
-    | "youtube_id"
-    | "url"
-    | "title"
-    | "channel"
-    | "thumbnail_url"
-    | "tags"
-    | "position"
+    "id" | "folder_id" | "youtube_id" | "url" | "title" | "channel" | "thumbnail_url" | "tags" | "position"
   >[];
 };
 
@@ -53,20 +45,7 @@ export type NoteStroke = {
 // A video time (in seconds) pinned onto the page; tapping it jumps the video there.
 export type NoteStamp = { id: string; t: number; x: number; y: number };
 
-export type NotePage = {
-  strokes: NoteStroke[];
-  stamps: NoteStamp[];
-  images?: NoteImage[];
-};
+export type NotePage = { strokes: NoteStroke[]; stamps: NoteStamp[]; images?: NoteImage[] };
 
 // A clipped picture placed on a handwriting page, with the video time it came from.
-export type NoteImage = {
-  id: string;
-  path: string;
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-  t: number;
-  hideTime?: boolean;
-};
+export type NoteImage = { id: string; path: string; x: number; y: number; w: number; h: number; t: number };
