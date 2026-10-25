@@ -77,7 +77,6 @@ export default function StudyPage({ videoId }: { videoId: string }) {
 
   const [clipBusy, setClipBusy] = useState(false);
   const pictureInput = useRef<HTMLInputElement>(null);
-  const [onWindows, setOnWindows] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
   const playerHost = useRef<HTMLDivElement>(null);
@@ -347,10 +346,6 @@ export default function StudyPage({ videoId }: { videoId: string }) {
     }
   }
 
-  useEffect(() => {
-    setOnWindows(/Windows/i.test(navigator.userAgent));
-  }, []);
-
   // Pasting a picture anywhere on the page (Ctrl+V / Cmd+V / long-press Paste) adds it as a clip.
   const addClipRef = useRef(addClip);
   addClipRef.current = addClip;
@@ -410,7 +405,6 @@ export default function StudyPage({ videoId }: { videoId: string }) {
       onUndo={undo}
       onStamp={stampTime}
       onPaste={pastePicture}
-      onSnip={onWindows ? () => player.current?.pauseVideo?.() : undefined}
       clipBusy={clipBusy}
       fingerDraws={fingerDraws}
       setFingerDraws={setFingerDraws}
@@ -641,7 +635,6 @@ function Toolbar(props: {
   onUndo: () => void;
   onStamp: () => void;
   onPaste: () => void;
-  onSnip?: () => void;
   clipBusy: boolean;
   fingerDraws: boolean;
   setFingerDraws: (v: boolean) => void;
@@ -726,17 +719,6 @@ function Toolbar(props: {
       >
         ⏱ Stamp time
       </button>
-      {props.onSnip && (
-        // Opens the Windows Snipping Tool; the snip is copied, ready to paste.
-        <a
-          href="ms-screenclip:"
-          onClick={props.onSnip}
-          className="rounded-lg px-3 py-1.5 text-sm font-semibold ring-1 ring-slate-300 hover:bg-slate-100"
-          title="Pause the video and open the Snipping Tool. Drag over the video, then press Ctrl+V here."
-        >
-          ✂️ Snip
-        </a>
-      )}
       <button
         onClick={props.onPaste}
         disabled={props.clipBusy}
