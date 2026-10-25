@@ -19,7 +19,6 @@ Built with Next.js, Tailwind CSS and Supabase. Hosted on Vercel.
 1. In [Supabase](https://supabase.com/dashboard), click **New project**. Pick a name and a database password (save it somewhere), and choose the region closest to you.
 2. When it's ready, open **SQL Editor → New query**, paste everything from [`supabase/schema.sql`](supabase/schema.sql), and click **Run**.
    (Set up before notes existed? Run [`supabase/notes.sql`](supabase/notes.sql) the same way.)
-   Then run [`supabase/clips.sql`](supabase/clips.sql) too. It creates the storage space for video clips.
 3. Open **Project Settings → API** (or **Data API**) and copy the **Project URL** and the **anon public** key.
 
 ### 2. Turn on Google sign-in

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef } from "react";
 import { formatTime } from "@/lib/youtube-player";
-import type { NoteImage, NotePage, NotePoint, NoteStroke } from "@/lib/types";
+import type { NotePage, NotePoint, NoteStroke } from "@/lib/types";
 
 export const PAGE_WIDTH = 1000;
 export const PAGE_HEIGHT = 1300;
@@ -21,16 +21,7 @@ type Props = {
   onAddStroke: (stroke: NoteStroke) => void;
   onEraseStrokes: (indexes: number[]) => void;
   onStampTap: (stampId: string, seconds: number) => void;
-  imageUrl: (path: string) => string;
-  onDeleteImage: (imageId: string) => void;
 };
-
-// Pictures are loaded once and shared by every page.
-const imageCache = new Map<string, HTMLImageElement>();
-
-function hitImage(images: NoteImage[], x: number, y: number) {
-  return [...images].reverse().find((im) => x >= im.x && x <= im.x + im.w && y >= im.y && y <= im.y + im.h);
-}
 
 function drawStroke(ctx: CanvasRenderingContext2D, stroke: NoteStroke) {
   const pts = stroke.points;
@@ -99,12 +90,7 @@ const round = (n: number, places: number) => Math.round(n * 10 ** places) / 10 *
 export default function NotePageCanvas(props: Props) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const current = useRef<{
-    pointerId: number;
-    stroke: NoteStroke | null;
-    erased: Set<number>;
-    start: NotePoint;
-  } | null>(null);
+  const current = useRef<{ pointerId: number; stroke: NoteStroke | null; erased: Set<number> } | null>(null);
   const latest = useRef(props);
   latest.current = props;
 
@@ -115,25 +101,6 @@ export default function NotePageCanvas(props: Props) {
     const scale = canvas.width / PAGE_WIDTH;
     ctx.setTransform(scale, 0, 0, scale, 0, 0);
     drawPaper(ctx);
-    for (const im of latest.current.page.images ?? []) {
-      const url = latest.current.imageUrl(im.path);
-      let img = imageCache.get(url);
-      if (!img) {
-        img = new Image();
-        img.src = url;
-        imageCache.set(url, img);
-      }
-      if (img.complete && img.naturalWidth) {
-        ctx.drawImage(img, im.x, im.y, im.w, im.h);
-      } else {
-        ctx.fillStyle = "#e2e8f0";
-        ctx.fillRect(im.x, im.y, im.w, im.h);
-        img.addEventListener("load", redraw, { once: true });
-      }
-      ctx.strokeStyle = "#cbd5e1";
-      ctx.lineWidth = 2;
-      ctx.strokeRect(im.x, im.y, im.w, im.h);
-    }
     const erased = current.current?.erased;
     latest.current.page.strokes.forEach((stroke, i) => {
       if (!erased?.has(i)) drawStroke(ctx, stroke);
@@ -210,14 +177,13 @@ export default function NotePageCanvas(props: Props) {
     e.currentTarget.setPointerCapture(e.pointerId);
     const point = toPoint(e);
     if (props.tool === "eraser") {
-      current.current = { pointerId: e.pointerId, stroke: null, erased: new Set(), start: point };
+      current.current = { pointerId: e.pointerId, stroke: null, erased: new Set() };
       eraseAt(point);
     } else {
       current.current = {
         pointerId: e.pointerId,
         stroke: { tool: props.tool, color: props.color, size: props.size, points: [point] },
         erased: new Set(),
-        start: point,
       };
       redraw();
     }
@@ -255,10 +221,7 @@ export default function NotePageCanvas(props: Props) {
     } else if (state.erased.size) {
       props.onEraseStrokes(Array.from(state.erased));
     } else {
-      // An eraser tap on a picture (without erasing any ink) removes the picture.
-      const image = hitImage(props.page.images ?? [], state.start[0], state.start[1]);
-      if (image) props.onDeleteImage(image.id);
-      else redraw();
+      redraw();
     }
   }
 
@@ -279,17 +242,6 @@ export default function NotePageCanvas(props: Props) {
         onPointerUp={finish}
         onPointerCancel={finish}
       />
-      {(props.page.images ?? []).map((im) => (
-        <button
-          key={im.id}
-          onClick={() => props.onStampTap(im.id, im.t)}
-          className="absolute rounded-br-md bg-red-600 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-white hover:bg-red-700"
-          style={{ left: `${(im.x / PAGE_WIDTH) * 100}%`, top: `${(im.y / PAGE_HEIGHT) * 100}%` }}
-          title="Jump the video to this moment"
-        >
-          ▶ {formatTime(im.t)}
-        </button>
-      ))}
       {props.page.stamps.map((stamp) => (
         <button
           key={stamp.id}
