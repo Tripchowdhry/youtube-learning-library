@@ -78,6 +78,7 @@ export default function StudyPage({ videoId }: { videoId: string }) {
   const [clipBusy, setClipBusy] = useState(false);
   const pictureInput = useRef<HTMLInputElement>(null);
   const [clipHelp, setClipHelp] = useState(false);
+  const resumeAfterClip = useRef(false);
   const [notice, setNotice] = useState<string | null>(null);
 
   const playerHost = useRef<HTMLDivElement>(null);
@@ -286,6 +287,20 @@ export default function StudyPage({ videoId }: { videoId: string }) {
     setTimeout(() => setNotice(null), 4000);
   }, []);
 
+  // Clip pauses the video so it's easy to screenshot, and plays it again once the picture is in.
+  function startClip() {
+    const playing = player.current?.getPlayerState?.() === 1;
+    resumeAfterClip.current = playing;
+    if (playing) player.current?.pauseVideo();
+    setClipHelp(true);
+  }
+
+  function endClip() {
+    setClipHelp(false);
+    if (resumeAfterClip.current) player.current?.playVideo();
+    resumeAfterClip.current = false;
+  }
+
   async function addClip(source: Blob, seconds: number) {
     setClipBusy(true);
     try {
@@ -293,6 +308,7 @@ export default function StudyPage({ videoId }: { videoId: string }) {
       const path = await uploadClip(supabase, image);
       if (mode === "type") insertTypedClip(path);
       else placeImage(image, path, seconds);
+      endClip();
     } catch (error) {
       flash(`Couldn't save the picture: ${error instanceof Error ? error.message : "unknown error"}`);
     } finally {
@@ -331,7 +347,6 @@ export default function StudyPage({ videoId }: { videoId: string }) {
 
   // The Paste picture button in the Clip box (handy on iPad). If the clipboard can't be read, pick a picture instead.
   async function pastePicture() {
-    setClipHelp(false);
     const seconds = player.current?.getCurrentTime?.() ?? 0;
     try {
       const items = await navigator.clipboard.read();
@@ -356,7 +371,6 @@ export default function StudyPage({ videoId }: { videoId: string }) {
       const file = Array.from(e.clipboardData?.files ?? []).find((f) => f.type.startsWith("image/"));
       if (!file) return;
       e.preventDefault();
-      setClipHelp(false);
       addClipRef.current(file, player.current?.getCurrentTime?.() ?? 0);
     };
     window.addEventListener("paste", onPaste);
@@ -407,7 +421,7 @@ export default function StudyPage({ videoId }: { videoId: string }) {
       canUndo={canUndo}
       onUndo={undo}
       onStamp={stampTime}
-      onClip={() => setClipHelp(true)}
+      onClip={startClip}
       clipBusy={clipBusy}
       fingerDraws={fingerDraws}
       setFingerDraws={setFingerDraws}
@@ -519,7 +533,7 @@ export default function StudyPage({ videoId }: { videoId: string }) {
           if (file) addClip(file, player.current?.getCurrentTime?.() ?? 0);
         }}
       />
-      {clipHelp && <ClipHelp onPaste={pastePicture} onClose={() => setClipHelp(false)} />}
+      {clipHelp && <ClipHelp onPaste={pastePicture} onClose={endClip} />}
       {(notice || clipBusy) && (
         <div className="fixed bottom-4 left-1/2 z-40 -translate-x-1/2 rounded-lg bg-slate-900 px-4 py-2 text-sm text-white shadow-lg">
           {clipBusy ? "Saving picture…" : notice}
