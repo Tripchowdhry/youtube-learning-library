@@ -195,6 +195,21 @@ export default function Library({ userEmail }: { userEmail: string }) {
     updateVideo(draggedId, { position, folder_id: target.folder_id });
   }
 
+  // Swap a video with its neighbor: -1 moves it earlier, +1 later.
+  function shiftVideo(id: string, step: -1 | 1) {
+    const index = visibleVideos.findIndex((v) => v.id === id);
+    const neighbor = visibleVideos[index + step];
+    if (index === -1 || !neighbor) return;
+    const video = visibleVideos[index];
+    if (video.position === neighbor.position) {
+      // Equal positions can't be swapped, so nudge just past the neighbor instead.
+      updateVideo(video.id, { position: neighbor.position + step * 0.5 });
+      return;
+    }
+    updateVideo(video.id, { position: neighbor.position });
+    updateVideo(neighbor.id, { position: video.position });
+  }
+
   function editTags(video: Video) {
     const answer = window.prompt("Tags, separated by commas:", video.tags.join(", "));
     if (answer === null) return;
@@ -414,11 +429,17 @@ export default function Library({ userEmail }: { userEmail: string }) {
             <>
               {canReorder && visibleVideos.length > 1 && (
                 <p className="mb-3 text-xs text-slate-500">
-                  Tip: drag a video onto another to reorder, or onto a folder on the left to move it.
+                  Tip: use ◀ ▶ on a video, or drag it onto another, to change the order. Drop it on a folder to move it.
+                </p>
+              )}
+              {!canReorder && visibleVideos.length > 1 && (
+                <p className="mb-3 text-xs text-slate-500">
+                  {searching ? "Search results" : "All videos"} show the newest first. To change the order, open a folder
+                  on the left.
                 </p>
               )}
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                {visibleVideos.map((video) => (
+                {visibleVideos.map((video, index) => (
                   <VideoCard
                     key={video.id}
                     video={video}
@@ -429,6 +450,9 @@ export default function Library({ userEmail }: { userEmail: string }) {
                     onDragStart={() => setDraggingId(video.id)}
                     onDragEnd={() => setDraggingId(null)}
                     onDropOnto={() => draggingId && reorderVideo(draggingId, video.id)}
+                    onShift={canReorder ? (step) => shiftVideo(video.id, step) : null}
+                    isFirst={index === 0}
+                    isLast={index === visibleVideos.length - 1}
                     onMove={(folderId) => moveVideo(video.id, folderId)}
                     onEditTags={() => editTags(video)}
                     onDelete={() => deleteVideo(video)}
@@ -583,6 +607,9 @@ function VideoCard(props: {
   onDragStart: () => void;
   onDragEnd: () => void;
   onDropOnto: () => void;
+  onShift: ((step: -1 | 1) => void) | null;
+  isFirst: boolean;
+  isLast: boolean;
   onMove: (folderId: string | null) => void;
   onEditTags: () => void;
   onDelete: () => void;
@@ -647,6 +674,16 @@ function VideoCard(props: {
               </option>
             ))}
           </select>
+          {props.onShift && (
+            <>
+              <SmallButton onClick={() => props.onShift!(-1)} disabled={props.isFirst} title="Move earlier">
+                ◀
+              </SmallButton>
+              <SmallButton onClick={() => props.onShift!(1)} disabled={props.isLast} title="Move later">
+                ▶
+              </SmallButton>
+            </>
+          )}
           <SmallButton onClick={props.onEditTags}>Tags</SmallButton>
           <SmallButton onClick={props.onDelete} danger>
             ✕
@@ -657,11 +694,26 @@ function VideoCard(props: {
   );
 }
 
-function SmallButton({ children, onClick, danger }: { children: React.ReactNode; onClick: () => void; danger?: boolean }) {
+function SmallButton({
+  children,
+  onClick,
+  danger,
+  disabled,
+  title,
+}: {
+  children: React.ReactNode;
+  onClick: () => void;
+  danger?: boolean;
+  disabled?: boolean;
+  title?: string;
+}) {
   return (
     <button
       onClick={onClick}
-      className={`rounded-md border px-2 py-1 text-xs ${danger ? "border-red-200 text-red-600 hover:bg-red-50" : "border-slate-300 text-slate-700 hover:bg-slate-100"}`}
+      disabled={disabled}
+      title={title}
+      aria-label={title}
+      className={`rounded-md border px-2 py-1 text-xs disabled:opacity-30 ${danger ? "border-red-200 text-red-600 hover:bg-red-50" : "border-slate-300 text-slate-700 hover:bg-slate-100"}`}
     >
       {children}
     </button>
