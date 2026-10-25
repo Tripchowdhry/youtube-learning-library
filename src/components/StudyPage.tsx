@@ -31,6 +31,7 @@ export default function StudyPage({ videoId }: { videoId: string }) {
   const [highlightColor, setHighlightColor] = useState(HIGHLIGHT_COLORS[0]);
   const [size, setSize] = useState(SIZES[0].value);
   const [fingerDraws, setFingerDraws] = useState(false);
+  const [notesHidden, setNotesHidden] = useState(false);
 
   const history = useRef<NotePage[][]>([]);
   const [canUndo, setCanUndo] = useState(false);
@@ -220,17 +221,32 @@ export default function StudyPage({ videoId }: { videoId: string }) {
         </Link>
         <h1 className="min-w-0 flex-1 truncate font-semibold">{video?.title ?? "Loading…"}</h1>
         <SaveBadge state={saveState} onRetry={save} />
+        <button
+          onClick={() => setNotesHidden((h) => !h)}
+          className="shrink-0 rounded-md px-2.5 py-1 text-sm ring-1 ring-slate-300 hover:bg-slate-100"
+        >
+          {notesHidden ? "Show notes" : "Hide notes"}
+        </button>
       </header>
 
-      <div className="gap-5 p-3 md:p-5 lg:grid lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
+      <div
+        className={`gap-5 p-3 md:p-5 ${notesHidden ? "" : "lg:grid lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]"}`}
+      >
         {/* Video: sticky on top in portrait, sticky on the left in landscape. */}
-        <div className="sticky top-14 z-20 -mx-3 bg-slate-100 px-3 pb-2 md:-mx-5 md:px-5 lg:top-[76px] lg:mx-0 lg:self-start lg:px-0">
+        <div
+          className={
+            notesHidden
+              ? ""
+              : "sticky top-14 z-20 -mx-3 bg-slate-100 px-3 pb-2 md:-mx-5 md:px-5 lg:top-[76px] lg:mx-0 lg:self-start lg:px-0"
+          }
+        >
           <div
             ref={playerHost}
             className="relative mx-auto aspect-video overflow-hidden rounded-lg bg-black [&_iframe]:absolute [&_iframe]:inset-0 [&_iframe]:h-full [&_iframe]:w-full"
-            style={{ width: "min(100%, calc(34vh * 16 / 9))" }}
+            // The player keeps the same element when notes are hidden, so playback isn't interrupted.
+            style={{ width: notesHidden ? "min(100%, calc((100vh - 110px) * 16 / 9))" : "min(100%, calc(34vh * 16 / 9))" }}
           />
-          <div className="mt-2 hidden lg:block">
+          <div className={notesHidden ? "hidden" : "mt-2 hidden lg:block"}>
             {video?.channel && <p className="text-sm text-slate-500">{video.channel}</p>}
             {video && (
               <a href={video.url} target="_blank" rel="noreferrer" className="text-sm text-slate-500 underline">
@@ -238,10 +254,10 @@ export default function StudyPage({ videoId }: { videoId: string }) {
               </a>
             )}
           </div>
-          <div className="mt-2 lg:hidden">{toolbar}</div>
+          <div className={notesHidden ? "hidden" : "mt-2 lg:hidden"}>{toolbar}</div>
         </div>
 
-        <div className="mt-2 flex min-w-0 flex-col gap-4 lg:mt-0">
+        <div className={notesHidden ? "hidden" : "mt-2 flex min-w-0 flex-col gap-4 lg:mt-0"}>
           <div className="sticky top-[76px] z-20 hidden lg:block">{toolbar}</div>
           {!loaded ? (
             <p className="text-slate-500">Loading your notes…</p>
