@@ -296,9 +296,10 @@ export default function StudyPage({ videoId }: { videoId: string }) {
     const playing = player.current?.getPlayerState?.() === 1;
     resumeAfterClip.current = playing;
     if (playing) player.current?.pauseVideo();
-    // On a Mac, run the "Clip Video" shortcut from Apple's Shortcuts app to start the drag-to-select screenshot.
+    // On a Mac, run the "Clip Video" shortcut from Apple's Shortcuts app to start the drag-to-select screenshot;
+    // the person then presses Cmd+V, so no help box is needed.
     if (onMac) window.location.href = `shortcuts://run-shortcut?name=${encodeURIComponent(MAC_SHORTCUT)}`;
-    setClipHelp(true);
+    else setClipHelp(true);
   }
 
   function endClip() {
@@ -544,7 +545,7 @@ export default function StudyPage({ videoId }: { videoId: string }) {
           if (file) addClip(file, player.current?.getCurrentTime?.() ?? 0);
         }}
       />
-      {clipHelp && <ClipHelp mac={onMac} onPaste={pastePicture} onClose={endClip} />}
+      {clipHelp && <ClipHelp onPaste={pastePicture} onClose={endClip} />}
       {(notice || clipBusy) && (
         <div className="fixed bottom-4 left-1/2 z-40 -translate-x-1/2 rounded-lg bg-slate-900 px-4 py-2 text-sm text-white shadow-lg">
           {clipBusy ? "Saving picture…" : notice}
@@ -650,7 +651,7 @@ function TypedNotes(props: {
   );
 }
 
-function ClipHelp(props: { mac: boolean; onPaste: () => void; onClose: () => void }) {
+function ClipHelp(props: { onPaste: () => void; onClose: () => void }) {
   const keys = [
     { device: "Mac", keys: ["Cmd", "Ctrl", "Shift", "4"], then: "Drag over the video." },
     { device: "Windows", keys: ["Windows", "Shift", "S"], then: "Drag over the video." },
@@ -661,51 +662,33 @@ function ClipHelp(props: { mac: boolean; onPaste: () => void; onClose: () => voi
     <div className="fixed right-4 bottom-4 z-40 w-[min(26rem,calc(100%-2rem))]">
       <div className="flex flex-col gap-4 rounded-xl bg-white p-5 shadow-2xl ring-1 ring-slate-200">
         <h2 className="text-lg font-semibold">Clip the video</h2>
-        {props.mac ? (
-          <div className="space-y-2 text-sm">
-            <p className="font-medium">1. Drag over the video to take the screenshot.</p>
-            <p className="font-medium">
-              2. Come back and press{" "}
-              <kbd className="rounded border border-slate-300 bg-slate-50 px-1.5 py-0.5 font-mono text-xs">Cmd</kbd> +{" "}
-              <kbd className="rounded border border-slate-300 bg-slate-50 px-1.5 py-0.5 font-mono text-xs">V</kbd>, or
-              tap Paste picture.
-            </p>
-            <p className="text-xs text-slate-500">
-              No screenshot started? Press Cmd + Ctrl + Shift + 4 instead, or set up the &ldquo;{MAC_SHORTCUT}&rdquo;
-              shortcut in the Shortcuts app.
-            </p>
-          </div>
-        ) : (
-          <div>
-            <p className="mb-2 text-sm font-medium">1. Take a screenshot. Press these keys together:</p>
-            <ul className="space-y-2">
-              {keys.map((k) => (
-                <li key={k.device} className="text-sm">
-                  <span className="inline-block w-20 font-medium">{k.device}</span>
-                  {k.keys.map((key, i) => (
-                    <span key={key}>
-                      {i > 0 && <span className="mx-1 text-slate-400">+</span>}
-                      <kbd className="rounded border border-slate-300 bg-slate-50 px-1.5 py-0.5 font-mono text-xs">
-                        {key}
-                      </kbd>
-                    </span>
-                  ))}
-                  <span className="mt-0.5 block pl-20 text-xs text-slate-500">{k.then}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-        {!props.mac && (
-          <p className="text-sm font-medium">
-            2. Come back and press{" "}
-            <kbd className="rounded border border-slate-300 bg-slate-50 px-1.5 py-0.5 font-mono text-xs">Cmd</kbd> +{" "}
-            <kbd className="rounded border border-slate-300 bg-slate-50 px-1.5 py-0.5 font-mono text-xs">V</kbd> (Mac)
-            or <kbd className="rounded border border-slate-300 bg-slate-50 px-1.5 py-0.5 font-mono text-xs">Ctrl</kbd> +{" "}
-            <kbd className="rounded border border-slate-300 bg-slate-50 px-1.5 py-0.5 font-mono text-xs">V</kbd>{" "}
-            (Windows), or tap Paste picture.
-          </p>
-        )}
+        <div>
+          <p className="mb-2 text-sm font-medium">1. Take a screenshot. Press these keys together:</p>
+          <ul className="space-y-2">
+            {keys.map((k) => (
+              <li key={k.device} className="text-sm">
+                <span className="inline-block w-20 font-medium">{k.device}</span>
+                {k.keys.map((key, i) => (
+                  <span key={key}>
+                    {i > 0 && <span className="mx-1 text-slate-400">+</span>}
+                    <kbd className="rounded border border-slate-300 bg-slate-50 px-1.5 py-0.5 font-mono text-xs">
+                      {key}
+                    </kbd>
+                  </span>
+                ))}
+                <span className="mt-0.5 block pl-20 text-xs text-slate-500">{k.then}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+        <p className="text-sm font-medium">
+          2. Come back and press{" "}
+          <kbd className="rounded border border-slate-300 bg-slate-50 px-1.5 py-0.5 font-mono text-xs">Cmd</kbd> +{" "}
+          <kbd className="rounded border border-slate-300 bg-slate-50 px-1.5 py-0.5 font-mono text-xs">V</kbd> (Mac) or{" "}
+          <kbd className="rounded border border-slate-300 bg-slate-50 px-1.5 py-0.5 font-mono text-xs">Ctrl</kbd> +{" "}
+          <kbd className="rounded border border-slate-300 bg-slate-50 px-1.5 py-0.5 font-mono text-xs">V</kbd>{" "}
+          (Windows), or tap Paste picture.
+        </p>
         <div className="flex gap-2">
           <button
             onClick={props.onPaste}
