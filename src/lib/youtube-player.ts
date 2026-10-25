@@ -4,6 +4,7 @@ export type YouTubePlayer = {
   getCurrentTime(): number;
   seekTo(seconds: number, allowSeekAhead: boolean): void;
   playVideo(): void;
+  pauseVideo(): void;
   destroy(): void;
 };
 
