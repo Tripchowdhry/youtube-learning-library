@@ -82,7 +82,8 @@ export default function StudyPage({ videoId }: { videoId: string }) {
   const pictureInput = useRef<HTMLInputElement>(null);
   const [clipHelp, setClipHelp] = useState(false);
   const resumeAfterClip = useRef(false);
-  const [onMac, setOnMac] = useState(false);
+  // The link that starts a drag-to-select screenshot on this computer, if there is one.
+  const [screenshotLink, setScreenshotLink] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
   const playerHost = useRef<HTMLDivElement>(null);
@@ -296,9 +297,9 @@ export default function StudyPage({ videoId }: { videoId: string }) {
     const playing = player.current?.getPlayerState?.() === 1;
     resumeAfterClip.current = playing;
     if (playing) player.current?.pauseVideo();
-    // On a Mac, run the "Clip Video" shortcut from Apple's Shortcuts app to start the drag-to-select screenshot;
-    // the person then presses Cmd+V, so no help box is needed.
-    if (onMac) window.location.href = `shortcuts://run-shortcut?name=${encodeURIComponent(MAC_SHORTCUT)}`;
+    // On a Mac or Windows PC, start the screenshot for them; they then press Cmd+V / Ctrl+V,
+    // so no help box is needed. Elsewhere (iPad), show the steps.
+    if (screenshotLink) window.location.href = screenshotLink;
     else setClipHelp(true);
   }
 
@@ -371,8 +372,13 @@ export default function StudyPage({ videoId }: { videoId: string }) {
   }
 
   useEffect(() => {
-    // iPads also say "Macintosh", but they have a touch screen.
-    setOnMac(/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints === 0);
+    // Mac: the "Clip Video" shortcut in Apple's Shortcuts app. iPads also say "Macintosh", but have a touch screen.
+    // Windows: the Snipping Tool.
+    if (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints === 0) {
+      setScreenshotLink(`shortcuts://run-shortcut?name=${encodeURIComponent(MAC_SHORTCUT)}`);
+    } else if (/Windows/.test(navigator.userAgent)) {
+      setScreenshotLink("ms-screenclip:");
+    }
   }, []);
 
   // Pasting a picture anywhere on the page (Ctrl+V / Cmd+V / long-press Paste) adds it as a clip.
