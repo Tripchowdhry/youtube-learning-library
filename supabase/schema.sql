@@ -57,8 +57,12 @@ create table if not exists public.notes (
   user_id uuid not null default auth.uid() references auth.users (id) on delete cascade,
   video_id uuid not null unique references public.videos (id) on delete cascade,
   pages jsonb not null default '[]'::jsonb,
+  text text not null default '',
   updated_at timestamptz not null default now()
 );
+
+-- Typed notes were added later; this adds the column to existing setups.
+alter table public.notes add column if not exists text text not null default '';
 
 create index if not exists notes_user_idx on public.notes (user_id);
 

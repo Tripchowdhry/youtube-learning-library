@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import NotePageCanvas, { PAGE_HEIGHT, type Tool } from "@/components/NotePageCanvas";
 import { createClient } from "@/lib/supabase/client";
-import { loadYouTubeApi, type YouTubePlayer } from "@/lib/youtube-player";
+import { formatTime, loadYouTubeApi, type YouTubePlayer } from "@/lib/youtube-player";
 import type { NotePage, NoteStroke, Video } from "@/lib/types";
 
 const PEN_COLORS = ["#111827", "#2563eb", "#dc2626", "#16a34a"];
@@ -17,12 +17,28 @@ const SIZES = [
 const emptyPage = (): NotePage => ({ strokes: [], stamps: [] });
 
 type SaveState = "saved" | "saving" | "unsaved" | "error";
+type Mode = "write" | "type";
+
+// Typed notes mark video times as [m:ss] or [h:mm:ss].
+const TIME_PATTERN = /\[(\d+):(\d{2})(?::(\d{2}))?\]/g;
+
+function timesIn(text: string) {
+  const seen = new Set<number>();
+  for (const m of text.matchAll(TIME_PATTERN)) {
+    const [a, b, c] = [Number(m[1]), Number(m[2]), m[3] === undefined ? null : Number(m[3])];
+    seen.add(c === null ? a * 60 + b : a * 3600 + b * 60 + c);
+  }
+  return Array.from(seen);
+}
 
 export default function StudyPage({ videoId }: { videoId: string }) {
   const supabase = useMemo(() => createClient(), []);
   const [video, setVideo] = useState<Video | null>(null);
   const [missing, setMissing] = useState(false);
   const [pages, setPages] = useState<NotePage[]>([emptyPage()]);
+  const [typed, setTyped] = useState("");
+  const [mode, setMode] = useState<Mode>("write");
+  const typedBox = useRef<HTMLTextAreaElement>(null);
   const [loaded, setLoaded] = useState(false);
   const [saveState, setSaveState] = useState<SaveState>("saved");
 
@@ -46,7 +62,7 @@ export default function StudyPage({ videoId }: { videoId: string }) {
     (async () => {
       const [v, n] = await Promise.all([
         supabase.from("videos").select("*").eq("id", videoId).maybeSingle(),
-        supabase.from("notes").select("pages").eq("video_id", videoId).maybeSingle(),
+        supabase.from("notes").select("*").eq("video_id", videoId).maybeSingle(),
       ]);
       if (!v.data) {
         setMissing(true);
@@ -54,7 +70,13 @@ export default function StudyPage({ videoId }: { videoId: string }) {
       }
       setVideo(v.data as Video);
       const saved = (n.data?.pages ?? []) as NotePage[];
+      const savedText = (n.data?.text ?? "") as string;
       if (saved.length) setPages(saved);
+      setTyped(savedText);
+      // Laptops (no touch screen) start in typing mode; tablets start with handwriting.
+      const hasHandwriting = saved.some((pg) => pg.strokes.length > 0);
+      const touchDevice = window.matchMedia("(pointer: coarse)").matches;
+      setMode(savedText && !hasHandwriting ? "type" : hasHandwriting || touchDevice ? "write" : "type");
       setLoaded(true);
     })();
   }, [supabase, videoId]);
@@ -87,13 +109,15 @@ export default function StudyPage({ videoId }: { videoId: string }) {
 
   const pagesRef = useRef(pages);
   pagesRef.current = pages;
+  const typedRef = useRef(typed);
+  typedRef.current = typed;
 
   const save = useCallback(async () => {
     setSaveState("saving");
     const { error } = await supabase
       .from("notes")
       .upsert(
-        { video_id: videoId, pages: pagesRef.current, updated_at: new Date().toISOString() },
+        { video_id: videoId, pages: pagesRef.current, text: typedRef.current, updated_at: new Date().toISOString() },
         { onConflict: "video_id" },
       );
     setSaveState(error ? "error" : "saved");
@@ -103,7 +127,7 @@ export default function StudyPage({ videoId }: { videoId: string }) {
     if (saveState !== "unsaved") return;
     const timer = setTimeout(save, 1200);
     return () => clearTimeout(timer);
-  }, [pages, saveState, save]);
+  }, [pages, typed, saveState, save]);
 
   // Save right away if the person switches apps or closes the tab.
   useEffect(() => {
@@ -143,7 +167,34 @@ export default function StudyPage({ videoId }: { videoId: string }) {
     change(pages.map((p, i) => (i === pageIndex ? { ...p, strokes: p.strokes.filter((_, j) => !gone.has(j)) } : p)));
   }
 
+  function changeTyped(text: string) {
+    setTyped(text);
+    setSaveState("unsaved");
+  }
+
+  // Typing mode: put [m:ss] at the cursor, on its own line.
+  function stampTyped() {
+    const box = typedBox.current;
+    const seconds = player.current?.getCurrentTime?.() ?? 0;
+    const at = box ? box.selectionStart : typed.length;
+    const before = typed.slice(0, at);
+    const after = typed.slice(at);
+    const insert = `${before && !before.endsWith("\n") ? "\n" : ""}[${formatTime(seconds)}] `;
+    changeTyped(before + insert + after);
+    requestAnimationFrame(() => {
+      if (!box) return;
+      box.focus();
+      box.selectionStart = box.selectionEnd = at + insert.length;
+    });
+  }
+
+  function jumpTo(seconds: number) {
+    player.current?.seekTo(seconds, true);
+    player.current?.playVideo();
+  }
+
   function stampTime() {
+    if (mode === "type") return stampTyped();
     const seconds = player.current?.getCurrentTime?.() ?? 0;
     let { page, y } = lastSpot.current;
     y += 50;
@@ -164,8 +215,7 @@ export default function StudyPage({ videoId }: { videoId: string }) {
       change(pages.map((p, i) => (i === pageIndex ? { ...p, stamps: p.stamps.filter((s) => s.id !== stampId) } : p)));
       return;
     }
-    player.current?.seekTo(seconds, true);
-    player.current?.playVideo();
+    jumpTo(seconds);
   }
 
   function addPage() {
@@ -198,6 +248,8 @@ export default function StudyPage({ videoId }: { videoId: string }) {
 
   const toolbar = (
     <Toolbar
+      mode={mode}
+      setMode={setMode}
       tool={tool}
       setTool={setTool}
       color={tool === "highlighter" ? highlightColor : penColor}
@@ -229,9 +281,7 @@ export default function StudyPage({ videoId }: { videoId: string }) {
         </button>
       </header>
 
-      <div
-        className={`gap-5 p-3 md:p-5 ${notesHidden ? "" : "lg:grid lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]"}`}
-      >
+      <div className={`gap-5 p-3 md:p-5 ${notesHidden ? "" : "lg:grid lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]"}`}>
         {/* Video: sticky on top in portrait, sticky on the left in landscape. */}
         <div
           className={
@@ -244,7 +294,9 @@ export default function StudyPage({ videoId }: { videoId: string }) {
             ref={playerHost}
             className="relative mx-auto aspect-video overflow-hidden rounded-lg bg-black [&_iframe]:absolute [&_iframe]:inset-0 [&_iframe]:h-full [&_iframe]:w-full"
             // The player keeps the same element when notes are hidden, so playback isn't interrupted.
-            style={{ width: notesHidden ? "min(100%, calc((100vh - 110px) * 16 / 9))" : "min(100%, calc(34vh * 16 / 9))" }}
+            style={{
+              width: notesHidden ? "min(100%, calc((100vh - 110px) * 16 / 9))" : "min(100%, calc(34vh * 16 / 9))",
+            }}
           />
           <div className={notesHidden ? "hidden" : "mt-2 hidden lg:block"}>
             {video?.channel && <p className="text-sm text-slate-500">{video.channel}</p>}
@@ -261,6 +313,8 @@ export default function StudyPage({ videoId }: { videoId: string }) {
           <div className="sticky top-[76px] z-20 hidden lg:block">{toolbar}</div>
           {!loaded ? (
             <p className="text-slate-500">Loading your notes…</p>
+          ) : mode === "type" ? (
+            <TypedNotes text={typed} onChange={changeTyped} onJump={jumpTo} boxRef={typedBox} onStamp={stampTyped} />
           ) : (
             <>
               {pages.map((page, i) => (
@@ -297,7 +351,54 @@ export default function StudyPage({ videoId }: { videoId: string }) {
   );
 }
 
+function TypedNotes(props: {
+  text: string;
+  onChange: (text: string) => void;
+  onJump: (seconds: number) => void;
+  onStamp: () => void;
+  boxRef: React.RefObject<HTMLTextAreaElement | null>;
+}) {
+  const times = timesIn(props.text);
+  return (
+    <div className="flex flex-col gap-2">
+      {times.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5 text-xs text-slate-500">
+          Jump to:
+          {times.map((t) => (
+            <button
+              key={t}
+              onClick={() => props.onJump(t)}
+              className="rounded-full bg-red-600 px-2 py-0.5 font-mono font-semibold text-white hover:bg-red-700"
+            >
+              ▶ {formatTime(t)}
+            </button>
+          ))}
+        </div>
+      )}
+      <textarea
+        id="typed-notes"
+        ref={props.boxRef}
+        value={props.text}
+        onChange={(e) => props.onChange(e.target.value)}
+        onKeyDown={(e) => {
+          // Ctrl/Cmd + Shift + S stamps the current video time while typing.
+          if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === "s") {
+            e.preventDefault();
+            props.onStamp();
+          }
+        }}
+        placeholder={
+          "Type your notes here…\n\nTip: press ⏱ Stamp time (or Ctrl+Shift+S) to add the video's current time, like [12:34]. Click a time above to jump back to it."
+        }
+        className="min-h-[65vh] w-full resize-y rounded-lg bg-white p-4 text-base leading-relaxed shadow-sm ring-1 ring-slate-200 outline-none focus:ring-2 focus:ring-slate-400"
+      />
+    </div>
+  );
+}
+
 function Toolbar(props: {
+  mode: Mode;
+  setMode: (m: Mode) => void;
   tool: Tool;
   setTool: (t: Tool) => void;
   color: string;
@@ -318,52 +419,72 @@ function Toolbar(props: {
   ];
   return (
     <div className="flex flex-wrap items-center gap-2 rounded-xl bg-white p-2 shadow-sm ring-1 ring-slate-200">
-      <div className="flex overflow-hidden rounded-lg ring-1 ring-slate-300">
-        {tools.map((t) => (
+      <div className="flex overflow-hidden rounded-lg bg-slate-100 p-0.5">
+        {(
+          [
+            ["write", "✍️ Handwriting"],
+            ["type", "⌨️ Typing"],
+          ] as const
+        ).map(([id, label]) => (
           <button
-            key={t.id}
-            onClick={() => props.setTool(t.id)}
-            className={`px-3 py-1.5 text-sm ${props.tool === t.id ? "bg-slate-900 text-white" : "hover:bg-slate-100"}`}
+            key={id}
+            onClick={() => props.setMode(id)}
+            className={`rounded-md px-3 py-1 text-sm ${props.mode === id ? "bg-white font-semibold shadow-sm" : "text-slate-600"}`}
           >
-            {t.label}
+            {label}
           </button>
         ))}
       </div>
-
-      {props.tool !== "eraser" && (
+      {props.mode === "write" && (
         <>
-          <div className="flex items-center gap-1.5">
-            {props.colors.map((c) => (
-              <button
-                key={c}
-                onClick={() => props.setColor(c)}
-                aria-label={`Color ${c}`}
-                className={`h-7 w-7 rounded-full ring-offset-2 ${props.color === c ? "ring-2 ring-slate-900" : ""}`}
-                style={{ background: c }}
-              />
-            ))}
-          </div>
           <div className="flex overflow-hidden rounded-lg ring-1 ring-slate-300">
-            {SIZES.map((s) => (
+            {tools.map((t) => (
               <button
-                key={s.value}
-                onClick={() => props.setSize(s.value)}
-                className={`px-2.5 py-1.5 text-xs ${props.size === s.value ? "bg-slate-200 font-semibold" : "hover:bg-slate-100"}`}
+                key={t.id}
+                onClick={() => props.setTool(t.id)}
+                className={`px-3 py-1.5 text-sm ${props.tool === t.id ? "bg-slate-900 text-white" : "hover:bg-slate-100"}`}
               >
-                {s.label}
+                {t.label}
               </button>
             ))}
           </div>
+
+          {props.tool !== "eraser" && (
+            <>
+              <div className="flex items-center gap-1.5">
+                {props.colors.map((c) => (
+                  <button
+                    key={c}
+                    onClick={() => props.setColor(c)}
+                    aria-label={`Color ${c}`}
+                    className={`h-7 w-7 rounded-full ring-offset-2 ${props.color === c ? "ring-2 ring-slate-900" : ""}`}
+                    style={{ background: c }}
+                  />
+                ))}
+              </div>
+              <div className="flex overflow-hidden rounded-lg ring-1 ring-slate-300">
+                {SIZES.map((s) => (
+                  <button
+                    key={s.value}
+                    onClick={() => props.setSize(s.value)}
+                    className={`px-2.5 py-1.5 text-xs ${props.size === s.value ? "bg-slate-200 font-semibold" : "hover:bg-slate-100"}`}
+                  >
+                    {s.label}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+
+          <button
+            onClick={props.onUndo}
+            disabled={!props.canUndo}
+            className="rounded-lg px-3 py-1.5 text-sm ring-1 ring-slate-300 hover:bg-slate-100 disabled:opacity-40"
+          >
+            Undo
+          </button>
         </>
       )}
-
-      <button
-        onClick={props.onUndo}
-        disabled={!props.canUndo}
-        className="rounded-lg px-3 py-1.5 text-sm ring-1 ring-slate-300 hover:bg-slate-100 disabled:opacity-40"
-      >
-        Undo
-      </button>
       <button
         onClick={props.onStamp}
         className="rounded-lg bg-red-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-red-700"
@@ -371,15 +492,17 @@ function Toolbar(props: {
       >
         ⏱ Stamp time
       </button>
-      <label className="ml-auto flex items-center gap-1.5 text-xs text-slate-600">
-        <input
-          id="finger-draws"
-          type="checkbox"
-          checked={props.fingerDraws}
-          onChange={(e) => props.setFingerDraws(e.target.checked)}
-        />
-        Draw with finger
-      </label>
+      {props.mode === "write" && (
+        <label className="ml-auto flex items-center gap-1.5 text-xs text-slate-600">
+          <input
+            id="finger-draws"
+            type="checkbox"
+            checked={props.fingerDraws}
+            onChange={(e) => props.setFingerDraws(e.target.checked)}
+          />
+          Draw with finger
+        </label>
+      )}
     </div>
   );
 }
@@ -395,4 +518,3 @@ function SaveBadge({ state, onRetry }: { state: SaveState; onRetry: () => void }
   const text = state === "saved" ? "Saved" : "Saving…";
   return <span className="shrink-0 text-xs text-slate-500">{text}</span>;
 }
-

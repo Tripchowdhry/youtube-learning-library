@@ -7,7 +7,7 @@ A web app for organizing the YouTube videos you learn from. Anyone can sign in w
 - Organize videos into folders and subfolders, and add tags
 - Drag videos to reorder them, or drop them onto a folder to move them (on phones, use the "Move to" menu on each video)
 - Search across titles, channels, folders and tags
-- Take handwritten notes on any video (Apple Pencil, mouse, or finger), with time stamps that jump the video to that moment
+- Take notes on any video, handwritten (Apple Pencil, mouse, or finger) or typed, with time stamps that jump the video to that moment
 - Share any folder with a read-only link
 - Works on any device with a browser
 
