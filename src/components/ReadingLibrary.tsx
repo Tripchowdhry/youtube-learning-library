@@ -122,6 +122,9 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
     [topCategories, subcategories],
   );
 
+  const categorySiblings = (category: ArticleCategory) =>
+    category.parent_id ? subcategories(category.parent_id) : topCategories;
+
   const currentCategory = view.kind === "category" ? categories.find((c) => c.id === view.id) ?? null : null;
 
   // A category shows its own articles plus those in its subcategories.
@@ -308,6 +311,24 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
     openView({ kind: "category", id: (data as ArticleCategory).id });
   }
 
+  // Moves a category up (-1) or down (+1) among the ones next to it, renumbering them so the order sticks.
+  async function shiftCategory(category: ArticleCategory, step: -1 | 1) {
+    const siblings = [...categorySiblings(category)];
+    const index = siblings.findIndex((c) => c.id === category.id);
+    if (index === -1 || !siblings[index + step]) return;
+    [siblings[index], siblings[index + step]] = [siblings[index + step], siblings[index]];
+    const changed = siblings.map((c, position) => ({ id: c.id, position })).filter((c, i) => siblings[i].position !== c.position);
+    setCategories((prev) => prev.map((c) => ({ ...c, position: changed.find((x) => x.id === c.id)?.position ?? c.position })));
+    const results = await Promise.all(
+      changed.map((c) => supabase.from("article_categories").update({ position: c.position }).eq("id", c.id)),
+    );
+    const failed = results.find((r) => r.error);
+    if (failed) {
+      notify(failed.error!.message, true);
+      load();
+    }
+  }
+
   async function renameCategory(category: ArticleCategory) {
     const name = window.prompt("Rename:", category.name)?.trim();
     if (!name || name === category.name) return;
@@ -443,6 +464,20 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
                     {!currentCategory.parent_id && (
                       <SmallButton onClick={() => createCategory(currentCategory.id)}>+ Subcategory</SmallButton>
                     )}
+                    <SmallButton
+                      onClick={() => shiftCategory(currentCategory, -1)}
+                      disabled={categorySiblings(currentCategory)[0]?.id === currentCategory.id}
+                      title="Move up"
+                    >
+                      ▲
+                    </SmallButton>
+                    <SmallButton
+                      onClick={() => shiftCategory(currentCategory, 1)}
+                      disabled={categorySiblings(currentCategory).at(-1)?.id === currentCategory.id}
+                      title="Move down"
+                    >
+                      ▼
+                    </SmallButton>
                     <SmallButton onClick={() => renameCategory(currentCategory)}>Rename</SmallButton>
                     <SmallButton onClick={() => deleteCategory(currentCategory)} danger>
                       Delete
