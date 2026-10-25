@@ -19,6 +19,20 @@ const emptyPage = (): NotePage => ({ strokes: [], stamps: [] });
 type SaveState = "saved" | "saving" | "unsaved" | "error";
 type Mode = "write" | "type";
 
+const MODE_KEY = "notes-mode";
+
+// The mode last picked on this device; otherwise typing when there's a mouse or
+// trackpad, and handwriting on touch-only devices like an iPad.
+function preferredMode(): Mode {
+  try {
+    const stored = localStorage.getItem(MODE_KEY);
+    if (stored === "write" || stored === "type") return stored;
+  } catch {
+    // Fall through to the device default.
+  }
+  return window.matchMedia("(any-pointer: fine)").matches ? "type" : "write";
+}
+
 // Typed notes mark video times as [m:ss] or [h:mm:ss].
 const TIME_PATTERN = /\[(\d+):(\d{2})(?::(\d{2}))?\]/g;
 
@@ -73,10 +87,7 @@ export default function StudyPage({ videoId }: { videoId: string }) {
       const savedText = (n.data?.text ?? "") as string;
       if (saved.length) setPages(saved);
       setTyped(savedText);
-      // Laptops (no touch screen) start in typing mode; tablets start with handwriting.
-      const hasHandwriting = saved.some((pg) => pg.strokes.length > 0);
-      const touchDevice = window.matchMedia("(pointer: coarse)").matches;
-      setMode(savedText && !hasHandwriting ? "type" : hasHandwriting || touchDevice ? "write" : "type");
+      setMode(preferredMode());
       setLoaded(true);
     })();
   }, [supabase, videoId]);
@@ -167,6 +178,15 @@ export default function StudyPage({ videoId }: { videoId: string }) {
     change(pages.map((p, i) => (i === pageIndex ? { ...p, strokes: p.strokes.filter((_, j) => !gone.has(j)) } : p)));
   }
 
+  function chooseMode(next: Mode) {
+    setMode(next);
+    try {
+      localStorage.setItem(MODE_KEY, next);
+    } catch {
+      // Storage can be blocked (private browsing); the choice just isn't remembered.
+    }
+  }
+
   function changeTyped(text: string) {
     setTyped(text);
     setSaveState("unsaved");
@@ -249,7 +269,7 @@ export default function StudyPage({ videoId }: { videoId: string }) {
   const toolbar = (
     <Toolbar
       mode={mode}
-      setMode={setMode}
+      setMode={chooseMode}
       tool={tool}
       setTool={setTool}
       color={tool === "highlighter" ? highlightColor : penColor}
