@@ -17,6 +17,9 @@ const PERIODS: { value: Period; label: string; days: number }[] = [
   { value: "year", label: "Past year", days: 366 },
 ];
 
+// Longest personal note on an article: about the length of an X post.
+export const NOTE_MAX = 280;
+
 const byPosition = (a: ArticleCategory, b: ArticleCategory) => a.position - b.position || a.name.localeCompare(b.name);
 
 export const formatDate = (iso: string) =>
@@ -112,7 +115,7 @@ export default function ReadingLibrary({ userEmail }: { userEmail: string }) {
       if (since && new Date(a.created_at).getTime() < since) return false;
       if (readFilter === "read" && !a.read_at) return false;
       if (readFilter === "unread" && a.read_at) return false;
-      if (q) return [a.title, a.site, a.author, a.url, categoryPath(a.category_id)].some((s) => s?.toLowerCase().includes(q));
+      if (q) return [a.title, a.site, a.author, a.url, a.note, categoryPath(a.category_id)].some((s) => s?.toLowerCase().includes(q));
       if (view.kind === "uncategorized") return !a.category_id;
       if (view.kind === "category") return inCategory(a, view.id);
       return true;
@@ -267,7 +270,7 @@ export default function ReadingLibrary({ userEmail }: { userEmail: string }) {
           type="search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search titles, sites, authors…"
+          placeholder="Search titles, sites, notes…"
           className="ml-auto w-full max-w-xs rounded-md border border-slate-300 px-3 py-1.5 text-sm"
         />
         <div className="hidden items-center gap-2 text-sm text-slate-500 sm:flex">
@@ -394,6 +397,7 @@ export default function ReadingLibrary({ userEmail }: { userEmail: string }) {
                       onToggleRead={() => toggleRead(article)}
                       onMove={(categoryId) => updateArticle(article.id, { category_id: categoryId })}
                       onRename={() => renameArticle(article)}
+                      onSaveNote={(note) => updateArticle(article.id, { note })}
                       onDelete={() => deleteArticle(article)}
                     />
                   ))}
@@ -454,9 +458,11 @@ function ArticleRow(props: {
   onToggleRead: () => void;
   onMove: (categoryId: string | null) => void;
   onRename: () => void;
+  onSaveNote: (note: string) => void;
   onDelete: () => void;
 }) {
   const { article } = props;
+  const [editingNote, setEditingNote] = useState(false);
   return (
     <li className="flex items-start gap-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
       <ReadCheck read={Boolean(article.read_at)} onClick={props.onToggleRead} />
@@ -469,6 +475,12 @@ function ArticleRow(props: {
           {" · "}Added {formatDate(article.created_at)}
           {article.read_at && <span className="text-green-700"> · Read {formatDate(article.read_at)}</span>}
         </p>
+        <ArticleNote
+          note={article.note}
+          editing={editingNote}
+          setEditing={setEditingNote}
+          onSave={props.onSaveNote}
+        />
         <div className="mt-1 flex flex-wrap items-center gap-1">
           <select
             value={article.category_id ?? ""}
@@ -492,6 +504,7 @@ function ArticleRow(props: {
           >
             Original ↗
           </a>
+          {!article.note && !editingNote && <SmallButton onClick={() => setEditingNote(true)}>📝 Add note</SmallButton>}
           <SmallButton onClick={props.onRename}>Edit title</SmallButton>
           <SmallButton onClick={props.onDelete} danger title="Delete">
             🗑 Delete
@@ -499,6 +512,73 @@ function ArticleRow(props: {
         </div>
       </div>
     </li>
+  );
+}
+
+// A short note to yourself: shown in yellow under the title, tap it to change it.
+export function ArticleNote(props: {
+  note: string;
+  editing: boolean;
+  setEditing: (editing: boolean) => void;
+  onSave: (note: string) => void;
+}) {
+  // Older rows can lack a note until supabase/articles.sql is rerun.
+  const current = props.note ?? "";
+  const [draft, setDraft] = useState(current);
+
+  useEffect(() => {
+    if (props.editing) setDraft(current);
+  }, [props.editing, current]);
+
+  function save() {
+    const note = draft.trim().slice(0, NOTE_MAX);
+    if (note !== current) props.onSave(note);
+    props.setEditing(false);
+  }
+
+  if (props.editing) {
+    return (
+      <div className="flex flex-col gap-1">
+        <textarea
+          autoFocus
+          value={draft}
+          maxLength={NOTE_MAX}
+          rows={2}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              save();
+            } else if (e.key === "Escape") props.setEditing(false);
+          }}
+          placeholder="Why you saved this, or what to remember…"
+          className="w-full rounded-md border border-amber-300 bg-amber-50 px-2 py-1.5 text-sm"
+        />
+        <div className="flex items-center gap-1">
+          <span className={`mr-auto text-xs ${draft.length >= NOTE_MAX ? "text-red-600" : "text-slate-400"}`}>
+            {draft.length}/{NOTE_MAX}
+          </span>
+          <SmallButton onClick={() => props.setEditing(false)}>Cancel</SmallButton>
+          <button
+            onClick={save}
+            className="rounded-md bg-slate-900 px-2 py-1 text-xs font-medium text-white hover:bg-slate-700"
+          >
+            Save note
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!current) return null;
+  return (
+    <button
+      onClick={() => props.setEditing(true)}
+      title="Tap to edit your note"
+      className="rounded-md bg-amber-50 px-2 py-1 text-left text-sm whitespace-pre-wrap text-slate-700 hover:bg-amber-100"
+    >
+      📝 {current}
+    </button>
   );
 }
 

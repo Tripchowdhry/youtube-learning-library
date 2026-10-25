@@ -80,6 +80,7 @@ export type Article = {
   title: string | null;
   site: string | null;
   author: string | null;
+  note: string;
   read_at: string | null;
   created_at: string;
 };
