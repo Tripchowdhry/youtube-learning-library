@@ -122,18 +122,49 @@ export default function Library({ userEmail }: { userEmail: string }) {
       return false;
     }
 
+    // Inside a folder, the video goes there. Otherwise it goes into its channel's folder.
+    let folderId = currentFolderId;
+    let newFolder: Folder | null = null;
+    if (!folderId && info.channel) {
+      const picked = await channelFolder(info.channel);
+      if (!picked) return false;
+      folderId = picked.id;
+      if (!folders.some((f) => f.id === picked.id)) newFolder = picked;
+    }
+
     const { data, error } = await supabase
       .from("videos")
-      .insert({ ...info, folder_id: currentFolderId, position: nextPosition(currentFolderId) })
+      .insert({ ...info, folder_id: folderId, position: nextPosition(folderId) })
       .select()
       .single();
     if (error) {
       notify(error.message, true);
       return false;
     }
+    if (newFolder) setFolders((prev) => [...prev, newFolder!]);
     setVideos((prev) => [...prev, data as Video]);
-    notify(`Saved "${info.title}"`);
+    notify(folderId && !currentFolderId ? `Saved to ${info.channel}` : `Saved "${info.title}"`);
     return true;
+  }
+
+  // Finds the top-level folder named after a channel, creating it the first time.
+  async function channelFolder(channel: string): Promise<Folder | null> {
+    const name = channel.trim().slice(0, 100);
+    const existing = folders.find((f) => f.parent_id === null && f.name.toLowerCase() === name.toLowerCase());
+    if (existing) return existing;
+
+    const topLevel = folders.filter((f) => f.parent_id === null);
+    const position = topLevel.length ? Math.max(...topLevel.map((f) => f.position)) + 1 : 0;
+    const { data, error } = await supabase
+      .from("folders")
+      .insert({ name, parent_id: null, position })
+      .select()
+      .single();
+    if (error) {
+      notify(error.message, true);
+      return null;
+    }
+    return data as Folder;
   }
 
   async function updateVideo(id: string, changes: Partial<Video>) {
@@ -357,7 +388,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
           {!searching && (
             <AddVideoForm
               onAdd={addVideo}
-              destination={view.kind === "folder" ? folderPath(view.id) : "Unsorted"}
+              destination={view.kind === "folder" ? folderPath(view.id) : null}
             />
           )}
 
@@ -513,7 +544,7 @@ function FolderTree(props: {
   );
 }
 
-function AddVideoForm({ onAdd, destination }: { onAdd: (link: string) => Promise<boolean>; destination: string }) {
+function AddVideoForm({ onAdd, destination }: { onAdd: (link: string) => Promise<boolean>; destination: string | null }) {
   const [link, setLink] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -537,7 +568,7 @@ function AddVideoForm({ onAdd, destination }: { onAdd: (link: string) => Promise
         disabled={busy}
         className="rounded-md bg-red-600 px-4 py-2 font-semibold text-white hover:bg-red-700 disabled:opacity-60"
       >
-        {busy ? "Adding…" : `Add to ${destination}`}
+        {busy ? "Adding…" : destination ? `Add to ${destination}` : "Add video"}
       </button>
     </form>
   );

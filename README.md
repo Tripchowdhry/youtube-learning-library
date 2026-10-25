@@ -3,6 +3,7 @@
 A web app for organizing the YouTube videos you learn from. Anyone can sign in with Google and get their own private library.
 
 - Paste a YouTube link and the title, channel and thumbnail fill in automatically
+- Videos added outside a folder are sorted into a folder named after their YouTube channel
 - Organize videos into folders and subfolders, and add tags
 - Drag videos to reorder them, or drop them onto a folder to move them (on phones, use the "Move to" menu on each video)
 - Search across titles, channels, folders and tags
