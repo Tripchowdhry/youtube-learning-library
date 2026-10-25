@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { SectionSwitch } from "@/components/ReadingLibrary";
 import VideoThumb from "@/components/VideoThumb";
 import { createClient } from "@/lib/supabase/client";
 import type { Folder, Video } from "@/lib/types";
@@ -328,7 +329,8 @@ export default function Library({ userEmail }: { userEmail: string }) {
         >
           {showFolders ? "Close" : "Folders"}
         </button>
-        <span className="text-lg font-bold">📚 Learning Library</span>
+        <span className="hidden text-lg font-bold sm:inline">📚 Learning Library</span>
+        <SectionSwitch active="videos" />
         <input
           type="search"
           value={query}
