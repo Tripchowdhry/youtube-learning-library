@@ -83,7 +83,8 @@ export default function StudyPage({ videoId }: { videoId: string }) {
 
   const [clipBusy, setClipBusy] = useState(false);
   const pictureInput = useRef<HTMLInputElement>(null);
-  const [clipHelp, setClipHelp] = useState(false);
+  // iPad: after the first Clip tap the video waits, paused, for the screenshot to be pasted.
+  const [waitingForPaste, setWaitingForPaste] = useState(false);
   const resumeAfterClip = useRef(false);
   // The link that starts a drag-to-select screenshot on this computer, if there is one.
   const [screenshotLink, setScreenshotLink] = useState<string | null>(null);
@@ -309,14 +310,14 @@ export default function StudyPage({ videoId }: { videoId: string }) {
     const playing = player.current?.getPlayerState?.() === 1;
     resumeAfterClip.current = playing;
     if (playing) player.current?.pauseVideo();
-    // On a Mac or Windows PC, start the screenshot for them; they then press Cmd+V / Ctrl+V,
-    // so no help box is needed. Elsewhere (iPad), show the steps.
+    // On a Mac or Windows PC, start the screenshot for them; they then press Cmd+V / Ctrl+V.
+    // Elsewhere (iPad), they take the screenshot themselves and tap Clip again to paste it.
     if (screenshotLink) window.location.href = screenshotLink;
-    else setClipHelp(true);
+    else setWaitingForPaste(true);
   }
 
   function endClip() {
-    setClipHelp(false);
+    setWaitingForPaste(false);
     if (resumeAfterClip.current) player.current?.playVideo();
     resumeAfterClip.current = false;
   }
@@ -365,7 +366,7 @@ export default function StudyPage({ videoId }: { videoId: string }) {
     changeTypedClips([...typedClipsRef.current, { path, t: null }]);
   }
 
-  // The Paste picture button in the Clip box (handy on iPad). If the clipboard can't be read, pick a picture instead.
+  // The second Clip tap on iPad. If the clipboard can't be read, pick a picture instead.
   async function pastePicture() {
     const seconds = player.current?.getCurrentTime?.() ?? 0;
     try {
@@ -451,7 +452,9 @@ export default function StudyPage({ videoId }: { videoId: string }) {
       canUndo={canUndo}
       onUndo={undo}
       onStamp={stampTime}
-      onClip={startClip}
+      onClip={waitingForPaste ? pastePicture : startClip}
+      waitingForPaste={waitingForPaste}
+      onCancelClip={endClip}
       clipCount={clipCount}
       onDeleteAllClips={deleteAllClips}
       clipBusy={clipBusy}
@@ -565,7 +568,6 @@ export default function StudyPage({ videoId }: { videoId: string }) {
           if (file) addClip(file, player.current?.getCurrentTime?.() ?? 0);
         }}
       />
-      {clipHelp && <ClipHelp onPaste={pastePicture} onClose={endClip} />}
       {(notice || clipBusy) && (
         <div className="fixed bottom-4 left-1/2 z-40 -translate-x-1/2 rounded-lg bg-slate-900 px-4 py-2 text-sm text-white shadow-lg">
           {clipBusy ? "Saving picture…" : notice}
@@ -644,63 +646,6 @@ function TypedNotes(props: {
   );
 }
 
-function ClipHelp(props: { onPaste: () => void; onClose: () => void }) {
-  const keys = [
-    { device: "Mac", keys: ["Cmd", "Ctrl", "Shift", "4"], then: "Drag over the video." },
-    { device: "Windows", keys: ["Windows", "Shift", "S"], then: "Drag over the video." },
-    { device: "iPad", keys: ["Top button", "Volume up"], then: "Crop to the video, then tap Copy." },
-  ];
-  return (
-    // A corner panel with no dimming, so it stays out of the screenshot of the video.
-    <div className="fixed right-4 bottom-4 z-40 w-[min(26rem,calc(100%-2rem))]">
-      <div className="flex flex-col gap-4 rounded-xl bg-white p-5 shadow-2xl ring-1 ring-slate-200">
-        <h2 className="text-lg font-semibold">Clip the video</h2>
-        <div>
-          <p className="mb-2 text-sm font-medium">1. Take a screenshot. Press these keys together:</p>
-          <ul className="space-y-2">
-            {keys.map((k) => (
-              <li key={k.device} className="text-sm">
-                <span className="inline-block w-20 font-medium">{k.device}</span>
-                {k.keys.map((key, i) => (
-                  <span key={key}>
-                    {i > 0 && <span className="mx-1 text-slate-400">+</span>}
-                    <kbd className="rounded border border-slate-300 bg-slate-50 px-1.5 py-0.5 font-mono text-xs">
-                      {key}
-                    </kbd>
-                  </span>
-                ))}
-                <span className="mt-0.5 block pl-20 text-xs text-slate-500">{k.then}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-        <p className="text-sm font-medium">
-          2. Come back and press{" "}
-          <kbd className="rounded border border-slate-300 bg-slate-50 px-1.5 py-0.5 font-mono text-xs">Cmd</kbd> +{" "}
-          <kbd className="rounded border border-slate-300 bg-slate-50 px-1.5 py-0.5 font-mono text-xs">V</kbd> (Mac) or{" "}
-          <kbd className="rounded border border-slate-300 bg-slate-50 px-1.5 py-0.5 font-mono text-xs">Ctrl</kbd> +{" "}
-          <kbd className="rounded border border-slate-300 bg-slate-50 px-1.5 py-0.5 font-mono text-xs">V</kbd>{" "}
-          (Windows), or tap Paste picture.
-        </p>
-        <div className="flex gap-2">
-          <button
-            onClick={props.onPaste}
-            className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700"
-          >
-            Paste picture
-          </button>
-          <button
-            onClick={props.onClose}
-            className="ml-auto rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-100"
-          >
-            Close
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function Toolbar(props: {
   mode: Mode;
   setMode: (m: Mode) => void;
@@ -715,6 +660,8 @@ function Toolbar(props: {
   onUndo: () => void;
   onStamp: () => void;
   onClip: () => void;
+  waitingForPaste: boolean;
+  onCancelClip: () => void;
   clipCount: number;
   onDeleteAllClips: () => void;
   clipBusy: boolean;
@@ -805,10 +752,22 @@ function Toolbar(props: {
         onClick={props.onClip}
         disabled={props.clipBusy}
         className="rounded-lg px-3 py-1.5 text-sm font-semibold ring-1 ring-slate-300 hover:bg-slate-100 disabled:opacity-50"
-        title="Put a screenshot of the video into your notes"
+        title={
+          props.waitingForPaste
+            ? "Take a screenshot of the video and tap Copy, then tap here to paste it"
+            : "Put a screenshot of the video into your notes"
+        }
       >
-        📷 Clip
+        {props.waitingForPaste ? "📋 Paste clip" : "📷 Clip"}
       </button>
+      {props.waitingForPaste && (
+        <button
+          onClick={props.onCancelClip}
+          className="rounded-lg px-2 py-1.5 text-sm text-slate-600 ring-1 ring-slate-300 hover:bg-slate-100"
+        >
+          Cancel
+        </button>
+      )}
       {props.clipCount > 0 && (
         <button
           onClick={props.onDeleteAllClips}
