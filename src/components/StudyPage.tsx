@@ -4,7 +4,15 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import NotePageCanvas, { PAGE_HEIGHT, type Tool } from "@/components/NotePageCanvas";
 import { DeleteClipButton } from "@/components/ClipButtons";
-import { clipUrl, compressImage, uploadClip, type ClipImage } from "@/lib/clips";
+import {
+  clipUrl,
+  compressImage,
+  joinTypedClips,
+  splitTypedClips,
+  uploadClip,
+  type ClipImage,
+  type TypedClip,
+} from "@/lib/clips";
 import { createClient } from "@/lib/supabase/client";
 import { formatTime, loadYouTubeApi, type YouTubePlayer } from "@/lib/youtube-player";
 import type { NoteImage, NotePage, NoteStroke, Video } from "@/lib/types";
@@ -40,11 +48,6 @@ function preferredMode(): Mode {
 
 // Typed notes mark video times as [m:ss] or [h:mm:ss].
 const TIME_PATTERN = /\[(\d+):(\d{2})(?::(\d{2}))?\]/g;
-
-function toSeconds(time: string) {
-  const parts = time.split(":").map(Number);
-  return parts.reduce((total, n) => total * 60 + n, 0);
-}
 
 function timesIn(text: string) {
   const seen = new Set<number>();
@@ -570,33 +573,6 @@ export default function StudyPage({ videoId }: { videoId: string }) {
       )}
     </div>
   );
-}
-
-// Typed notes store clips as "[12:34] ![clip](path)".
-const CLIP_PATTERN = /(?:\[([\d:]+)\]\s*)?!\[clip\]\(([^)\s]+)\)/g;
-
-// A clip in typed notes. t is null when its time was removed.
-type TypedClip = { path: string; t: number | null };
-
-// Typed clips are saved after the notes, below this line, so they never show in the text box.
-const CLIPS_MARKER = "\n\n--- clips ---\n";
-
-function splitTypedClips(saved: string) {
-  const clips: TypedClip[] = Array.from(saved.matchAll(CLIP_PATTERN), (m) => ({
-    path: m[2],
-    t: m[1] ? toSeconds(m[1]) : null,
-  }));
-  // Older notes had clips mixed into the text; take them out of it.
-  const text = saved.includes(CLIPS_MARKER)
-    ? saved.split(CLIPS_MARKER)[0]
-    : saved.replace(new RegExp(`${CLIP_PATTERN.source}\\n?`, "g"), "");
-  return { text, clips };
-}
-
-function joinTypedClips(text: string, clips: TypedClip[]) {
-  if (!clips.length) return text;
-  const lines = clips.map((c) => `${c.t === null ? "" : `[${formatTime(c.t)}] `}![clip](${c.path})`);
-  return text + CLIPS_MARKER + lines.join("\n");
 }
 
 function TypedNotes(props: {

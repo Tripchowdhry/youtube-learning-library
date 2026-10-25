@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import VideoThumb from "@/components/VideoThumb";
@@ -335,6 +336,13 @@ export default function Library({ userEmail }: { userEmail: string }) {
           placeholder="Search titles, channels, tags…"
           className="ml-auto w-full max-w-xs rounded-md border border-slate-300 px-3 py-1.5 text-sm"
         />
+        <Link
+          href="/clips"
+          className="shrink-0 rounded-md px-2 py-1 text-sm text-slate-600 hover:bg-slate-100"
+          title="See and delete your clips to free up space"
+        >
+          🗂 Clips
+        </Link>
         <div className="hidden items-center gap-2 text-sm text-slate-500 sm:flex">
           <span className="max-w-40 truncate">{userEmail}</span>
           <button onClick={signOut} className="rounded-md px-2 py-1 hover:bg-slate-100">
