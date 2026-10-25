@@ -279,6 +279,15 @@ export default function StudyPage({ videoId }: { videoId: string }) {
     setSaveState("unsaved");
   }
 
+  const clipCount = typedClips.length + pages.reduce((n, p) => n + (p.images?.length ?? 0), 0);
+
+  // Removes every clip from this video's notes, in both handwriting and typed notes.
+  function deleteAllClips() {
+    if (!window.confirm(`Delete all ${clipCount} clips from this video?`)) return;
+    if (pages.some((p) => p.images?.length)) change(pages.map((p) => ({ ...p, images: [] })));
+    if (typedClips.length) changeTypedClips([]);
+  }
+
   function deleteImage(pageIndex: number, imageId: string) {
     change(
       pages.map((p, i) => (i === pageIndex ? { ...p, images: (p.images ?? []).filter((im) => im.id !== imageId) } : p)),
@@ -440,6 +449,8 @@ export default function StudyPage({ videoId }: { videoId: string }) {
       onUndo={undo}
       onStamp={stampTime}
       onClip={startClip}
+      clipCount={clipCount}
+      onDeleteAllClips={deleteAllClips}
       clipBusy={clipBusy}
       fingerDraws={fingerDraws}
       setFingerDraws={setFingerDraws}
@@ -728,6 +739,8 @@ function Toolbar(props: {
   onUndo: () => void;
   onStamp: () => void;
   onClip: () => void;
+  clipCount: number;
+  onDeleteAllClips: () => void;
   clipBusy: boolean;
   fingerDraws: boolean;
   setFingerDraws: (v: boolean) => void;
@@ -820,6 +833,15 @@ function Toolbar(props: {
       >
         📷 Clip
       </button>
+      {props.clipCount > 0 && (
+        <button
+          onClick={props.onDeleteAllClips}
+          className="rounded-lg px-3 py-1.5 text-sm text-red-700 ring-1 ring-slate-300 hover:bg-red-50"
+          title="Delete every clip in this video's notes"
+        >
+          🗑 Delete all clips
+        </button>
+      )}
       {props.mode === "write" && (
         <label className="ml-auto flex items-center gap-1.5 text-xs text-slate-600">
           <input
