@@ -522,7 +522,7 @@ export function ArticleNote(props: {
   setEditing: (editing: boolean) => void;
   onSave: (note: string) => void;
 }) {
-  // Older rows can lack a note until supabase/articles.sql is rerun.
+  // Rows can lack a note until the SQL that adds the column has been run.
   const current = props.note ?? "";
   const [draft, setDraft] = useState(current);
 

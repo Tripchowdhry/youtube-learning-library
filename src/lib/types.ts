@@ -18,6 +18,7 @@ export type Video = {
   channel: string | null;
   thumbnail_url: string | null;
   tags: string[];
+  note: string;
   position: number;
   created_at: string;
 };

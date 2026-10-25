@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { SectionSwitch } from "@/components/ReadingLibrary";
+import { ArticleNote, SectionSwitch, formatDate } from "@/components/ReadingLibrary";
 import VideoThumb from "@/components/VideoThumb";
 import { createClient } from "@/lib/supabase/client";
 import type { Folder, Video } from "@/lib/types";
@@ -99,7 +99,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
     const q = query.trim().toLowerCase();
     if (q) {
       return videos.filter((v) =>
-        [v.title, v.channel, folderPath(v.folder_id), ...v.tags].some((s) => s?.toLowerCase().includes(q)),
+        [v.title, v.channel, v.note, folderPath(v.folder_id), ...v.tags].some((s) => s?.toLowerCase().includes(q)),
       );
     }
     if (view.kind === "all") return [...videos].sort((a, b) => b.created_at.localeCompare(a.created_at));
@@ -335,7 +335,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
           type="search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search titles, channels, tags…"
+          placeholder="Search titles, channels, notes…"
           className="ml-auto w-full max-w-xs rounded-md border border-slate-300 px-3 py-1.5 text-sm"
         />
         <Link
@@ -443,7 +443,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
             <>
               {canReorder && visibleVideos.length > 1 && (
                 <p className="mb-3 text-xs text-slate-500">
-                  Tip: use ◀ ▶ on a video, or drag it onto another, to change the order. Drop it on a folder to move it.
+                  Tip: use ▲ ▼ on a video, or drag it onto another, to change the order. Drop it on a folder to move it.
                 </p>
               )}
               {!canReorder && visibleVideos.length > 1 && (
@@ -452,12 +452,11 @@ export default function Library({ userEmail }: { userEmail: string }) {
                   on the left.
                 </p>
               )}
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              <div className="flex flex-col gap-2">
                 {visibleVideos.map((video, index) => (
                   <VideoCard
                     key={video.id}
                     video={video}
-                    folderLabel={view.kind === "all" || searching ? folderPath(video.folder_id) || "Unsorted" : null}
                     folderOptions={folderOptions}
                     hasNotes={notedVideoIds.has(video.id)}
                     canReorder={canReorder}
@@ -470,6 +469,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
                     isLast={index === visibleVideos.length - 1}
                     onMove={(folderId) => moveVideo(video.id, folderId)}
                     onEditTags={() => editTags(video)}
+                    onSaveNote={(note) => updateVideo(video.id, { note })}
                     onDelete={() => deleteVideo(video)}
                     onTagClick={(tag) => setQuery(tag)}
                   />
@@ -615,7 +615,6 @@ function AddVideoForm({ onAdd, destination }: { onAdd: (link: string) => Promise
 
 function VideoCard(props: {
   video: Video;
-  folderLabel: string | null;
   folderOptions: { id: string; label: string }[];
   hasNotes: boolean;
   canReorder: boolean;
@@ -628,15 +627,17 @@ function VideoCard(props: {
   isLast: boolean;
   onMove: (folderId: string | null) => void;
   onEditTags: () => void;
+  onSaveNote: (note: string) => void;
   onDelete: () => void;
   onTagClick: (tag: string) => void;
 }) {
   const { video } = props;
   const [over, setOver] = useState(false);
+  const [editingNote, setEditingNote] = useState(false);
 
   return (
     <div
-      draggable
+      draggable={!editingNote}
       onDragStart={(e) => {
         e.dataTransfer.effectAllowed = "move";
         e.dataTransfer.setData("text/plain", video.id);
@@ -654,23 +655,19 @@ function VideoCard(props: {
         setOver(false);
         props.onDropOnto();
       }}
-      className={`flex cursor-grab flex-col overflow-hidden rounded-xl border bg-white shadow-sm transition ${props.dragging ? "opacity-40" : ""} ${over ? "border-blue-500 ring-2 ring-blue-500" : "border-slate-200"}`}
+      className={`flex gap-3 rounded-xl border bg-white p-3 shadow-sm transition ${props.dragging ? "opacity-40" : ""} ${over ? "border-blue-500 ring-2 ring-blue-500" : "border-slate-200"}`}
     >
-      <VideoThumb video={video} href={`/video/${video.id}`} />
-      <div className="flex flex-1 flex-col gap-2 p-3">
+      <div className="w-28 shrink-0 cursor-grab overflow-hidden rounded-lg sm:w-48">
+        <VideoThumb video={video} href={`/video/${video.id}`} />
+      </div>
+      <div className="flex min-w-0 flex-1 flex-col gap-1">
         <a href={`/video/${video.id}`} className="line-clamp-2 font-medium hover:underline" draggable={false}>
           {video.title}
         </a>
-        {video.channel && <p className="-mt-1 text-sm text-slate-500">{video.channel}</p>}
-        <div className="flex flex-wrap items-center gap-3 text-xs">
-          <a href={`/video/${video.id}`} className="font-medium text-slate-700 hover:underline" draggable={false}>
-            ✏️ {props.hasNotes ? "Open notes" : "Take notes"}
-          </a>
-          <a href={video.url} target="_blank" rel="noreferrer" className="text-slate-500 hover:underline" draggable={false}>
-            YouTube ↗
-          </a>
-        </div>
-        {props.folderLabel && <p className="text-xs text-slate-500">📁 {props.folderLabel}</p>}
+        <p className="text-xs text-slate-500">
+          {video.channel && `${video.channel} · `}Added {formatDate(video.created_at)}
+        </p>
+        <ArticleNote note={video.note} editing={editingNote} setEditing={setEditingNote} onSave={props.onSaveNote} />
         {video.tags.length > 0 && (
           <div className="flex flex-wrap gap-1">
             {video.tags.map((tag) => (
@@ -684,11 +681,27 @@ function VideoCard(props: {
             ))}
           </div>
         )}
-        <div className="mt-auto flex items-center gap-1 pt-1">
+        <div className="mt-1 flex flex-wrap items-center gap-1">
+          <a
+            href={`/video/${video.id}`}
+            className="rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100"
+            draggable={false}
+          >
+            ✏️ {props.hasNotes ? "Open notes" : "Take notes"}
+          </a>
+          <a
+            href={video.url}
+            target="_blank"
+            rel="noreferrer"
+            className="rounded-md border border-slate-300 px-2 py-1 text-xs text-slate-700 hover:bg-slate-100"
+            draggable={false}
+          >
+            YouTube ↗
+          </a>
           <select
             value={video.folder_id ?? ""}
             onChange={(e) => props.onMove(e.target.value || null)}
-            className="min-w-0 flex-1 rounded-md border border-slate-300 bg-white px-1 py-1 text-xs"
+            className="max-w-48 min-w-0 rounded-md border border-slate-300 bg-white px-1 py-1 text-xs"
             aria-label="Move to folder"
           >
             <option value="">📥 Unsorted</option>
@@ -700,17 +713,18 @@ function VideoCard(props: {
           </select>
           {props.onShift && (
             <>
-              <SmallButton onClick={() => props.onShift!(-1)} disabled={props.isFirst} title="Move earlier">
-                ◀
+              <SmallButton onClick={() => props.onShift!(-1)} disabled={props.isFirst} title="Move up">
+                ▲
               </SmallButton>
-              <SmallButton onClick={() => props.onShift!(1)} disabled={props.isLast} title="Move later">
-                ▶
+              <SmallButton onClick={() => props.onShift!(1)} disabled={props.isLast} title="Move down">
+                ▼
               </SmallButton>
             </>
           )}
+          {!video.note && !editingNote && <SmallButton onClick={() => setEditingNote(true)}>📝 Add note</SmallButton>}
           <SmallButton onClick={props.onEditTags}>Tags</SmallButton>
           <SmallButton onClick={props.onDelete} danger>
-            ✕
+            🗑 Delete
           </SmallButton>
         </div>
       </div>
