@@ -30,3 +30,19 @@ export type SharedFolder = {
     "id" | "folder_id" | "youtube_id" | "url" | "title" | "channel" | "thumbnail_url" | "tags" | "position"
   >[];
 };
+
+// Handwritten notes. Coordinates are in page units (PAGE_WIDTH x PAGE_HEIGHT), so
+// notes look the same on any screen size.
+export type NotePoint = [x: number, y: number, pressure: number];
+
+export type NoteStroke = {
+  tool: "pen" | "highlighter";
+  color: string;
+  size: number;
+  points: NotePoint[];
+};
+
+// A video time (in seconds) pinned onto the page; tapping it jumps the video there.
+export type NoteStamp = { id: string; t: number; x: number; y: number };
+
+export type NotePage = { strokes: NoteStroke[]; stamps: NoteStamp[] };

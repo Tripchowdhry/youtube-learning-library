@@ -7,6 +7,7 @@ A web app for organizing the YouTube videos you learn from. Anyone can sign in w
 - Organize videos into folders and subfolders, and add tags
 - Drag videos to reorder them, or drop them onto a folder to move them (on phones, use the "Move to" menu on each video)
 - Search across titles, channels, folders and tags
+- Take handwritten notes on any video (Apple Pencil, mouse, or finger), with time stamps that jump the video to that moment
 - Share any folder with a read-only link
 - Works on any device with a browser
 
@@ -17,6 +18,7 @@ Built with Next.js, Tailwind CSS and Supabase. Hosted on Vercel.
 ### 1. Create the Supabase project
 1. In [Supabase](https://supabase.com/dashboard), click **New project**. Pick a name and a database password (save it somewhere), and choose the region closest to you.
 2. When it's ready, open **SQL Editor → New query**, paste everything from [`supabase/schema.sql`](supabase/schema.sql), and click **Run**.
+   (Set up before notes existed? Run [`supabase/notes.sql`](supabase/notes.sql) the same way.)
 3. Open **Project Settings → API** (or **Data API**) and copy the **Project URL** and the **anon public** key.
 
 ### 2. Turn on Google sign-in

@@ -16,6 +16,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
 
   const [folders, setFolders] = useState<Folder[]>([]);
   const [videos, setVideos] = useState<Video[]>([]);
+  const [notedVideoIds, setNotedVideoIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<View>({ kind: "all" });
   const [query, setQuery] = useState("");
@@ -30,10 +31,13 @@ export default function Library({ userEmail }: { userEmail: string }) {
   }, []);
 
   const load = useCallback(async () => {
-    const [f, v] = await Promise.all([
+    const [f, v, n] = await Promise.all([
       supabase.from("folders").select("*").order("position").order("name"),
       supabase.from("videos").select("*").order("position"),
+      supabase.from("notes").select("video_id"),
     ]);
+    // Notes are optional: ignore errors so the library still loads before the notes table exists.
+    if (!n.error) setNotedVideoIds(new Set(n.data.map((row) => row.video_id as string)));
     if (f.error || v.error) {
       notify((f.error ?? v.error)!.message, true);
     } else {
@@ -445,6 +449,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
                     video={video}
                     folderLabel={view.kind === "all" || searching ? folderPath(video.folder_id) || "Unsorted" : null}
                     folderOptions={folderOptions}
+                    hasNotes={notedVideoIds.has(video.id)}
                     canReorder={canReorder}
                     dragging={draggingId === video.id}
                     onDragStart={() => setDraggingId(video.id)}
@@ -602,6 +607,7 @@ function VideoCard(props: {
   video: Video;
   folderLabel: string | null;
   folderOptions: { id: string; label: string }[];
+  hasNotes: boolean;
   canReorder: boolean;
   dragging: boolean;
   onDragStart: () => void;
@@ -640,12 +646,20 @@ function VideoCard(props: {
       }}
       className={`flex cursor-grab flex-col overflow-hidden rounded-xl border bg-white shadow-sm transition ${props.dragging ? "opacity-40" : ""} ${over ? "border-blue-500 ring-2 ring-blue-500" : "border-slate-200"}`}
     >
-      <VideoThumb video={video} />
+      <VideoThumb video={video} href={`/video/${video.id}`} />
       <div className="flex flex-1 flex-col gap-2 p-3">
-        <a href={video.url} target="_blank" rel="noreferrer" className="line-clamp-2 font-medium hover:underline" draggable={false}>
+        <a href={`/video/${video.id}`} className="line-clamp-2 font-medium hover:underline" draggable={false}>
           {video.title}
         </a>
         {video.channel && <p className="-mt-1 text-sm text-slate-500">{video.channel}</p>}
+        <div className="flex flex-wrap items-center gap-3 text-xs">
+          <a href={`/video/${video.id}`} className="font-medium text-slate-700 hover:underline" draggable={false}>
+            ✏️ {props.hasNotes ? "Open notes" : "Take notes"}
+          </a>
+          <a href={video.url} target="_blank" rel="noreferrer" className="text-slate-500 hover:underline" draggable={false}>
+            YouTube ↗
+          </a>
+        </div>
         {props.folderLabel && <p className="text-xs text-slate-500">📁 {props.folderLabel}</p>}
         {video.tags.length > 0 && (
           <div className="flex flex-wrap gap-1">
