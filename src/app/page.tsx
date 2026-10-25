@@ -1,3 +1,4 @@
+import Link from "next/link";
 import Library from "@/components/Library";
 import SignInButton from "@/components/SignInButton";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
@@ -29,6 +30,9 @@ export default async function Home({
       </p>
       <SignInButton />
       {error && <p className="text-sm text-red-600">Sign-in didn&apos;t work. Please try again.</p>}
+      <Link href="/privacy" className="text-sm text-slate-500 underline">
+        Privacy policy
+      </Link>
     </main>
   );
 }
