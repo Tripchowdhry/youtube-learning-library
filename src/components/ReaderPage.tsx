@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ReadCheck, formatDate } from "@/components/ReadingLibrary";
+import { ArticleNote, ReadCheck, formatDate } from "@/components/ReadingLibrary";
 import { createClient } from "@/lib/supabase/client";
 import type { Article, ArticleContent } from "@/lib/types";
 
@@ -40,6 +40,7 @@ export default function ReaderPage({ articleId }: { articleId: string }) {
   // True once the post or text is on screen, so the end marker only counts after that.
   const [ready, setReady] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const [editingNote, setEditingNote] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
   const tweetRef = useRef<HTMLDivElement>(null);
   const autoMarked = useRef(false);
@@ -93,6 +94,13 @@ export default function ReaderPage({ articleId }: { articleId: string }) {
     },
     [article, supabase],
   );
+
+  async function saveNote(note: string) {
+    if (!article) return;
+    setArticle({ ...article, note });
+    const { error } = await supabase.from("articles").update({ note }).eq("id", article.id);
+    if (error) setToast(error.message);
+  }
 
   // Reaching the end marks the article as read (once per visit).
   useEffect(() => {
@@ -158,6 +166,15 @@ export default function ReaderPage({ articleId }: { articleId: string }) {
               {[article.site, article.author].filter(Boolean).join(" · ")} · Added {formatDate(article.created_at)}
               {article.read_at && <span className="text-green-700"> · Read {formatDate(article.read_at)}</span>}
             </p>
+            <div className="mt-3">
+              {!article.note && !editingNote ? (
+                <button onClick={() => setEditingNote(true)} className="text-sm text-slate-500 hover:underline">
+                  📝 Add a note for yourself
+                </button>
+              ) : (
+                <ArticleNote note={article.note} editing={editingNote} setEditing={setEditingNote} onSave={saveNote} />
+              )}
+            </div>
           </div>
         )}
 
