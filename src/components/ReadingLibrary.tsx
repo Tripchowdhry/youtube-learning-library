@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { linkKey } from "@/lib/links";
 import { createClient } from "@/lib/supabase/client";
-import type { Article, ArticleCategory } from "@/lib/types";
+import type { Article, ArticleCategory, SectionKind } from "@/lib/types";
 
 type View = { kind: "all" } | { kind: "uncategorized" } | { kind: "category"; id: string };
 type Period = "any" | "week" | "month" | "year";
@@ -26,7 +26,33 @@ const byPosition = (a: ArticleCategory, b: ArticleCategory) => a.position - b.po
 export const formatDate = (iso: string) =>
   new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
 
-export default function ReadingLibrary({ userEmail }: { userEmail: string }) {
+// Reading and Tutorials work the same way; each has its own links and categories.
+export const SECTIONS: Record<
+  SectionKind,
+  { path: string; icon: string; name: string; all: string; list: string; placeholder: string; example: string }
+> = {
+  reading: {
+    path: "/reading",
+    icon: "📄",
+    name: "Reading",
+    all: "All reading",
+    list: "reading list",
+    placeholder: "Paste a link to an X post or article…",
+    example: "an X post or a blog article",
+  },
+  tutorial: {
+    path: "/tutorials",
+    icon: "🎓",
+    name: "Tutorials",
+    all: "All tutorials",
+    list: "tutorials list",
+    placeholder: "Paste a link to a tutorial…",
+    example: "a how-to guide or a course page",
+  },
+};
+
+export default function ReadingLibrary({ userEmail, kind }: { userEmail: string; kind: SectionKind }) {
+  const section = SECTIONS[kind];
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
 
@@ -49,8 +75,8 @@ export default function ReadingLibrary({ userEmail }: { userEmail: string }) {
 
   const load = useCallback(async () => {
     const [c, a] = await Promise.all([
-      supabase.from("article_categories").select("*").order("position").order("name"),
-      supabase.from("articles").select("*").order("created_at", { ascending: false }),
+      supabase.from("article_categories").select("*").eq("kind", kind).order("position").order("name"),
+      supabase.from("articles").select("*").eq("kind", kind).order("created_at", { ascending: false }),
     ]);
     const error = c.error ?? a.error;
     if (error) {
@@ -62,7 +88,7 @@ export default function ReadingLibrary({ userEmail }: { userEmail: string }) {
       setArticles(a.data as Article[]);
     }
     setLoading(false);
-  }, [supabase, notify]);
+  }, [supabase, notify, kind]);
 
   useEffect(() => {
     load();
@@ -188,6 +214,7 @@ export default function ReadingLibrary({ userEmail }: { userEmail: string }) {
         author: info.author,
         category_id: categoryId,
         position: topPosition(categoryId),
+        kind,
       })
       .select()
       .single();
@@ -253,7 +280,7 @@ export default function ReadingLibrary({ userEmail }: { userEmail: string }) {
   }
 
   async function deleteArticle(article: Article) {
-    if (!window.confirm(`Delete "${article.title}" from your reading list?`)) return;
+    if (!window.confirm(`Delete "${article.title}" from your ${section.list}?`)) return;
     setArticles((prev) => prev.filter((a) => a.id !== article.id));
     const { error } = await supabase.from("articles").delete().eq("id", article.id);
     if (error) {
@@ -273,7 +300,7 @@ export default function ReadingLibrary({ userEmail }: { userEmail: string }) {
     const position = siblings.length ? Math.max(...siblings.map((c) => c.position)) + 1 : 0;
     const { data, error } = await supabase
       .from("article_categories")
-      .insert({ name: name.slice(0, 100), parent_id: parentId, position })
+      .insert({ name: name.slice(0, 100), parent_id: parentId, position, kind })
       .select()
       .single();
     if (error) return notify(error.message, true);
@@ -321,7 +348,7 @@ export default function ReadingLibrary({ userEmail }: { userEmail: string }) {
   const title = searching
     ? `Search results for "${query.trim()}"`
     : view.kind === "all"
-      ? "All reading"
+      ? section.all
       : view.kind === "uncategorized"
         ? "Uncategorized"
         : categoryPath(view.id);
@@ -338,7 +365,7 @@ export default function ReadingLibrary({ userEmail }: { userEmail: string }) {
           {showCategories ? "Close" : "Categories"}
         </button>
         <span className="hidden text-lg font-bold sm:inline">📚 Learning Library</span>
-        <SectionSwitch active="reading" />
+        <SectionSwitch active={kind} />
         <input
           type="search"
           value={query}
@@ -358,7 +385,7 @@ export default function ReadingLibrary({ userEmail }: { userEmail: string }) {
         <aside
           className={`${showCategories ? "fixed inset-x-0 top-[57px] bottom-0 z-10 block" : "hidden"} w-full overflow-y-auto border-r border-slate-200 bg-white p-3 md:sticky md:top-[57px] md:block md:h-[calc(100vh-57px)] md:w-72`}
         >
-          <NavItem label="📄 All reading" count={articles.length} active={view.kind === "all" && !searching} onClick={() => openView({ kind: "all" })} />
+          <NavItem label={`${section.icon} ${section.all}`} count={articles.length} active={view.kind === "all" && !searching} onClick={() => openView({ kind: "all" })} />
           <NavItem
             label="📥 Uncategorized"
             count={articles.filter((a) => !a.category_id).length}
@@ -430,6 +457,7 @@ export default function ReadingLibrary({ userEmail }: { userEmail: string }) {
                   onAdd={addArticle}
                   defaultCategoryId={view.kind === "category" ? view.id : null}
                   categoryOptions={categoryOptions}
+                  placeholder={section.placeholder}
                 />
               )}
 
@@ -453,14 +481,14 @@ export default function ReadingLibrary({ userEmail }: { userEmail: string }) {
               </div>
 
               {loading ? (
-                <p className="text-slate-500">Loading your reading list…</p>
+                <p className="text-slate-500">Loading your {section.list}…</p>
               ) : visibleArticles.length === 0 ? (
                 <div className="rounded-xl border border-dashed border-slate-300 p-10 text-center text-slate-500">
                   {searching || filtered
                     ? "Nothing matches. Try another search or a longer time range."
                     : articles.length
                       ? "Nothing here yet. Paste a link above, or move articles in from another category."
-                      : "Your reading list is empty. Paste a link above, like an X post or a blog article."}
+                      : `Your ${section.list} is empty. Paste a link above, like ${section.example}.`}
                 </div>
               ) : (
                 <>
@@ -468,7 +496,7 @@ export default function ReadingLibrary({ userEmail }: { userEmail: string }) {
                   <p className="mb-3 text-xs text-slate-500">
                     {canReorder
                       ? "Tip: drag an article onto another, or use ▲ ▼, to change the order. Drop it on a category to move it."
-                      : `${searching ? "Search results" : "All reading"} show the newest first. To change the order, open a category on the left.`}
+                      : `${searching ? "Search results" : section.all} show the newest first. To change the order, open a category on the left.`}
                   </p>
                 )}
                 <ul className="flex flex-col gap-2">
@@ -514,8 +542,8 @@ export default function ReadingLibrary({ userEmail }: { userEmail: string }) {
 
 // ---------- Pieces ----------
 
-// The Videos | Reading switch in the header of both sections.
-export function SectionSwitch({ active }: { active: "videos" | "reading" }) {
+// The Videos | Reading | Tutorials switch in the header of every section.
+export function SectionSwitch({ active }: { active: "videos" | SectionKind }) {
   const tab = (on: boolean) =>
     `rounded-md px-2.5 py-1 text-sm font-medium ${on ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:text-slate-900"}`;
   return (
@@ -523,9 +551,12 @@ export function SectionSwitch({ active }: { active: "videos" | "reading" }) {
       <Link href="/" className={tab(active === "videos")} title="Videos">
         🎬<span className="hidden sm:inline"> Videos</span>
       </Link>
-      <Link href="/reading" className={tab(active === "reading")} title="Reading">
-        📄<span className="hidden sm:inline"> Reading</span>
-      </Link>
+      {(Object.keys(SECTIONS) as SectionKind[]).map((k) => (
+        <Link key={k} href={SECTIONS[k].path} className={tab(active === k)} title={SECTIONS[k].name}>
+          {SECTIONS[k].icon}
+          <span className="hidden sm:inline"> {SECTIONS[k].name}</span>
+        </Link>
+      ))}
     </nav>
   );
 }
@@ -718,6 +749,7 @@ function AddArticleForm(props: {
   onAdd: (link: string, categoryId: string | null) => Promise<boolean>;
   defaultCategoryId: string | null;
   categoryOptions: { id: string; label: string }[];
+  placeholder: string;
 }) {
   const [link, setLink] = useState("");
   const [categoryId, setCategoryId] = useState(props.defaultCategoryId ?? "");
@@ -736,7 +768,7 @@ function AddArticleForm(props: {
       <input
         value={link}
         onChange={(e) => setLink(e.target.value)}
-        placeholder="Paste a link to an X post or article…"
+        placeholder={props.placeholder}
         className="min-w-0 flex-1 rounded-md border border-slate-300 bg-white px-3 py-2"
       />
       <select
@@ -849,7 +881,7 @@ function SetupNotice() {
     <div className="max-w-xl rounded-xl border border-amber-300 bg-amber-50 p-5 text-slate-800">
       <h2 className="mb-2 text-lg font-semibold">One quick setup step</h2>
       <p>
-        The Reading section needs two new tables. In Supabase, open <b>SQL Editor</b> → <b>New query</b>, paste the
+        This section needs the latest database setup. In Supabase, open <b>SQL Editor</b> → <b>New query</b>, paste the
         whole <code>supabase/articles.sql</code> file, and click <b>Run</b>. Then reload this page.
       </p>
     </div>

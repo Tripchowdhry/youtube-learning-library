@@ -63,6 +63,9 @@ export type NoteImage = {
   t: number;
 };
 
+// The Reading and Tutorials sections share the same tables, told apart by kind.
+export type SectionKind = "reading" | "tutorial";
+
 // Reading section: categories are two levels deep (parent_id is null or a top-level category).
 export type ArticleCategory = {
   id: string;
@@ -70,6 +73,7 @@ export type ArticleCategory = {
   parent_id: string | null;
   name: string;
   position: number;
+  kind: SectionKind;
   created_at: string;
 };
 
@@ -83,6 +87,7 @@ export type Article = {
   author: string | null;
   note: string;
   position: number;
+  kind: SectionKind;
   read_at: string | null;
   created_at: string;
 };
