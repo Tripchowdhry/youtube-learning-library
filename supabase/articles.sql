@@ -1,4 +1,4 @@
--- Adds the Reading section: saved articles and posts, sorted into categories.
+-- Adds the Reading and Tutorials sections: saved links sorted into categories.
 -- Paste this into Supabase > SQL Editor > New query, then click Run.
 -- It is safe to run more than once.
 
@@ -33,6 +33,10 @@ alter table public.articles add column if not exists note text not null default 
 
 -- Your own order inside a category (drag and drop) was added later too.
 alter table public.articles add column if not exists position double precision not null default 0;
+
+-- Reading and Tutorials share these tables; kind says which section a row belongs to.
+alter table public.article_categories add column if not exists kind text not null default 'reading' check (kind in ('reading', 'tutorial'));
+alter table public.articles add column if not exists kind text not null default 'reading' check (kind in ('reading', 'tutorial'));
 
 create index if not exists article_categories_user_idx on public.article_categories (user_id);
 create index if not exists articles_user_idx on public.articles (user_id);

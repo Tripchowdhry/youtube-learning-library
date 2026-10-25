@@ -11,5 +11,5 @@ export default async function ReadingPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/");
 
-  return <ReadingLibrary userEmail={user.email ?? ""} />;
+  return <ReadingLibrary userEmail={user.email ?? ""} kind="reading" />;
 }

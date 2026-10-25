@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArticleNote, ReadCheck, formatDate } from "@/components/ReadingLibrary";
+import { ArticleNote, ReadCheck, SECTIONS, formatDate } from "@/components/ReadingLibrary";
 import { createClient } from "@/lib/supabase/client";
 import type { Article, ArticleContent } from "@/lib/types";
 
@@ -125,10 +125,13 @@ export default function ReaderPage({ articleId }: { articleId: string }) {
     };
   }, [ready, article, setRead]);
 
+  // Older rows have no kind until the database setup is rerun; they belong to Reading.
+  const section = SECTIONS[article?.kind ?? "reading"] ?? SECTIONS.reading;
+
   if (missing) {
     return (
       <main className="mx-auto max-w-2xl px-4 py-16 text-center">
-        <p className="mb-4 text-slate-600">This article isn&apos;t in your reading list.</p>
+        <p className="mb-4 text-slate-600">This isn&apos;t in your library.</p>
         <Link href="/reading" className="text-blue-600 underline">
           ← Back to Reading
         </Link>
@@ -139,8 +142,8 @@ export default function ReaderPage({ articleId }: { articleId: string }) {
   return (
     <div className="min-h-screen bg-slate-50">
       <header className="sticky top-0 z-20 flex items-center gap-3 border-b border-slate-200 bg-white px-4 py-3">
-        <Link href="/reading" className="shrink-0 rounded-md px-2 py-1 text-sm text-slate-600 hover:bg-slate-100">
-          ← Reading
+        <Link href={section.path} className="shrink-0 rounded-md px-2 py-1 text-sm text-slate-600 hover:bg-slate-100">
+          ← {section.name}
         </Link>
         <span className="min-w-0 flex-1 truncate font-medium">{article?.title}</span>
         {article && (
