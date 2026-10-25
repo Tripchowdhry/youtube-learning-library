@@ -61,3 +61,33 @@ export type NoteImage = {
   h: number;
   t: number;
 };
+
+// Reading section: categories are two levels deep (parent_id is null or a top-level category).
+export type ArticleCategory = {
+  id: string;
+  user_id: string;
+  parent_id: string | null;
+  name: string;
+  position: number;
+  created_at: string;
+};
+
+export type Article = {
+  id: string;
+  user_id: string;
+  category_id: string | null;
+  url: string;
+  title: string | null;
+  site: string | null;
+  author: string | null;
+  read_at: string | null;
+  created_at: string;
+};
+
+// What the reading page shows: an X post, the article's text, or nothing (open the original instead).
+export type ArticleBlock = { type: "h" | "p" | "li" | "quote"; text: string };
+
+export type ArticleContent =
+  | { kind: "x"; postId: string }
+  | { kind: "text"; blocks: ArticleBlock[] }
+  | { kind: "none" };
