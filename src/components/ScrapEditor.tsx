@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { compareFolders, useFolderSort } from "@/components/FolderSort";
 import NotePageCanvas, { type Tool } from "@/components/NotePageCanvas";
-import { byPosition, formatDate } from "@/components/ReadingLibrary";
+import { formatDate } from "@/components/ReadingLibrary";
 import { createClient } from "@/lib/supabase/client";
 import type { ArticleCategory, NotePage, NoteStroke, Scrap } from "@/lib/types";
 
@@ -63,6 +64,7 @@ export default function ScrapEditor({ scrapId }: { scrapId: string }) {
   const [scrap, setScrap] = useState<Scrap | null>(null);
   const [missing, setMissing] = useState(false);
   const [categories, setCategories] = useState<ArticleCategory[]>([]);
+  const [folderSort] = useFolderSort();
   const [title, setTitle] = useState("");
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [pages, setPages] = useState<NotePage[]>([emptyPage()]);
@@ -234,15 +236,16 @@ export default function ScrapEditor({ scrapId }: { scrapId: string }) {
   }
 
   const categoryOptions = useMemo(() => {
-    const top = categories.filter((c) => !c.parent_id).sort(byPosition);
+    const byChoice = compareFolders(folderSort);
+    const top = categories.filter((c) => !c.parent_id).sort(byChoice);
     return top.flatMap((c) => [
       { id: c.id, label: c.name },
       ...categories
         .filter((s) => s.parent_id === c.id)
-        .sort(byPosition)
+        .sort(byChoice)
         .map((s) => ({ id: s.id, label: `  ${s.name}` })),
     ]);
-  }, [categories]);
+  }, [categories, folderSort]);
 
   // ---------- Render ----------
 
