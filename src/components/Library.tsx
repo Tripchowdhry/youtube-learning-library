@@ -651,7 +651,7 @@ function FolderTree(props: {
               leading={
                 <button
                   onClick={toggle}
-                  className={`w-5 shrink-0 text-xs ${hasChildren ? "" : "invisible"}`}
+                  className={`w-9 shrink-0 text-4xl leading-none ${hasChildren ? "" : "invisible"}`}
                   aria-label={isOpen ? "Collapse" : "Expand"}
                 >
                   {isOpen ? "▾" : "▸"}
