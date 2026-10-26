@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import ContextMenu, { type MenuState } from "@/components/ContextMenu";
+import { FolderSortSelect, compareFolders, sortHint, useFolderSort } from "@/components/FolderSort";
 import { linkKey } from "@/lib/links";
 import { createClient } from "@/lib/supabase/client";
 import type { Article, ArticleCategory, SectionKind } from "@/lib/types";
@@ -21,8 +22,6 @@ export const PERIODS: { value: Period; label: string; days: number }[] = [
 
 // Longest personal note on an article: about the length of an X post.
 export const NOTE_MAX = 280;
-
-export const byPosition = (a: ArticleCategory, b: ArticleCategory) => a.position - b.position || a.name.localeCompare(b.name);
 
 export const formatDate = (iso: string) =>
   new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
@@ -100,10 +99,14 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
 
   // ---------- Category helpers ----------
 
-  const topCategories = useMemo(() => categories.filter((c) => !c.parent_id).sort(byPosition), [categories]);
+  const [folderSort, setFolderSort] = useFolderSort();
+  const topCategories = useMemo(
+    () => categories.filter((c) => !c.parent_id).sort(compareFolders(folderSort)),
+    [categories, folderSort],
+  );
   const subcategories = useCallback(
-    (parentId: string) => categories.filter((c) => c.parent_id === parentId).sort(byPosition),
-    [categories],
+    (parentId: string) => categories.filter((c) => c.parent_id === parentId).sort(compareFolders(folderSort)),
+    [categories, folderSort],
   );
 
   const categoryPath = useCallback(
@@ -126,6 +129,7 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
     [topCategories, subcategories],
   );
 
+  const canDragCategories = folderSort === "custom";
   const categorySiblings = (category: ArticleCategory) =>
     category.parent_id ? subcategories(category.parent_id) : topCategories;
 
@@ -449,6 +453,7 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
 
           <div className="mt-4 mb-1 flex items-center justify-between px-2 text-xs font-semibold tracking-wide text-slate-500 uppercase">
             Categories
+            <FolderSortSelect sort={folderSort} onChange={setFolderSort} />
             <button onClick={() => createCategory(null)} className="rounded px-1.5 text-base text-slate-700 hover:bg-slate-100" title="New category">
               +
             </button>
@@ -464,7 +469,7 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
                 active={!searching && view.kind === "category" && view.id === cat.id}
                 onClick={() => openView({ kind: "category", id: cat.id })}
                 onDropArticle={dropOnCategory(cat)}
-                onDragStart={() => setDraggingCategoryId(cat.id)}
+                onDragStart={canDragCategories ? () => setDraggingCategoryId(cat.id) : undefined}
                 onDragEnd={() => setDraggingCategoryId(null)}
                 onContextMenu={(e) => openCategoryMenu(cat, e)}
               />
@@ -477,7 +482,7 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
                   active={!searching && view.kind === "category" && view.id === sub.id}
                   onClick={() => openView({ kind: "category", id: sub.id })}
                   onDropArticle={dropOnCategory(sub)}
-                  onDragStart={() => setDraggingCategoryId(sub.id)}
+                  onDragStart={canDragCategories ? () => setDraggingCategoryId(sub.id) : undefined}
                   onDragEnd={() => setDraggingCategoryId(null)}
                   onContextMenu={(e) => openCategoryMenu(sub, e)}
                 />
@@ -485,7 +490,7 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
             </div>
           ))}
           {topCategories.length > 1 && (
-            <p className="mt-3 px-2 text-xs text-slate-400">Drag categories to reorder. Right-click one to rename.</p>
+            <p className="mt-3 px-2 text-xs text-slate-400">{sortHint(folderSort, "categories")}</p>
           )}
 
           <button onClick={signOut} className="mt-6 px-2 text-sm text-slate-500 underline sm:hidden">

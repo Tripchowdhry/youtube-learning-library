@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArticleNote, SectionSwitch, formatDate } from "@/components/ReadingLibrary";
 import ContextMenu, { type MenuState } from "@/components/ContextMenu";
+import { FolderSortSelect, compareFolders, sortHint, useFolderSort } from "@/components/FolderSort";
 import VideoThumb from "@/components/VideoThumb";
 import { createClient } from "@/lib/supabase/client";
 import type { Folder, Video } from "@/lib/types";
@@ -29,6 +30,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
   const [menu, setMenu] = useState<MenuState | null>(null);
   const closeMenu = useCallback(() => setMenu(null), []);
   const [showFolders, setShowFolders] = useState(false);
+  const [folderSort, setFolderSort] = useFolderSort();
   const [toast, setToast] = useState<{ text: string; isError?: boolean } | null>(null);
 
   const notify = useCallback((text: string, isError = false) => {
@@ -61,8 +63,8 @@ export default function Library({ userEmail }: { userEmail: string }) {
 
   const childFolders = useCallback(
     (parentId: string | null) =>
-      folders.filter((f) => f.parent_id === parentId).sort((a, b) => byPosition(a, b) || a.name.localeCompare(b.name)),
-    [folders],
+      folders.filter((f) => f.parent_id === parentId).sort(compareFolders(folderSort)),
+    [folders, folderSort],
   );
 
   const folderPath = useCallback(
@@ -412,6 +414,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
 
           <div className="mt-4 mb-1 flex items-center justify-between px-2 text-xs font-semibold tracking-wide text-slate-500 uppercase">
             Folders
+            <FolderSortSelect sort={folderSort} onChange={setFolderSort} />
             <button onClick={() => createFolder(null)} className="rounded px-1.5 text-base text-slate-700 hover:bg-slate-100" title="New folder">
               +
             </button>
@@ -434,10 +437,11 @@ export default function Library({ userEmail }: { userEmail: string }) {
             onFolderDragStart={setDraggingFolderId}
             onFolderDragEnd={() => setDraggingFolderId(null)}
             onDropFolder={(targetId) => draggingFolderId && moveFolderTo(draggingFolderId, targetId)}
+            canDragFolders={folderSort === "custom"}
             onFolderMenu={openFolderMenu}
           />
           {childFolders(null).length > 1 && (
-            <p className="mt-3 px-2 text-xs text-slate-400">Drag folders to reorder. Right-click one to rename.</p>
+            <p className="mt-3 px-2 text-xs text-slate-400">{sortHint(folderSort, "folders")}</p>
           )}
 
           <button onClick={signOut} className="mt-6 px-2 text-sm text-slate-500 underline sm:hidden">
@@ -611,6 +615,7 @@ function FolderTree(props: {
   onFolderDragStart: (id: string) => void;
   onFolderDragEnd: () => void;
   onDropFolder: (targetId: string) => void;
+  canDragFolders: boolean;
   onFolderMenu: (folder: Folder, e: React.MouseEvent) => void;
 }) {
   const { draggingFolder } = props;
@@ -640,7 +645,7 @@ function FolderTree(props: {
                 (draggingFolder !== null && draggingFolder.id !== folder.id && draggingFolder.parent_id === folder.parent_id)
               }
               onDrop={() => (draggingFolder ? props.onDropFolder(folder.id) : props.onDropVideo(folder.id))}
-              onDragStart={() => props.onFolderDragStart(folder.id)}
+              onDragStart={props.canDragFolders ? () => props.onFolderDragStart(folder.id) : undefined}
               onDragEnd={props.onFolderDragEnd}
               onContextMenu={(e) => props.onFolderMenu(folder, e)}
               leading={
