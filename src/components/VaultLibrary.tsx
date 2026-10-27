@@ -764,11 +764,10 @@ function UnlockForm({ onUnlock, onForgot }: { onUnlock: (passphrase: string) => 
       </p>
       <div className="flex flex-col gap-2 sm:flex-row">
         <input
-          type="password"
+          {...secretInput(false)}
           value={passphrase}
           onChange={(e) => setPassphrase(e.target.value)}
           placeholder="Vault passphrase"
-          autoComplete="off"
           autoFocus
           className="min-w-0 flex-1 rounded-md border border-slate-300 bg-white px-3 py-2"
         />
@@ -816,11 +815,10 @@ function PassphraseForm({ submitLabel, onSubmit }: { submitLabel: string; onSubm
     <form onSubmit={submit} className="flex flex-col gap-2">
       <div className="flex gap-2">
         <input
-          type={show ? "text" : "password"}
+          {...secretInput(show)}
           value={passphrase}
           onChange={(e) => setPassphrase(e.target.value)}
           placeholder={`New passphrase (at least ${PASSPHRASE_MIN} characters)`}
-          autoComplete="off"
           className="min-w-0 flex-1 rounded-md border border-slate-300 bg-white px-3 py-2 font-mono"
         />
         <button type="button" onClick={() => setShow((s) => !s)} className="rounded-md border border-slate-300 px-2 text-sm">
@@ -828,11 +826,10 @@ function PassphraseForm({ submitLabel, onSubmit }: { submitLabel: string; onSubm
         </button>
       </div>
       <input
-        type={show ? "text" : "password"}
+        {...secretInput(show)}
         value={again}
         onChange={(e) => setAgain(e.target.value)}
         placeholder="Type it again"
-        autoComplete="off"
         className="rounded-md border border-slate-300 bg-white px-3 py-2 font-mono"
       />
       <p className="text-xs text-slate-500">
@@ -956,12 +953,11 @@ function EntryEditor(props: {
         <Field label="Password 🔒" hint="Encrypted">
           <div className="flex gap-2">
             <input
-              type={showSecrets ? "text" : "password"}
+              {...secretInput(showSecrets)}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               maxLength={FIELD_MAX}
               disabled={!ready}
-              autoComplete="new-password"
               className={`${input} font-mono`}
             />
             <button
@@ -979,12 +975,11 @@ function EntryEditor(props: {
         </Field>
         <Field label="API key 🔒" hint="Encrypted">
           <input
-            type={showSecrets ? "text" : "password"}
+            {...secretInput(showSecrets)}
             value={apiKey}
             onChange={(e) => setApiKey(e.target.value)}
             maxLength={FIELD_MAX}
             disabled={!ready}
-            autoComplete="off"
             className={`${input} font-mono`}
           />
         </Field>
@@ -1046,6 +1041,23 @@ function Modal({ children, onClose }: { children: React.ReactNode; onClose: () =
       </div>
     </div>
   );
+}
+
+// Secret fields are plain text boxes drawn as dots, so Safari and other browsers don't
+// treat them as a login and offer to save the vault passphrase or the passwords in it.
+// Browsers that can't draw the dots fall back to a normal password box.
+function secretInput(shown: boolean) {
+  const canMask = typeof CSS !== "undefined" && CSS.supports("-webkit-text-security", "disc");
+  return {
+    type: shown || canMask ? "text" : "password",
+    style: shown ? undefined : ({ WebkitTextSecurity: "disc" } as React.CSSProperties),
+    autoComplete: "off",
+    autoCorrect: "off",
+    autoCapitalize: "off",
+    spellCheck: false,
+    "data-1p-ignore": true,
+    "data-lpignore": "true",
+  };
 }
 
 // 20 random letters, digits and symbols.
