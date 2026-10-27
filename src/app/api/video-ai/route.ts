@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { GeminiError, askAboutVideo, geminiConfigured } from "@/lib/gemini";
+import { FOCUS_SECONDS, GeminiError, askAboutVideo, geminiConfigured } from "@/lib/gemini";
 import { isSignedIn } from "@/lib/require-user";
 import { parseYouTubeId, watchUrl } from "@/lib/youtube";
 
@@ -37,6 +37,9 @@ export async function POST(request: Request) {
 
     const ask = String(body.prompt ?? "").trim().slice(0, 2000);
     if (!ask) return NextResponse.json({ error: "Type what you'd like the AI to do." }, { status: 400 });
+    // A question about one moment (like "screenshot at 1:01") only looks at the seconds around it.
+    const focusAt = Number(body.focusAt);
+    const focus = Number.isFinite(focusAt) && focusAt >= 0 ? { around: Math.round(focusAt) } : null;
     const text = await askAboutVideo(
       watchUrl(youtubeId),
       [
@@ -46,8 +49,14 @@ export async function POST(request: Request) {
         "Put short headings on their own line, use '- ' for bullet points and '1. ' for steps.",
         "Whenever you refer to a moment in the video, write its time in square brackets like [1:05] or [1:02:30].",
         "If they ask for a screenshot, describe what is on screen at that moment instead; the app adds the picture itself.",
+        ...(focus
+          ? [
+              `You are shown only the ${FOCUS_SECONDS} seconds either side of the moment they ask about, so focus on that moment.`,
+            ]
+          : []),
       ].join("\n"),
       ask,
+      focus,
     );
     return NextResponse.json({ text });
   } catch (error) {

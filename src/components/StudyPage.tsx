@@ -440,7 +440,7 @@ export default function StudyPage({ videoId }: { videoId: string }) {
     setMode("type");
     setAiError(null);
     setAiBusy(true);
-    const result = await askVideoAi({ youtubeId: video.youtube_id, title: video.title, task: "ask", prompt });
+    const result = await askVideoAi({ youtubeId: video.youtube_id, title: video.title, task: "ask", prompt, focusAt: shotAt ?? undefined });
     setAiBusy(false);
     if (result.error || !result.text) {
       setAiError(result.error ?? "The AI didn't answer.");
