@@ -8,6 +8,7 @@ A web app for organizing the YouTube videos you learn from. Anyone can sign in w
 - Drag videos to reorder them, or drop them onto a folder to move them (on phones, use the "Move to" menu on each video)
 - Search across titles, channels, folders and tags
 - Take notes on any video, handwritten (Apple Pencil, mouse, or finger) or typed, with time stamps that jump the video to that moment
+- Optional AI (Google Gemini, free key): new videos get a short note written for them, and on a video's notes page you can ask for a summary, a report or an explanation of any moment. Answers land in your typed notes
 - Share any folder with a read-only link
 - Keep logins and API keys in the Vault, sorted into categories. Passwords and API keys are encrypted in your browser with a passphrase only you know; web addresses and user IDs stay readable so you can still reset things if you forget it
 - Works on any device with a browser
@@ -34,6 +35,7 @@ Built with Next.js, Tailwind CSS and Supabase. Hosted on Vercel.
 2. Under **Environment Variables**, add:
    - `NEXT_PUBLIC_SUPABASE_URL` = your Project URL
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY` = your anon public key
+   - `GEMINI_API_KEY` = optional, for the AI features. Get a free key at [Google AI Studio](https://aistudio.google.com/apikey) (**Create API key**)
 3. Click **Deploy**.
 4. Back in Supabase, go to **Authentication → URL Configuration**. Set **Site URL** to your Vercel address (like `https://youtube-learning-library.vercel.app`) and add `https://youtube-learning-library.vercel.app/**` to **Redirect URLs**.
 
