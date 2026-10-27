@@ -27,13 +27,21 @@ export function geminiConfigured() {
   return Boolean(process.env.GEMINI_API_KEY);
 }
 
-async function callModel(model: string, videoUrl: string, instructions: string, request: string) {
+// Gemini normally looks at one frame per second. One frame every 5 seconds is plenty for
+// talks and tutorials, and makes long videos much quicker.
+const FRAMES_PER_SECOND = 0.2;
+
+async function callModel(model: string, videoUrl: string, instructions: string, request: string, fewerFrames = true) {
+  const video = {
+    file_data: { file_uri: videoUrl },
+    ...(fewerFrames ? { video_metadata: { fps: FRAMES_PER_SECOND } } : {}),
+  };
   const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
     method: "POST",
     headers: { "Content-Type": "application/json", "x-goog-api-key": process.env.GEMINI_API_KEY ?? "" },
     body: JSON.stringify({
       systemInstruction: { parts: [{ text: instructions }] },
-      contents: [{ role: "user", parts: [{ file_data: { file_uri: videoUrl } }, { text: request }] }],
+      contents: [{ role: "user", parts: [video, { text: request }] }],
       // Low detail per frame keeps long videos inside the free tier's limits.
       generationConfig: { mediaResolution: "MEDIA_RESOLUTION_LOW" },
     }),
@@ -45,7 +53,9 @@ export async function askAboutVideo(videoUrl: string, instructions: string, requ
   let lastStatus = 0;
   let lastDetail = "";
   for (const model of MODELS) {
-    const { res, data } = await callModel(model, videoUrl, instructions, request);
+    let { res, data } = await callModel(model, videoUrl, instructions, request);
+    // A model that doesn't accept a custom frame rate gets the plain request instead.
+    if (res.status === 400) ({ res, data } = await callModel(model, videoUrl, instructions, request, false));
     if (res.ok) {
       const parts: { text?: string }[] = data?.candidates?.[0]?.content?.parts ?? [];
       const text = parts.map((p) => p.text ?? "").join("").trim();

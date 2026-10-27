@@ -4,7 +4,7 @@ import { isSignedIn } from "@/lib/require-user";
 import { parseYouTubeId, watchUrl } from "@/lib/youtube";
 
 // Watching a long video can take a while.
-export const maxDuration = 120;
+export const maxDuration = 300;
 
 const NOTE_MAX = 280;
 
