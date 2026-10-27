@@ -34,6 +34,7 @@ export async function askAboutVideo(videoUrl: string, instructions: string, requ
       throw new GeminiError("The free AI limit is used up for now. Try again in a minute, or tomorrow.", 429);
     }
     const detail = data?.error?.message ?? `error ${res.status}`;
+    console.error("Gemini request failed", res.status, detail);
     throw new GeminiError(`The AI couldn't watch this video (${detail}).`, 502);
   }
   const parts: { text?: string }[] = data?.candidates?.[0]?.content?.parts ?? [];

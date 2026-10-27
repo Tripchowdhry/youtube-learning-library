@@ -103,6 +103,7 @@ export default function StudyPage({ videoId }: { videoId: string }) {
   const [screenshotLink, setScreenshotLink] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [aiBusy, setAiBusy] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
 
   const playerHost = useRef<HTMLDivElement>(null);
   const player = useRef<YouTubePlayer | null>(null);
@@ -437,11 +438,12 @@ export default function StudyPage({ videoId }: { videoId: string }) {
       else setWaitingForPaste(true);
     }
     setMode("type");
+    setAiError(null);
     setAiBusy(true);
     const result = await askVideoAi({ youtubeId: video.youtube_id, title: video.title, task: "ask", prompt });
     setAiBusy(false);
     if (result.error || !result.text) {
-      flash(result.error ?? "The AI didn't answer.");
+      setAiError(result.error ?? "The AI didn't answer.");
       return;
     }
     const current = typedRef.current.trimEnd();
@@ -554,7 +556,7 @@ export default function StudyPage({ videoId }: { videoId: string }) {
         <div className={notesHidden ? "hidden" : "mt-2 flex min-w-0 flex-col gap-4 lg:mt-0"}>
           <div className="sticky top-[76px] z-20 hidden lg:block">{toolbar}</div>
           {loaded && (
-            <AskAi busy={aiBusy} onAsk={askAi} currentTime={() => player.current?.getCurrentTime?.() ?? 0} />
+            <AskAi busy={aiBusy} error={aiError} onAsk={askAi} currentTime={() => player.current?.getCurrentTime?.() ?? 0} />
           )}
           {!loaded ? (
             <p className="text-slate-500">Loading your notes…</p>
@@ -703,7 +705,7 @@ const AI_PRESETS = [
   { label: "• Report in bullets", prompt: "Write a report on this video in bullet points." },
 ];
 
-function AskAi(props: { busy: boolean; onAsk: (prompt: string) => void; currentTime: () => number }) {
+function AskAi(props: { busy: boolean; error: string | null; onAsk: (prompt: string) => void; currentTime: () => number }) {
   const [prompt, setPrompt] = useState("");
   const [open, setOpen] = useState(true);
 
@@ -767,6 +769,14 @@ function AskAi(props: { busy: boolean; onAsk: (prompt: string) => void; currentT
               Ask
             </button>
           </div>
+          {props.busy && (
+            <p className="rounded-md bg-violet-50 px-2 py-1.5 text-sm text-violet-800 ring-1 ring-violet-200">
+              ⏳ The AI is watching the video. Long videos can take 1 to 2 minutes…
+            </p>
+          )}
+          {props.error && (
+            <p className="rounded-md bg-red-50 px-2 py-1.5 text-sm text-red-700 ring-1 ring-red-200">⚠️ {props.error}</p>
+          )}
           <p className="text-xs text-slate-500">
             Answers are added to the end of your typed notes, where you can edit them. Ask for a screenshot at a time and
             the video jumps there so 📷 Clip can add the picture.

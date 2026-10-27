@@ -15,7 +15,11 @@ export async function askVideoAi(body: {
       body: JSON.stringify(body),
     });
     const data = await res.json().catch(() => ({}));
-    return res.ok ? { text: data.text } : { error: data.error ?? "The AI couldn't answer.", code: data.code };
+    if (res.ok) return { text: data.text };
+    if (res.status === 504) {
+      return { error: "The AI took too long (over 2 minutes). Very long videos can be too much for the free plan." };
+    }
+    return { error: data.error ?? `The AI couldn't answer (error ${res.status}).`, code: data.code };
   } catch {
     return { error: "The AI couldn't be reached. Check your connection and try again." };
   }
