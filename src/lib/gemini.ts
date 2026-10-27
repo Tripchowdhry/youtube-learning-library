@@ -27,9 +27,9 @@ export function geminiConfigured() {
   return Boolean(process.env.GEMINI_API_KEY);
 }
 
-// Gemini normally looks at one frame per second. One frame every 5 seconds is plenty for
-// talks and tutorials, and makes long videos much quicker.
-const FRAMES_PER_SECOND = 0.2;
+// Gemini normally looks at one frame per second. One frame every 3 seconds (with all the
+// audio) still catches slides and code, and makes long videos much quicker.
+const FRAMES_PER_SECOND = 1 / 3;
 
 async function callModel(model: string, videoUrl: string, instructions: string, request: string, fewerFrames = true) {
   const video = {
