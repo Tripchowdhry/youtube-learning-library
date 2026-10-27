@@ -9,6 +9,7 @@ A web app for organizing the YouTube videos you learn from. Anyone can sign in w
 - Search across titles, channels, folders and tags
 - Take notes on any video, handwritten (Apple Pencil, mouse, or finger) or typed, with time stamps that jump the video to that moment
 - Share any folder with a read-only link
+- Keep logins and API keys in the Vault, sorted into categories. Passwords and API keys are encrypted in your browser with a passphrase only you know; web addresses and user IDs stay readable so you can still reset things if you forget it
 - Works on any device with a browser
 
 Built with Next.js, Tailwind CSS and Supabase. Hosted on Vercel.
@@ -20,6 +21,7 @@ Built with Next.js, Tailwind CSS and Supabase. Hosted on Vercel.
 2. When it's ready, open **SQL Editor → New query**, paste everything from [`supabase/schema.sql`](supabase/schema.sql), and click **Run**.
    (Set up before notes existed? Run [`supabase/notes.sql`](supabase/notes.sql) the same way.)
    Then run [`supabase/clips.sql`](supabase/clips.sql) too. It creates the storage space for pictures you paste into notes.
+   For the Reading, Tutorials, ScrapBook and Vault sections, also run [`supabase/articles.sql`](supabase/articles.sql), [`supabase/scrapbook.sql`](supabase/scrapbook.sql) and [`supabase/vault.sql`](supabase/vault.sql).
 3. Open **Project Settings → API** (or **Data API**) and copy the **Project URL** and the **anon public** key.
 
 ### 2. Turn on Google sign-in

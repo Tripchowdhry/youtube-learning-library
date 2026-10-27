@@ -115,3 +115,37 @@ export type Scrap = {
   created_at: string;
   updated_at: string;
 };
+
+// Vault: logins and API keys in categories. password and api_key are encrypted in the
+// browser ("iv.ciphertext"), or null when empty; everything else is plain text.
+export type VaultCategory = {
+  id: string;
+  user_id: string;
+  parent_id: string | null;
+  name: string;
+  position: number;
+  created_at: string;
+};
+
+export type VaultEntry = {
+  id: string;
+  user_id: string;
+  category_id: string | null;
+  name: string;
+  url: string;
+  username: string;
+  password: string | null;
+  api_key: string | null;
+  note: string;
+  position: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type VaultKey = {
+  user_id: string;
+  salt: string;
+  iterations: number;
+  check_value: string;
+  created_at: string;
+};
