@@ -619,6 +619,8 @@ function FolderTree(props: {
   onFolderMenu: (folder: Folder, e: React.MouseEvent) => void;
 }) {
   const { draggingFolder } = props;
+  const inTree = (folderId: string | null, rootId: string): boolean =>
+    folderId === rootId || props.childFolders(rootId).some((f) => inTree(folderId, f.id));
   return (
     <>
       {props.childFolders(props.parentId).map((folder) => {
@@ -635,7 +637,8 @@ function FolderTree(props: {
           <div key={folder.id}>
             <NavItem
               label={`${folder.share_token ? "🔗" : "📁"} ${folder.name}`}
-              count={props.videos.filter((v) => v.folder_id === folder.id).length}
+              // A top-level folder counts the videos in all its subfolders too; a subfolder counts only its own.
+              count={props.videos.filter((v) => (props.depth === 0 ? inTree(v.folder_id, folder.id) : v.folder_id === folder.id)).length}
               active={props.activeId === folder.id}
               onClick={() => props.onOpen(folder.id)}
               indent={props.depth}
