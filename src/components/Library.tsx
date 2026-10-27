@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArticleNote, SectionSwitch, formatDate } from "@/components/ReadingLibrary";
 import ContextMenu, { type MenuState } from "@/components/ContextMenu";
@@ -9,6 +9,7 @@ import { FolderSortSelect, compareFolders, sortHint, useFolderSort } from "@/com
 import VideoThumb from "@/components/VideoThumb";
 import { createClient } from "@/lib/supabase/client";
 import type { Folder, Video } from "@/lib/types";
+import { askVideoAi } from "@/lib/video-ai";
 
 type View = { kind: "all" } | { kind: "unsorted" } | { kind: "folder"; id: string };
 
@@ -20,6 +21,9 @@ export default function Library({ userEmail }: { userEmail: string }) {
 
   const [folders, setFolders] = useState<Folder[]>([]);
   const [videos, setVideos] = useState<Video[]>([]);
+  const videosRef = useRef(videos);
+  videosRef.current = videos;
+  const [aiNoteIds, setAiNoteIds] = useState<Set<string>>(new Set());
   const [notedVideoIds, setNotedVideoIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<View>({ kind: "all" });
@@ -160,7 +164,27 @@ export default function Library({ userEmail }: { userEmail: string }) {
     if (newFolder) setFolders((prev) => [...prev, newFolder!]);
     setVideos((prev) => [...prev, data as Video]);
     notify(folderId && !currentFolderId ? `Saved to ${info.channel}` : `Saved "${info.title}"`);
+    writeAiNote(data as Video, true);
     return true;
+  }
+
+  // Asks the AI to watch the video and fill in its note. New videos do this on their own and
+  // stay quiet if it fails; the ✨ AI note button says what went wrong.
+  async function writeAiNote(video: Video, quiet = false) {
+    setAiNoteIds((prev) => new Set(prev).add(video.id));
+    const result = await askVideoAi({ youtubeId: video.youtube_id, title: video.title, task: "note" });
+    setAiNoteIds((prev) => {
+      const next = new Set(prev);
+      next.delete(video.id);
+      return next;
+    });
+    if (result.error) {
+      if (!quiet) notify(result.error, true);
+      return;
+    }
+    // Don't replace a note typed while the AI was working.
+    const current = videosRef.current.find((v) => v.id === video.id);
+    if (current && !current.note && result.text) updateVideo(video.id, { note: result.text });
   }
 
   // Finds the top-level folder named after a channel, creating it the first time.
@@ -525,6 +549,8 @@ export default function Library({ userEmail }: { userEmail: string }) {
                     onMove={(folderId) => moveVideo(video.id, folderId)}
                     onEditTags={() => editTags(video)}
                     onSaveNote={(note) => updateVideo(video.id, { note })}
+                    aiNoteBusy={aiNoteIds.has(video.id)}
+                    onAiNote={() => writeAiNote(video)}
                     onDelete={() => deleteVideo(video)}
                     onTagClick={(tag) => setQuery(tag)}
                   />
@@ -714,6 +740,8 @@ function VideoCard(props: {
   onMove: (folderId: string | null) => void;
   onEditTags: () => void;
   onSaveNote: (note: string) => void;
+  aiNoteBusy: boolean;
+  onAiNote: () => void;
   onDelete: () => void;
   onTagClick: (tag: string) => void;
 }) {
@@ -808,6 +836,11 @@ function VideoCard(props: {
             </>
           )}
           {!video.note && !editingNote && <SmallButton onClick={() => setEditingNote(true)}>📝 Add note</SmallButton>}
+          {!video.note && !editingNote && (
+            <SmallButton onClick={props.onAiNote} disabled={props.aiNoteBusy} title="Let AI watch the video and write the note">
+              {props.aiNoteBusy ? "✨ Writing note…" : "✨ AI note"}
+            </SmallButton>
+          )}
           <SmallButton onClick={props.onEditTags}>Tags</SmallButton>
           <SmallButton onClick={props.onDelete} danger>
             🗑 Delete

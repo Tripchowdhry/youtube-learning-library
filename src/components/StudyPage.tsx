@@ -16,6 +16,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { formatTime, loadYouTubeApi, type YouTubePlayer } from "@/lib/youtube-player";
 import type { NoteImage, NotePage, NoteStroke, Video } from "@/lib/types";
+import { askVideoAi } from "@/lib/video-ai";
 
 const PEN_COLORS = ["#111827", "#2563eb", "#dc2626", "#16a34a"];
 const HIGHLIGHT_COLORS = ["#facc15", "#4ade80", "#f472b6", "#60a5fa"];
@@ -48,6 +49,18 @@ function preferredMode(): Mode {
 
 // Typed notes mark video times as [m:ss] or [h:mm:ss].
 const TIME_PATTERN = /\[(\d+):(\d{2})(?::(\d{2}))?\]/g;
+
+// "screenshot at 1:01", "take a picture at 12:30": the first time mentioned, in seconds.
+const SHOT_PATTERN = /\b(screen ?shots?|pictures?|snap|images?|frames?)\b/i;
+const ANY_TIME = /(\d+):(\d{2})(?::(\d{2}))?/;
+
+function screenshotTime(prompt: string) {
+  if (!SHOT_PATTERN.test(prompt)) return null;
+  const m = prompt.match(ANY_TIME);
+  if (!m) return null;
+  const [a, b, c] = [Number(m[1]), Number(m[2]), m[3] === undefined ? null : Number(m[3])];
+  return c === null ? a * 60 + b : a * 3600 + b * 60 + c;
+}
 
 function timesIn(text: string) {
   const seen = new Set<number>();
@@ -89,6 +102,7 @@ export default function StudyPage({ videoId }: { videoId: string }) {
   // The link that starts a drag-to-select screenshot on this computer, if there is one.
   const [screenshotLink, setScreenshotLink] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [aiBusy, setAiBusy] = useState(false);
 
   const playerHost = useRef<HTMLDivElement>(null);
   const player = useRef<YouTubePlayer | null>(null);
@@ -408,6 +422,36 @@ export default function StudyPage({ videoId }: { videoId: string }) {
     return () => window.removeEventListener("paste", onPaste);
   }, []);
 
+  // ---------- Ask AI ----------
+
+  // The answer is added to the end of the typed notes. Asking for a screenshot at a time
+  // also jumps the video there, paused, and starts Clip so the picture lands in the notes too.
+  async function askAi(prompt: string) {
+    if (!video || aiBusy) return;
+    const shotAt = screenshotTime(prompt);
+    if (shotAt !== null) {
+      player.current?.seekTo(shotAt, true);
+      player.current?.pauseVideo();
+      resumeAfterClip.current = false;
+      if (screenshotLink) window.location.href = screenshotLink;
+      else setWaitingForPaste(true);
+    }
+    setMode("type");
+    setAiBusy(true);
+    const result = await askVideoAi({ youtubeId: video.youtube_id, title: video.title, task: "ask", prompt });
+    setAiBusy(false);
+    if (result.error || !result.text) {
+      flash(result.error ?? "The AI didn't answer.");
+      return;
+    }
+    const current = typedRef.current.trimEnd();
+    changeTyped(`${current ? `${current}\n\n` : ""}✨ ${prompt}\n${result.text}\n`);
+    requestAnimationFrame(() => {
+      const box = typedBox.current;
+      if (box) box.scrollTop = box.scrollHeight;
+    });
+  }
+
   const imageUrl = useCallback((path: string) => clipUrl(supabase, path), [supabase]);
 
   function addPage() {
@@ -509,6 +553,9 @@ export default function StudyPage({ videoId }: { videoId: string }) {
 
         <div className={notesHidden ? "hidden" : "mt-2 flex min-w-0 flex-col gap-4 lg:mt-0"}>
           <div className="sticky top-[76px] z-20 hidden lg:block">{toolbar}</div>
+          {loaded && (
+            <AskAi busy={aiBusy} onAsk={askAi} currentTime={() => player.current?.getCurrentTime?.() ?? 0} />
+          )}
           {!loaded ? (
             <p className="text-slate-500">Loading your notes…</p>
           ) : mode === "type" ? (
@@ -642,6 +689,90 @@ function TypedNotes(props: {
         }
         className="min-h-[65vh] w-full resize-y rounded-lg bg-white p-4 text-base leading-relaxed shadow-sm ring-1 ring-slate-200 outline-none focus:ring-2 focus:ring-slate-400"
       />
+    </div>
+  );
+}
+
+const AI_PRESETS = [
+  { label: "📝 Summary in 100 words", prompt: "Summarize the video in 100 words." },
+  {
+    label: "💡 Key innovations",
+    prompt: "Write a short report highlighting the key innovations in this video, with the time each one comes up.",
+  },
+  { label: "🪜 How to use it in 3 steps", prompt: "Explain in 3 steps how to use what this video shows." },
+  { label: "• Report in bullets", prompt: "Write a report on this video in bullet points." },
+];
+
+function AskAi(props: { busy: boolean; onAsk: (prompt: string) => void; currentTime: () => number }) {
+  const [prompt, setPrompt] = useState("");
+  const [open, setOpen] = useState(true);
+
+  function ask(text: string) {
+    const clean = text.trim();
+    if (!clean || props.busy) return;
+    props.onAsk(clean);
+  }
+
+  return (
+    <div className="rounded-xl bg-white p-3 shadow-sm ring-1 ring-violet-200">
+      <button onClick={() => setOpen((o) => !o)} className="flex w-full items-center gap-2 text-left text-sm font-semibold">
+        ✨ Ask AI about this video
+        {props.busy && <span className="font-normal text-violet-700">Watching the video… this can take a minute</span>}
+        <span className="ml-auto text-xs font-normal text-slate-500">{open ? "Hide" : "Show"}</span>
+      </button>
+      {open && (
+        <div className="mt-2 flex flex-col gap-2">
+          <div className="flex flex-wrap gap-1.5">
+            {AI_PRESETS.map((p) => (
+              <button
+                key={p.label}
+                onClick={() => ask(p.prompt)}
+                disabled={props.busy}
+                className="rounded-full bg-violet-50 px-3 py-1 text-xs text-violet-800 ring-1 ring-violet-200 hover:bg-violet-100 disabled:opacity-50"
+              >
+                {p.label}
+              </button>
+            ))}
+            <button
+              onClick={() =>
+                ask(`Take a screenshot at ${formatTime(props.currentTime())} and explain it in 2 sentences.`)
+              }
+              disabled={props.busy}
+              className="rounded-full bg-violet-50 px-3 py-1 text-xs text-violet-800 ring-1 ring-violet-200 hover:bg-violet-100 disabled:opacity-50"
+              title="Explain what's on screen right now, and add a screenshot of it"
+            >
+              📷 Explain this moment
+            </button>
+          </div>
+          <div className="flex gap-2">
+            <textarea
+              value={prompt}
+              rows={2}
+              maxLength={2000}
+              onChange={(e) => setPrompt(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  ask(prompt);
+                }
+              }}
+              placeholder="Ask anything, e.g. “Take a screenshot at 1:01 and explain it in 2 sentences”"
+              className="min-w-0 flex-1 resize-y rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+            />
+            <button
+              onClick={() => ask(prompt)}
+              disabled={props.busy || !prompt.trim()}
+              className="self-start rounded-lg bg-violet-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-violet-700 disabled:opacity-50"
+            >
+              Ask
+            </button>
+          </div>
+          <p className="text-xs text-slate-500">
+            Answers are added to the end of your typed notes, where you can edit them. Ask for a screenshot at a time and
+            the video jumps there so 📷 Clip can add the picture.
+          </p>
+        </div>
+      )}
     </div>
   );
 }
