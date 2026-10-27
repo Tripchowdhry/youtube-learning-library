@@ -2,7 +2,17 @@
 // link, so it sees the slides and screen as well as hearing what's said.
 // Needs GEMINI_API_KEY (free from Google AI Studio); GEMINI_MODEL is optional.
 
-const MODEL = process.env.GEMINI_MODEL || "gemini-flash-latest";
+// When a model is busy (Google's free tier often is) or missing, the next one is tried.
+const MODELS = [
+  ...(process.env.GEMINI_MODEL ? [process.env.GEMINI_MODEL] : []),
+  "gemini-flash-latest",
+  "gemini-2.5-flash",
+  "gemini-flash-lite-latest",
+  "gemini-2.5-flash-lite",
+].filter((m, i, all) => all.indexOf(m) === i);
+
+// Busy (503), over the limit (429), or not offered to this key (404): worth trying another model.
+const TRY_NEXT = new Set([404, 429, 500, 503]);
 
 export class GeminiError extends Error {
   constructor(
@@ -17,8 +27,8 @@ export function geminiConfigured() {
   return Boolean(process.env.GEMINI_API_KEY);
 }
 
-export async function askAboutVideo(videoUrl: string, instructions: string, request: string) {
-  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`, {
+async function callModel(model: string, videoUrl: string, instructions: string, request: string) {
+  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
     method: "POST",
     headers: { "Content-Type": "application/json", "x-goog-api-key": process.env.GEMINI_API_KEY ?? "" },
     body: JSON.stringify({
@@ -28,17 +38,30 @@ export async function askAboutVideo(videoUrl: string, instructions: string, requ
       generationConfig: { mediaResolution: "MEDIA_RESOLUTION_LOW" },
     }),
   });
-  const data = await res.json().catch(() => null);
-  if (!res.ok) {
-    if (res.status === 429) {
-      throw new GeminiError("The free AI limit is used up for now. Try again in a minute, or tomorrow.", 429);
+  return { res, data: await res.json().catch(() => null) };
+}
+
+export async function askAboutVideo(videoUrl: string, instructions: string, request: string) {
+  let lastStatus = 0;
+  let lastDetail = "";
+  for (const model of MODELS) {
+    const { res, data } = await callModel(model, videoUrl, instructions, request);
+    if (res.ok) {
+      const parts: { text?: string }[] = data?.candidates?.[0]?.content?.parts ?? [];
+      const text = parts.map((p) => p.text ?? "").join("").trim();
+      if (!text) throw new GeminiError("The AI didn't send an answer. Try asking a different way.", 502);
+      return text;
     }
-    const detail = data?.error?.message ?? `error ${res.status}`;
-    console.error("Gemini request failed", res.status, detail);
-    throw new GeminiError(`The AI couldn't watch this video (${detail}).`, 502);
+    lastStatus = res.status;
+    lastDetail = data?.error?.message ?? `error ${res.status}`;
+    console.error("Gemini request failed", model, res.status, lastDetail);
+    if (!TRY_NEXT.has(res.status)) break;
   }
-  const parts: { text?: string }[] = data?.candidates?.[0]?.content?.parts ?? [];
-  const text = parts.map((p) => p.text ?? "").join("").trim();
-  if (!text) throw new GeminiError("The AI didn't send an answer. Try asking a different way.", 502);
-  return text;
+  if (lastStatus === 429) {
+    throw new GeminiError("The free AI limit is used up for now. Try again in a minute, or tomorrow.", 429);
+  }
+  if (lastStatus === 503 || lastStatus === 500) {
+    throw new GeminiError("Google's free AI is busy right now. Please try again in a minute.", 503);
+  }
+  throw new GeminiError(`The AI couldn't watch this video (${lastDetail}).`, 502);
 }
