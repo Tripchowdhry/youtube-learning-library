@@ -7,6 +7,7 @@ export async function askVideoAi(body: {
   title?: string | null;
   task: "note" | "ask";
   prompt?: string;
+  focusAt?: number;
 }): Promise<VideoAiResult> {
   try {
     const res = await fetch("/api/video-ai", {

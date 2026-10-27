@@ -31,10 +31,32 @@ export function geminiConfigured() {
 // audio) still catches slides and code, and makes long videos much quicker.
 const FRAMES_PER_SECOND = 1 / 3;
 
-async function callModel(model: string, videoUrl: string, instructions: string, request: string, fewerFrames = true) {
+// A question about one moment only looks at this many seconds either side of it, at full detail.
+export const FOCUS_SECONDS = 20;
+
+// What part of the video to look at: all of it, or just around one moment (in seconds).
+type Focus = { around: number } | null;
+
+function videoMetadata(focus: Focus) {
+  if (!focus) return { fps: FRAMES_PER_SECOND };
+  return {
+    start_offset: `${Math.max(0, focus.around - FOCUS_SECONDS)}s`,
+    end_offset: `${focus.around + FOCUS_SECONDS}s`,
+    fps: 1,
+  };
+}
+
+async function callModel(
+  model: string,
+  videoUrl: string,
+  instructions: string,
+  request: string,
+  focus: Focus,
+  customFrames = true,
+) {
   const video = {
     file_data: { file_uri: videoUrl },
-    ...(fewerFrames ? { video_metadata: { fps: FRAMES_PER_SECOND } } : {}),
+    ...(customFrames ? { video_metadata: videoMetadata(focus) } : {}),
   };
   const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
     method: "POST",
@@ -42,20 +64,21 @@ async function callModel(model: string, videoUrl: string, instructions: string, 
     body: JSON.stringify({
       systemInstruction: { parts: [{ text: instructions }] },
       contents: [{ role: "user", parts: [video, { text: request }] }],
-      // Low detail per frame keeps long videos inside the free tier's limits.
-      generationConfig: { mediaResolution: "MEDIA_RESOLUTION_LOW" },
+      // Low detail per frame keeps long videos inside the free tier's limits; a short
+      // clip around one moment gets normal detail so text on screen can be read.
+      ...(focus && customFrames ? {} : { generationConfig: { mediaResolution: "MEDIA_RESOLUTION_LOW" } }),
     }),
   });
   return { res, data: await res.json().catch(() => null) };
 }
 
-export async function askAboutVideo(videoUrl: string, instructions: string, request: string) {
+export async function askAboutVideo(videoUrl: string, instructions: string, request: string, focus: Focus = null) {
   let lastStatus = 0;
   let lastDetail = "";
   for (const model of MODELS) {
-    let { res, data } = await callModel(model, videoUrl, instructions, request);
-    // A model that doesn't accept a custom frame rate gets the plain request instead.
-    if (res.status === 400) ({ res, data } = await callModel(model, videoUrl, instructions, request, false));
+    let { res, data } = await callModel(model, videoUrl, instructions, request, focus);
+    // A model that doesn't accept a custom frame rate or clip gets the plain request instead.
+    if (res.status === 400) ({ res, data } = await callModel(model, videoUrl, instructions, request, focus, false));
     if (res.ok) {
       const parts: { text?: string }[] = data?.candidates?.[0]?.content?.parts ?? [];
       const text = parts.map((p) => p.text ?? "").join("").trim();
