@@ -612,7 +612,7 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
 // ---------- Pieces ----------
 
 // The Videos | Reading | Tutorials | ScrapBook switch in the header of every section.
-export function SectionSwitch({ active }: { active: "videos" | SectionKind | "scrap" }) {
+export function SectionSwitch({ active }: { active: "videos" | SectionKind | "scrap" | "vault" }) {
   const tab = (on: boolean) =>
     `rounded-md px-2.5 py-1 text-sm font-medium ${on ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:text-slate-900"}`;
   return (
@@ -628,6 +628,9 @@ export function SectionSwitch({ active }: { active: "videos" | SectionKind | "sc
       ))}
       <Link href="/scrapbook" className={tab(active === "scrap")} title="ScrapBook">
         📒<span className="hidden sm:inline"> ScrapBook</span>
+      </Link>
+      <Link href="/vault" className={tab(active === "vault")} title="Vault">
+        🔐<span className="hidden sm:inline"> Vault</span>
       </Link>
     </nav>
   );
