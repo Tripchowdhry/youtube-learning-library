@@ -115,12 +115,11 @@ export default function VaultLibrary({ userEmail }: { userEmail: string }) {
     };
   }, [key, lock]);
 
-  async function unlock(passphrase: string) {
-    if (!vaultKey) return false;
+  // Gives back the key if the passphrase is right, or null if not.
+  async function checkPassphrase(passphrase: string) {
+    if (!vaultKey) return null;
     const candidate = await deriveKey(passphrase, vaultKey.salt, vaultKey.iterations);
-    if (!(await isRightKey(candidate, vaultKey.check_value))) return false;
-    setKey(candidate);
-    return true;
+    return (await isRightKey(candidate, vaultKey.check_value)) ? candidate : null;
   }
 
   // Makes the key for a new passphrase and what gets saved to check it later.
@@ -571,7 +570,7 @@ export default function VaultLibrary({ userEmail }: { userEmail: string }) {
                   <SmallButton onClick={lock}>🔒 Lock now</SmallButton>
                 </div>
               ) : (
-                <UnlockForm onUnlock={unlock} onForgot={() => setResetting(true)} />
+                <UnlockForm onCheck={checkPassphrase} onUnlock={setKey} onForgot={() => setResetting(true)} />
               )}
 
               {visibleEntries.length === 0 ? (
@@ -743,22 +742,30 @@ function PlainLine({ label, children }: { label: string; children: React.ReactNo
   );
 }
 
-function UnlockForm({ onUnlock, onForgot }: { onUnlock: (passphrase: string) => Promise<boolean>; onForgot: () => void }) {
+function UnlockForm(props: {
+  onCheck: (passphrase: string) => Promise<CryptoKey | null>;
+  onUnlock: (key: CryptoKey) => void;
+  onForgot: () => void;
+}) {
   const [passphrase, setPassphrase] = useState("");
   const [busy, setBusy] = useState(false);
   const [wrong, setWrong] = useState(false);
 
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
+  async function submit() {
+    if (!passphrase || busy) return;
     setBusy(true);
-    const ok = await onUnlock(passphrase);
+    const key = await props.onCheck(passphrase);
     setBusy(false);
-    setWrong(!ok);
-    if (ok) setPassphrase("");
+    setWrong(!key);
+    if (!key) return;
+    // Empty the box before it goes away, so the browser has nothing to offer to save.
+    setPassphrase("");
+    await afterPaint();
+    props.onUnlock(key);
   }
 
   return (
-    <form onSubmit={submit} className="mb-4 rounded-xl border border-amber-300 bg-amber-50 p-4">
+    <NoSaveForm onSubmit={submit} className="mb-4 rounded-xl border border-amber-300 bg-amber-50 p-4">
       <p className="mb-2 text-sm text-slate-700">
         🔒 Your vault is locked. Enter your passphrase to see, copy or change passwords and API keys.
       </p>
@@ -772,6 +779,8 @@ function UnlockForm({ onUnlock, onForgot }: { onUnlock: (passphrase: string) => 
           className="min-w-0 flex-1 rounded-md border border-slate-300 bg-white px-3 py-2"
         />
         <button
+          type="button"
+          onClick={submit}
           disabled={busy || !passphrase}
           className="rounded-md bg-blue-600 px-4 py-2 font-semibold whitespace-nowrap text-white hover:bg-blue-700 disabled:opacity-60"
         >
@@ -779,10 +788,10 @@ function UnlockForm({ onUnlock, onForgot }: { onUnlock: (passphrase: string) => 
         </button>
       </div>
       {wrong && <p className="mt-2 text-sm text-red-600">That passphrase doesn&apos;t match. Please try again.</p>}
-      <button type="button" onClick={onForgot} className="mt-2 text-xs text-slate-500 underline">
+      <button type="button" onClick={props.onForgot} className="mt-2 text-xs text-slate-500 underline">
         Forgot your passphrase?
       </button>
-    </form>
+    </NoSaveForm>
   );
 }
 
@@ -796,11 +805,15 @@ function PassphraseForm({ submitLabel, onSubmit }: { submitLabel: string; onSubm
   const tooShort = passphrase.length < PASSPHRASE_MIN;
   const mismatch = again.length > 0 && again !== passphrase;
 
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    if (tooShort || passphrase !== again) return;
+  async function submit() {
+    if (busy || tooShort || passphrase !== again) return;
+    const chosen = passphrase;
     setBusy(true);
-    await onSubmit(passphrase);
+    // Empty the boxes before they go away, so the browser has nothing to offer to save.
+    setPassphrase("");
+    setAgain("");
+    await afterPaint();
+    await onSubmit(chosen);
     setBusy(false);
   }
 
@@ -812,7 +825,7 @@ function PassphraseForm({ submitLabel, onSubmit }: { submitLabel: string; onSubm
   }
 
   return (
-    <form onSubmit={submit} className="flex flex-col gap-2">
+    <NoSaveForm onSubmit={submit} className="flex flex-col gap-2">
       <div className="flex gap-2">
         <input
           {...secretInput(show)}
@@ -847,12 +860,14 @@ function PassphraseForm({ submitLabel, onSubmit }: { submitLabel: string; onSubm
         the vault and set them again.
       </p>
       <button
+        type="button"
+        onClick={submit}
         disabled={busy || tooShort || passphrase !== again}
         className="self-start rounded-md bg-blue-600 px-4 py-2 font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
       >
         {busy ? "Working…" : submitLabel}
       </button>
-    </form>
+    </NoSaveForm>
   );
 }
 
@@ -912,28 +927,33 @@ function EntryEditor(props: {
     });
   }, [entry, openSecret]);
 
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!name.trim()) return;
+  async function submit() {
+    if (busy || !ready || !name.trim()) return;
+    const secrets = { password, api_key: apiKey };
     setBusy(true);
+    // Empty the secret boxes before the editor goes away, so the browser has nothing to offer to save.
+    setPassword("");
+    setApiKey("");
+    await afterPaint();
     const ok = await props.onSave(entry, {
       name: name.trim(),
       url: url.trim(),
       username: username.trim(),
       note: note.trim(),
       category_id: categoryId || null,
-      password,
-      api_key: apiKey,
+      ...secrets,
     });
     setBusy(false);
-    if (ok) props.onClose();
+    if (ok) return props.onClose();
+    setPassword(secrets.password);
+    setApiKey(secrets.api_key);
   }
 
   const input = "w-full rounded-md border border-slate-300 bg-white px-3 py-2";
 
   return (
     <Modal onClose={props.onClose}>
-      <form onSubmit={submit} className="flex flex-col gap-3">
+      <NoSaveForm onSubmit={submit} className="flex flex-col gap-3">
         <h2 className="text-xl font-bold">{entry ? "Edit entry" : "New entry"}</h2>
         <Field label="Name" hint="Like “Gmail” or “OpenAI API”">
           <input value={name} onChange={(e) => setName(e.target.value)} maxLength={NAME_MAX} required className={input} autoFocus />
@@ -1002,6 +1022,8 @@ function EntryEditor(props: {
         </Field>
         <div className="flex gap-2">
           <button
+            type="button"
+            onClick={submit}
             disabled={busy || !ready || !name.trim()}
             className="rounded-md bg-blue-600 px-4 py-2 font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
           >
@@ -1011,7 +1033,7 @@ function EntryEditor(props: {
             Cancel
           </button>
         </div>
-      </form>
+      </NoSaveForm>
     </Modal>
   );
 }
@@ -1042,6 +1064,26 @@ function Modal({ children, onClose }: { children: React.ReactNode; onClose: () =
     </div>
   );
 }
+
+// Works like a form (Enter submits) without being one: Safari offers to save a password
+// whenever a real form with a secret in it is sent, even when the fields aren't password boxes.
+function NoSaveForm({ onSubmit, className, children }: { onSubmit: () => void; className?: string; children: React.ReactNode }) {
+  return (
+    <div
+      className={className}
+      onKeyDown={(e) => {
+        if (e.key !== "Enter" || !(e.target instanceof HTMLInputElement)) return;
+        e.preventDefault();
+        onSubmit();
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+// Waits until the screen has redrawn, so emptied boxes are really empty before they go away.
+const afterPaint = () => new Promise<void>((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)));
 
 // Secret fields are plain text boxes drawn as dots, so Safari and other browsers don't
 // treat them as a login and offer to save the vault passphrase or the passwords in it.
