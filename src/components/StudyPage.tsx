@@ -708,6 +708,15 @@ const AI_PRESETS = [
 function AskAi(props: { busy: boolean; error: string | null; onAsk: (prompt: string) => void; currentTime: () => number }) {
   const [prompt, setPrompt] = useState("");
   const [open, setOpen] = useState(true);
+  const [elapsed, setElapsed] = useState(0);
+
+  // Counts the seconds while the AI works, so it's clear nothing is stuck.
+  useEffect(() => {
+    if (!props.busy) return;
+    setElapsed(0);
+    const timer = setInterval(() => setElapsed((n) => n + 1), 1000);
+    return () => clearInterval(timer);
+  }, [props.busy]);
 
   function ask(text: string) {
     const clean = text.trim();
@@ -771,7 +780,8 @@ function AskAi(props: { busy: boolean; error: string | null; onAsk: (prompt: str
           </div>
           {props.busy && (
             <p className="rounded-md bg-violet-50 px-2 py-1.5 text-sm text-violet-800 ring-1 ring-violet-200">
-              ⏳ The AI is watching the video. Long videos can take 1 to 2 minutes…
+              <span className="mr-2 inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-violet-300 border-t-violet-700 align-[-2px]" />
+              The AI is watching the video ({formatTime(elapsed)}). Long videos can take 1 to 2 minutes…
             </p>
           )}
           {props.error && (
