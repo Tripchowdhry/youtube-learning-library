@@ -8,6 +8,7 @@ import { FolderSortSelect, compareFolders, sortHint, useFolderSort } from "@/com
 import { linkKey } from "@/lib/links";
 import { createClient } from "@/lib/supabase/client";
 import type { Article, ArticleCategory, SectionKind } from "@/lib/types";
+import { askConfirm } from "./ConfirmDialog";
 
 type View = { kind: "all" } | { kind: "uncategorized" } | { kind: "category"; id: string };
 export type Period = "any" | "week" | "month" | "year";
@@ -798,10 +799,17 @@ export function ArticleNote(props: {
           </span>
           {(current || draft) && (
             <SmallButton
-              onClick={() => {
+              onClick={async () => {
                 // Nothing saved yet: just empty the box.
                 if (!current) return setDraft("");
-                if (!window.confirm("Remove this note? Only the note is removed.")) return;
+                const ok = await askConfirm({
+                  title: "Clear this note?",
+                  quote: current,
+                  message: "Only the note goes away. The article stays in your list.",
+                  confirmLabel: "Yes, clear note",
+                  cancelLabel: "Keep it",
+                });
+                if (!ok) return;
                 props.onSave("");
                 props.setEditing(false);
               }}

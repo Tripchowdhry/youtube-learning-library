@@ -10,6 +10,7 @@ import VideoThumb from "@/components/VideoThumb";
 import { createClient } from "@/lib/supabase/client";
 import type { Folder, Video } from "@/lib/types";
 import { askVideoAi } from "@/lib/video-ai";
+import { askConfirm } from "./ConfirmDialog";
 
 type View = { kind: "all" } | { kind: "unsorted" } | { kind: "folder"; id: string };
 
@@ -268,8 +269,16 @@ export default function Library({ userEmail }: { userEmail: string }) {
   }
 
   async function deleteVideo(video: Video) {
-    const message = `DELETE THIS WHOLE VIDEO?\n\n"${video.title}"\n\nThe video, its short note and everything on its notes page are deleted for good. To remove only the short note, press Cancel and use 🧹 Clear note.`;
-    if (!window.confirm(message)) return;
+    const ok = await askConfirm({
+      title: "Delete this whole video?",
+      quote: video.title ?? undefined,
+      message:
+        "The video, its short note and everything on its notes page will be gone for good.\n\nOnly want to remove the short note? Choose Keep the video, then use 🧹 Clear note.",
+      confirmLabel: "Yes, delete video",
+      cancelLabel: "Keep the video",
+      danger: true,
+    });
+    if (!ok) return;
     setVideos((prev) => prev.filter((v) => v.id !== video.id));
     const { error } = await supabase.from("videos").delete().eq("id", video.id);
     if (error) {
@@ -854,10 +863,15 @@ function VideoCard(props: {
           {!video.note && !editingNote && <SmallButton onClick={() => setEditingNote(true)}>📝 Add note</SmallButton>}
           {video.note && !editingNote && (
             <SmallButton
-              onClick={() => {
-                const preview = video.note.length > 80 ? `${video.note.slice(0, 80)}…` : video.note;
-                const message = `Remove this note from the video?\n\n"${preview}"\n\nYour typed and handwritten notes on the notes page are not affected.`;
-                if (window.confirm(message)) props.onSaveNote("");
+              onClick={async () => {
+                const ok = await askConfirm({
+                  title: "Clear this note?",
+                  quote: video.note,
+                  message: "Only this short note goes away. The video and your notes page stay as they are.",
+                  confirmLabel: "Yes, clear note",
+                  cancelLabel: "Keep it",
+                });
+                if (ok) props.onSaveNote("");
               }}
             >
               🧹 Clear note
