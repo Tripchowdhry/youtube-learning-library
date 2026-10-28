@@ -237,6 +237,12 @@ export default function StudyPage({ videoId }: { videoId: string }) {
     setSaveState("unsaved");
   }
 
+  function clearTyped() {
+    const message =
+      "Remove all your typed notes for this video?\n\nThis deletes the text in the typing box. Pictures, handwriting and the short note in your library stay.";
+    if (window.confirm(message)) changeTyped("");
+  }
+
   // Typing mode: put [m:ss] at the cursor, on its own line.
   function stampTyped() {
     const box = typedBox.current;
@@ -504,6 +510,7 @@ export default function StudyPage({ videoId }: { videoId: string }) {
       onCancelClip={endClip}
       clipCount={clipCount}
       onDeleteAllClips={deleteAllClips}
+      onClearTyped={typed.trim() ? clearTyped : null}
       clipBusy={clipBusy}
       fingerDraws={fingerDraws}
       setFingerDraws={setFingerDraws}
@@ -661,20 +668,6 @@ function TypedNotes(props: {
           ))}
         </div>
       )}
-      {props.text.trim() && (
-        <div className="flex justify-end">
-          <button
-            onClick={() => {
-              const message =
-                "Remove all your typed notes for this video?\n\nThis deletes the text in the box below. Pictures, handwriting and the short note in your library stay.";
-              if (window.confirm(message)) props.onChange("");
-            }}
-            className="rounded-md px-2 py-1 text-xs text-slate-600 ring-1 ring-slate-300 hover:bg-slate-100"
-          >
-            🧹 Clear typed notes
-          </button>
-        </div>
-      )}
       {times.length > 0 && (
         <div className="flex flex-wrap items-center gap-1.5 text-xs text-slate-500">
           Jump to:
@@ -830,6 +823,7 @@ function Toolbar(props: {
   onCancelClip: () => void;
   clipCount: number;
   onDeleteAllClips: () => void;
+  onClearTyped: (() => void) | null;
   clipBusy: boolean;
   fingerDraws: boolean;
   setFingerDraws: (v: boolean) => void;
@@ -932,6 +926,15 @@ function Toolbar(props: {
           className="rounded-lg px-2 py-1.5 text-sm text-slate-600 ring-1 ring-slate-300 hover:bg-slate-100"
         >
           Cancel
+        </button>
+      )}
+      {props.mode === "type" && props.onClearTyped && (
+        <button
+          onClick={props.onClearTyped}
+          className="rounded-lg px-3 py-1.5 text-sm text-slate-700 ring-1 ring-slate-300 hover:bg-slate-100"
+          title="Remove all the text you typed for this video"
+        >
+          🧹 Clear typed notes
         </button>
       )}
       {props.clipCount > 0 && (
