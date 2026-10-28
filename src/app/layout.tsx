@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import { ConfirmHost } from "@/components/ConfirmDialog";
 
 export const metadata: Metadata = {
   title: "YouTube Learning Library",
@@ -18,7 +19,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className="antialiased">{children}</body>
+      <body className="antialiased">
+        {children}
+        <ConfirmHost />
+      </body>
     </html>
   );
 }

@@ -17,6 +17,7 @@ import { createClient } from "@/lib/supabase/client";
 import { formatTime, loadYouTubeApi, type YouTubePlayer } from "@/lib/youtube-player";
 import type { NoteImage, NotePage, NoteStroke, Video } from "@/lib/types";
 import { askVideoAi } from "@/lib/video-ai";
+import { askConfirm } from "./ConfirmDialog";
 
 const PEN_COLORS = ["#111827", "#2563eb", "#dc2626", "#16a34a"];
 const HIGHLIGHT_COLORS = ["#facc15", "#4ade80", "#f472b6", "#60a5fa"];
@@ -237,10 +238,16 @@ export default function StudyPage({ videoId }: { videoId: string }) {
     setSaveState("unsaved");
   }
 
-  function clearTyped() {
-    const message =
-      "Remove all your typed notes for this video?\n\nThis deletes the text in the typing box. Pictures, handwriting and the short note in your library stay.";
-    if (window.confirm(message)) changeTyped("");
+  async function clearTyped() {
+    const ok = await askConfirm({
+      title: "Clear your typed notes?",
+      message:
+        "Everything you typed (and AI answers) for this video will be erased.\n\nYour pictures, handwriting and the short note in your library stay safe.",
+      confirmLabel: "Yes, clear typed notes",
+      cancelLabel: "Keep them",
+      danger: true,
+    });
+    if (ok) changeTyped("");
   }
 
   // Typing mode: put [m:ss] at the cursor, on its own line.
@@ -307,8 +314,15 @@ export default function StudyPage({ videoId }: { videoId: string }) {
   const clipCount = typedClips.length + pages.reduce((n, p) => n + (p.images?.length ?? 0), 0);
 
   // Removes every clip from this video's notes, in both handwriting and typed notes.
-  function deleteAllClips() {
-    if (!window.confirm(`Delete all ${clipCount} clips from this video?`)) return;
+  async function deleteAllClips() {
+    const ok = await askConfirm({
+      title: `Delete all ${clipCount} pictures?`,
+      message: "Every picture in this video's notes will be removed. Your typed text and handwriting stay.",
+      confirmLabel: "Yes, delete pictures",
+      cancelLabel: "Keep them",
+      danger: true,
+    });
+    if (!ok) return;
     if (pages.some((p) => p.images?.length)) change(pages.map((p) => ({ ...p, images: [] })));
     if (typedClips.length) changeTypedClips([]);
   }
@@ -468,8 +482,15 @@ export default function StudyPage({ videoId }: { videoId: string }) {
     lastSpot.current = { page: pages.length, y: 40 };
   }
 
-  function clearPage(pageIndex: number) {
-    if (!window.confirm(`Erase everything on page ${pageIndex + 1}?`)) return;
+  async function clearPage(pageIndex: number) {
+    const ok = await askConfirm({
+      title: `Erase page ${pageIndex + 1}?`,
+      message: "All handwriting and pictures on this page will be erased. Other pages stay as they are.",
+      confirmLabel: "Yes, erase page",
+      cancelLabel: "Keep it",
+      danger: true,
+    });
+    if (!ok) return;
     change(
       pages.length > 1 && pageIndex === pages.length - 1
         ? pages.slice(0, -1)
@@ -660,8 +681,15 @@ function TypedNotes(props: {
                 <img src={props.imageUrl(c.path)} alt="Picture from the video" className="block w-full" />
               </a>
               <DeleteClipButton
-                onClick={() => {
-                  if (window.confirm("Delete this picture?")) remove(i);
+                onClick={async () => {
+                  const ok = await askConfirm({
+                    title: "Delete this picture?",
+                    message: "It will be removed from your notes.",
+                    confirmLabel: "Yes, delete",
+                    cancelLabel: "Keep it",
+                    danger: true,
+                  });
+                  if (ok) remove(i);
                 }}
               />
             </div>
