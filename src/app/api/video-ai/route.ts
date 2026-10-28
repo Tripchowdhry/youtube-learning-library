@@ -27,12 +27,12 @@ export async function POST(request: Request) {
 
   try {
     if (body.task === "note") {
-      const text = await askAboutVideo(
+      const { text, model } = await askAboutVideo(
         watchUrl(youtubeId),
         `You write the short note shown next to a video in someone's learning library. ${about}`,
         `In one or two plain sentences, under ${NOTE_MAX - 30} characters, say what this video teaches and why it's worth watching. No markdown, no quotes, no emojis.`,
       );
-      return NextResponse.json({ text: text.replace(/\s+/g, " ").slice(0, NOTE_MAX) });
+      return NextResponse.json({ text: text.replace(/\s+/g, " ").slice(0, NOTE_MAX), model });
     }
 
     const ask = String(body.prompt ?? "").trim().slice(0, 2000);
@@ -40,7 +40,7 @@ export async function POST(request: Request) {
     // A question about one moment (like "screenshot at 1:01") only looks at the seconds around it.
     const focusAt = Number(body.focusAt);
     const focus = Number.isFinite(focusAt) && focusAt >= 0 ? { around: Math.round(focusAt) } : null;
-    const text = await askAboutVideo(
+    const { text, model } = await askAboutVideo(
       watchUrl(youtubeId),
       [
         `You help someone take study notes on a YouTube video. ${about}`,
@@ -58,7 +58,7 @@ export async function POST(request: Request) {
       ask,
       focus,
     );
-    return NextResponse.json({ text });
+    return NextResponse.json({ text, model });
   } catch (error) {
     if (error instanceof GeminiError) return NextResponse.json({ error: error.message }, { status: error.status });
     return NextResponse.json({ error: "The AI couldn't be reached. Try again." }, { status: 502 });

@@ -191,7 +191,10 @@ export default function Library({ userEmail }: { userEmail: string }) {
     }
     // Don't replace a note typed while the AI was working.
     const current = videosRef.current.find((v) => v.id === video.id);
-    if (current && !current.note && result.text) updateVideo(video.id, { note: result.text });
+    if (current && !current.note && result.text) {
+      updateVideo(video.id, { note: result.text });
+      if (result.model) notify(`Note written by ${result.model}`);
+    }
   }
 
   // Finds the top-level folder named after a channel, creating it the first time.

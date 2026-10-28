@@ -447,7 +447,8 @@ export default function StudyPage({ videoId }: { videoId: string }) {
       return;
     }
     const current = typedRef.current.trimEnd();
-    changeTyped(`${current ? `${current}\n\n` : ""}✨ ${prompt}\n${result.text}\n`);
+    const by = result.model ? ` (${result.model})` : "";
+    changeTyped(`${current ? `${current}\n\n` : ""}✨ ${prompt}${by}\n${result.text}\n`);
     requestAnimationFrame(() => {
       const box = typedBox.current;
       if (box) box.scrollTop = box.scrollHeight;
