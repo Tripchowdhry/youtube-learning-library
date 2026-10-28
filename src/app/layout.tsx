@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import AiJobsBadge from "@/components/AiJobsBadge";
 import { ConfirmHost } from "@/components/ConfirmDialog";
 
 export const metadata: Metadata = {
@@ -22,6 +23,7 @@ export default function RootLayout({
       <body className="antialiased">
         {children}
         <ConfirmHost />
+        <AiJobsBadge />
       </body>
     </html>
   );
