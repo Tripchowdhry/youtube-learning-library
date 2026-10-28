@@ -5,6 +5,8 @@
 // When a model is busy (Google's free tier often is) or missing, the next one is tried.
 const MODELS = [
   ...(process.env.GEMINI_MODEL ? [process.env.GEMINI_MODEL] : []),
+  // Gemini 3.5 Flash is retired and Google sends it to 3.6 Flash, so that's asked for by name.
+  "gemini-3.6-flash",
   "gemini-flash-latest",
   "gemini-2.5-flash",
   "gemini-flash-lite-latest",
