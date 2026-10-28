@@ -5,10 +5,15 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import ContextMenu, { type MenuState } from "@/components/ContextMenu";
 import { FolderSortSelect, compareFolders, sortHint, useFolderSort } from "@/components/FolderSort";
+import { onAiJobDone, runAiJob, useAiJobs, useSecondsSince } from "@/lib/ai-jobs";
 import { linkKey } from "@/lib/links";
 import { createClient } from "@/lib/supabase/client";
 import type { Article, ArticleCategory, SectionKind } from "@/lib/types";
+import { askArticleAi } from "@/lib/video-ai";
 import { askConfirm } from "./ConfirmDialog";
+
+type AiNote = { articleId: string; note: string; model?: string };
+const aiNoteKey = (articleId: string) => `article-note:${articleId}`;
 
 type View = { kind: "all" } | { kind: "uncategorized" } | { kind: "category"; id: string };
 export type Period = "any" | "week" | "month" | "year";
@@ -59,6 +64,7 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
 
   const [categories, setCategories] = useState<ArticleCategory[]>([]);
   const [articles, setArticles] = useState<Article[]>([]);
+  const aiJobs = useAiJobs();
   const [loading, setLoading] = useState(true);
   const [needsSetup, setNeedsSetup] = useState(false);
   const [view, setView] = useState<View>({ kind: "all" });
@@ -236,8 +242,46 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
     }
     setArticles((prev) => [data as Article, ...prev]);
     notify(`Saved "${title}"`);
+    writeAiNote(data as Article);
     return true;
   }
+
+  // Asks the AI to read the page and fill in its note. New links do this on their own; if it
+  // fails, the reason shows on the row until the next try. It keeps going, and saves the note,
+  // even if the person moves to another tab meanwhile.
+  function writeAiNote(article: Article) {
+    runAiJob<AiNote>({
+      key: aiNoteKey(article.id),
+      label: `AI note for "${article.title ?? article.site ?? "your link"}"`,
+      work: async () => {
+        const result = await askArticleAi({ url: article.url, title: article.title, kind });
+        if (result.error) return result.code === "no-key" ? {} : { error: result.error };
+        if (!result.text) return {};
+        // Only fills an empty note, so a note typed while the AI was working stays.
+        const { data, error } = await supabase
+          .from("articles")
+          .update({ note: result.text })
+          .eq("id", article.id)
+          .eq("note", "")
+          .select("id");
+        if (error) return { error: error.message };
+        return data.length ? { result: { articleId: article.id, note: result.text, model: result.model } } : {};
+      },
+    });
+  }
+
+  // Shows a finished AI note right away when this list is open.
+  useEffect(
+    () =>
+      onAiJobDone((key, result) => {
+        if (!key.startsWith("article-note:")) return false;
+        const { articleId, note, model } = result as AiNote;
+        setArticles((prev) => prev.map((a) => (a.id === articleId ? { ...a, note } : a)));
+        if (model) notify(`Note written by ${model}`);
+        return true;
+      }),
+    [notify],
+  );
 
   async function updateArticle(id: string, changes: Partial<Article>) {
     setArticles((prev) => prev.map((a) => (a.id === id ? { ...a, ...changes } : a)));
@@ -292,7 +336,15 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
   }
 
   async function deleteArticle(article: Article) {
-    if (!window.confirm(`Delete "${article.title}" from your ${section.list}?`)) return;
+    const ok = await askConfirm({
+      title: `Delete this from your ${section.list}?`,
+      quote: article.title ?? article.url,
+      message: "The link and its note will be gone for good.\n\nOnly want to remove the note? Choose Keep it, then use 🧹 Clear note.",
+      confirmLabel: "Yes, delete",
+      cancelLabel: "Keep it",
+      danger: true,
+    });
+    if (!ok) return;
     setArticles((prev) => prev.filter((a) => a.id !== article.id));
     const { error } = await supabase.from("articles").delete().eq("id", article.id);
     if (error) {
@@ -586,6 +638,9 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
                       isLast={index === visibleArticles.length - 1}
                       onRename={() => renameArticle(article)}
                       onSaveNote={(note) => updateArticle(article.id, { note })}
+                      aiNoteStartedAt={aiJobs.running.find((j) => j.key === aiNoteKey(article.id))?.startedAt ?? null}
+                      aiNoteError={aiJobs.errors.get(aiNoteKey(article.id)) ?? null}
+                      onAiNote={() => writeAiNote(article)}
                       onDelete={() => deleteArticle(article)}
                     />
                   ))}
@@ -667,6 +722,9 @@ function ArticleRow(props: {
   isLast: boolean;
   onRename: () => void;
   onSaveNote: (note: string) => void;
+  aiNoteStartedAt: number | null;
+  aiNoteError: string | null;
+  onAiNote: () => void;
   onDelete: () => void;
 }) {
   const { article } = props;
@@ -710,6 +768,9 @@ function ArticleRow(props: {
           setEditing={setEditingNote}
           onSave={props.onSaveNote}
         />
+        {props.aiNoteError && !article.note && (
+          <p className="rounded-md bg-red-50 px-2 py-1 text-xs text-red-700 ring-1 ring-red-200">⚠️ {props.aiNoteError}</p>
+        )}
         <div className="mt-1 flex flex-wrap items-center gap-1">
           <select
             value={article.category_id ?? ""}
@@ -744,13 +805,49 @@ function ArticleRow(props: {
             </>
           )}
           {!article.note && !editingNote && <SmallButton onClick={() => setEditingNote(true)}>📝 Add note</SmallButton>}
+          {article.note && !editingNote && (
+            <SmallButton
+              onClick={async () => {
+                const ok = await askConfirm({
+                  title: "Clear this note?",
+                  quote: article.note,
+                  message: "Only the note goes away. The link stays in your list.",
+                  confirmLabel: "Yes, clear note",
+                  cancelLabel: "Keep it",
+                });
+                if (ok) props.onSaveNote("");
+              }}
+            >
+              🧹 Clear note
+            </SmallButton>
+          )}
+          {!article.note && !editingNote && props.aiNoteStartedAt === null && (
+            <SmallButton onClick={props.onAiNote} title="Let AI read the page and write the note">
+              ✨ AI note
+            </SmallButton>
+          )}
+          {!article.note && props.aiNoteStartedAt !== null && <AiNoteWorking startedAt={props.aiNoteStartedAt} />}
           <SmallButton onClick={props.onRename}>Edit title</SmallButton>
-          <SmallButton onClick={props.onDelete} danger title="Delete">
-            🗑 Delete
-          </SmallButton>
+          {/* Kept apart from the note buttons so it isn't pressed by mistake. */}
+          <span className="ml-auto pl-3">
+            <SmallButton onClick={props.onDelete} danger title="Delete">
+              🗑 Delete
+            </SmallButton>
+          </span>
         </div>
       </div>
     </li>
+  );
+}
+
+// Shown in place of the ✨ AI note button while the AI writes the note.
+export function AiNoteWorking({ startedAt }: { startedAt: number }) {
+  const seconds = useSecondsSince(startedAt);
+  return (
+    <span className="flex items-center gap-1.5 rounded-md border border-violet-200 bg-violet-50 px-2 py-1 text-xs text-violet-800">
+      <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-violet-300 border-t-violet-700" />
+      Writing note… {Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, "0")}
+    </span>
   );
 }
 
