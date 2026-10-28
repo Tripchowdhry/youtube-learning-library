@@ -265,7 +265,8 @@ export default function Library({ userEmail }: { userEmail: string }) {
   }
 
   async function deleteVideo(video: Video) {
-    if (!window.confirm(`Remove "${video.title}" from your library?`)) return;
+    const message = `DELETE THIS WHOLE VIDEO?\n\n"${video.title}"\n\nThe video, its short note and everything on its notes page are deleted for good. To remove only the short note, press Cancel and use 🧹 Clear note.`;
+    if (!window.confirm(message)) return;
     setVideos((prev) => prev.filter((v) => v.id !== video.id));
     const { error } = await supabase.from("videos").delete().eq("id", video.id);
     if (error) {
@@ -866,9 +867,12 @@ function VideoCard(props: {
           )}
           {!video.note && props.aiNoteBusy && <AiNoteWorking />}
           <SmallButton onClick={props.onEditTags}>Tags</SmallButton>
-          <SmallButton onClick={props.onDelete} danger>
-            🗑 Delete
-          </SmallButton>
+          {/* Kept apart from the note buttons so it isn't pressed by mistake. */}
+          <span className="ml-auto pl-3">
+            <SmallButton onClick={props.onDelete} danger>
+              🗑 Delete video
+            </SmallButton>
+          </span>
         </div>
       </div>
     </div>
