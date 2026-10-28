@@ -848,6 +848,15 @@ function VideoCard(props: {
             </>
           )}
           {!video.note && !editingNote && <SmallButton onClick={() => setEditingNote(true)}>📝 Add note</SmallButton>}
+          {video.note && !editingNote && (
+            <SmallButton
+              onClick={() => {
+                if (window.confirm("Clear this video's note?")) props.onSaveNote("");
+              }}
+            >
+              🧹 Clear note
+            </SmallButton>
+          )}
           {!video.note && !editingNote && !props.aiNoteBusy && (
             <SmallButton onClick={props.onAiNote} title="Let AI watch the video and write the note">
               ✨ AI note

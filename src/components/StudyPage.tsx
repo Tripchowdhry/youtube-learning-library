@@ -660,6 +660,18 @@ function TypedNotes(props: {
           ))}
         </div>
       )}
+      {props.text.trim() && (
+        <div className="flex justify-end">
+          <button
+            onClick={() => {
+              if (window.confirm("Clear all your typed notes for this video? Pictures stay.")) props.onChange("");
+            }}
+            className="rounded-md px-2 py-1 text-xs text-slate-600 ring-1 ring-slate-300 hover:bg-slate-100"
+          >
+            🧹 Clear typed notes
+          </button>
+        </div>
+      )}
       {times.length > 0 && (
         <div className="flex flex-wrap items-center gap-1.5 text-xs text-slate-500">
           Jump to:
