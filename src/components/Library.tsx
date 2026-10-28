@@ -851,7 +851,9 @@ function VideoCard(props: {
           {video.note && !editingNote && (
             <SmallButton
               onClick={() => {
-                if (window.confirm("Clear this video's note?")) props.onSaveNote("");
+                const preview = video.note.length > 80 ? `${video.note.slice(0, 80)}…` : video.note;
+                const message = `Remove this note from the video?\n\n"${preview}"\n\nYour typed and handwritten notes on the notes page are not affected.`;
+                if (window.confirm(message)) props.onSaveNote("");
               }}
             >
               🧹 Clear note
