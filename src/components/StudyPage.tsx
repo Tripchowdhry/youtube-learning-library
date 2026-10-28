@@ -664,7 +664,9 @@ function TypedNotes(props: {
         <div className="flex justify-end">
           <button
             onClick={() => {
-              if (window.confirm("Clear all your typed notes for this video? Pictures stay.")) props.onChange("");
+              const message =
+                "Remove all your typed notes for this video?\n\nThis deletes the text in the box below. Pictures, handwriting and the short note in your library stay.";
+              if (window.confirm(message)) props.onChange("");
             }}
             className="rounded-md px-2 py-1 text-xs text-slate-600 ring-1 ring-slate-300 hover:bg-slate-100"
           >
