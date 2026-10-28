@@ -77,6 +77,15 @@ async function callModel(
   return { res, data: await res.json().catch(() => null) };
 }
 
+// "gemini-3.8-flash" -> "Gemini 3.8 Flash"
+function modelName(id: string) {
+  return id
+    .split("-")
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ");
+}
+
+// Returns the answer and the name of the Gemini model that wrote it.
 export async function askAboutVideo(videoUrl: string, instructions: string, request: string, focus: Focus = null) {
   let lastStatus = 0;
   let lastDetail = "";
@@ -88,7 +97,7 @@ export async function askAboutVideo(videoUrl: string, instructions: string, requ
       const parts: { text?: string }[] = data?.candidates?.[0]?.content?.parts ?? [];
       const text = parts.map((p) => p.text ?? "").join("").trim();
       if (!text) throw new GeminiError("The AI didn't send an answer. Try asking a different way.", 502);
-      return text;
+      return { text, model: modelName(data?.modelVersion || model) };
     }
     lastStatus = res.status;
     lastDetail = data?.error?.message ?? `error ${res.status}`;

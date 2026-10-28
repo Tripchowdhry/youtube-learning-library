@@ -1,6 +1,6 @@
 // Browser side of /api/video-ai.
 
-export type VideoAiResult = { text?: string; error?: string; code?: string };
+export type VideoAiResult = { text?: string; model?: string; error?: string; code?: string };
 
 export async function askVideoAi(body: {
   youtubeId: string;
@@ -16,7 +16,7 @@ export async function askVideoAi(body: {
       body: JSON.stringify(body),
     });
     const data = await res.json().catch(() => ({}));
-    if (res.ok) return { text: data.text };
+    if (res.ok) return { text: data.text, model: data.model };
     if (res.status === 504) {
       return { error: "The AI took too long (over 5 minutes). Very long videos can be too much for the free plan." };
     }
