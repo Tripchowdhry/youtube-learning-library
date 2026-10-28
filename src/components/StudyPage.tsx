@@ -16,6 +16,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { formatTime, loadYouTubeApi, type YouTubePlayer } from "@/lib/youtube-player";
 import type { NoteImage, NotePage, NoteStroke, Video } from "@/lib/types";
+import { onAiJobDone, runAiJob, useAiJobs, useSecondsSince } from "@/lib/ai-jobs";
 import { askVideoAi } from "@/lib/video-ai";
 import { askConfirm } from "./ConfirmDialog";
 
@@ -63,6 +64,12 @@ function screenshotTime(prompt: string) {
   return c === null ? a * 60 + b : a * 3600 + b * 60 + c;
 }
 
+// Adds an AI answer to the end of the typed notes.
+function addAnswer(typed: string, answer: string) {
+  const current = typed.trimEnd();
+  return `${current ? `${current}\n\n` : ""}${answer}`;
+}
+
 function timesIn(text: string) {
   const seen = new Set<number>();
   for (const m of text.matchAll(TIME_PATTERN)) {
@@ -103,8 +110,10 @@ export default function StudyPage({ videoId }: { videoId: string }) {
   // The link that starts a drag-to-select screenshot on this computer, if there is one.
   const [screenshotLink, setScreenshotLink] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [aiBusy, setAiBusy] = useState(false);
-  const [aiError, setAiError] = useState<string | null>(null);
+  const aiJobs = useAiJobs();
+  const aiKey = `ask:${videoId}`;
+  const aiStartedAt = aiJobs.running.find((j) => j.key === aiKey)?.startedAt ?? null;
+  const aiError = aiJobs.errors.get(aiKey) ?? null;
 
   const playerHost = useRef<HTMLDivElement>(null);
   const player = useRef<YouTubePlayer | null>(null);
@@ -185,6 +194,16 @@ export default function StudyPage({ videoId }: { videoId: string }) {
     const timer = setTimeout(save, 1200);
     return () => clearTimeout(timer);
   }, [pages, typed, typedClips, saveState, save]);
+
+  // Save right away when leaving for another page of the app.
+  const saveStateRef = useRef(saveState);
+  saveStateRef.current = saveState;
+  useEffect(
+    () => () => {
+      if (saveStateRef.current === "unsaved") save();
+    },
+    [save],
+  );
 
   // Save right away if the person switches apps or closes the tab.
   useEffect(() => {
@@ -447,8 +466,9 @@ export default function StudyPage({ videoId }: { videoId: string }) {
 
   // The answer is added to the end of the typed notes. Asking for a screenshot at a time
   // also jumps the video there, paused, and starts Clip so the picture lands in the notes too.
-  async function askAi(prompt: string) {
-    if (!video || aiBusy) return;
+  // The AI keeps working if the person leaves this page; the answer is then saved to the notes.
+  function askAi(prompt: string) {
+    if (!video || aiStartedAt !== null) return;
     const shotAt = screenshotTime(prompt);
     if (shotAt !== null) {
       player.current?.seekTo(shotAt, true);
@@ -458,22 +478,53 @@ export default function StudyPage({ videoId }: { videoId: string }) {
       else setWaitingForPaste(true);
     }
     setMode("type");
-    setAiError(null);
-    setAiBusy(true);
-    const result = await askVideoAi({ youtubeId: video.youtube_id, title: video.title, task: "ask", prompt, focusAt: shotAt ?? undefined });
-    setAiBusy(false);
-    if (result.error || !result.text) {
-      setAiError(result.error ?? "The AI didn't answer.");
-      return;
-    }
-    const current = typedRef.current.trimEnd();
-    const by = result.model ? ` (${result.model})` : "";
-    changeTyped(`${current ? `${current}\n\n` : ""}✨ ${prompt}${by}\n${result.text}\n`);
-    requestAnimationFrame(() => {
-      const box = typedBox.current;
-      if (box) box.scrollTop = box.scrollHeight;
+    runAiJob<string>({
+      key: aiKey,
+      label: `AI answer for "${video.title ?? "your video"}"`,
+      work: async () => {
+        const result = await askVideoAi({
+          youtubeId: video.youtube_id,
+          title: video.title,
+          task: "ask",
+          prompt,
+          focusAt: shotAt ?? undefined,
+        });
+        if (result.error || !result.text) return { error: result.error ?? "The AI didn't answer." };
+        const by = result.model ? ` (${result.model})` : "";
+        return { result: `✨ ${prompt}${by}\n${result.text}\n` };
+      },
+      // This page was left: add the answer to the saved notes instead.
+      fallback: async (answer) => {
+        const { data } = await supabase.from("notes").select("pages, text").eq("video_id", videoId).maybeSingle();
+        const saved = splitTypedClips((data?.text ?? "") as string);
+        const { error } = await supabase.from("notes").upsert(
+          {
+            video_id: videoId,
+            pages: data?.pages ?? [],
+            text: joinTypedClips(addAnswer(saved.text, answer), saved.clips),
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "video_id" },
+        );
+        if (error) throw error;
+      },
     });
   }
+
+  // An answer that arrives while this page is open goes straight into the typing box.
+  useEffect(() => {
+    if (!loaded) return;
+    return onAiJobDone((key, answer) => {
+      if (key !== `ask:${videoId}`) return false;
+      setTyped(addAnswer(typedRef.current, answer as string));
+      setSaveState("unsaved");
+      requestAnimationFrame(() => {
+        const box = typedBox.current;
+        if (box) box.scrollTop = box.scrollHeight;
+      });
+      return true;
+    });
+  }, [loaded, videoId]);
 
   const imageUrl = useCallback((path: string) => clipUrl(supabase, path), [supabase]);
 
@@ -585,7 +636,7 @@ export default function StudyPage({ videoId }: { videoId: string }) {
         <div className={notesHidden ? "hidden" : "mt-2 flex min-w-0 flex-col gap-4 lg:mt-0"}>
           <div className="sticky top-[76px] z-20 hidden lg:block">{toolbar}</div>
           {loaded && (
-            <AskAi busy={aiBusy} error={aiError} onAsk={askAi} currentTime={() => player.current?.getCurrentTime?.() ?? 0} />
+            <AskAi startedAt={aiStartedAt} error={aiError} onAsk={askAi} currentTime={() => player.current?.getCurrentTime?.() ?? 0} />
           )}
           {!loaded ? (
             <p className="text-slate-500">Loading your notes…</p>
@@ -741,22 +792,19 @@ const AI_PRESETS = [
   { label: "• Report in bullets", prompt: "Write a report on this video in bullet points." },
 ];
 
-function AskAi(props: { busy: boolean; error: string | null; onAsk: (prompt: string) => void; currentTime: () => number }) {
+function AskAi(props: {
+  startedAt: number | null;
+  error: string | null;
+  onAsk: (prompt: string) => void;
+  currentTime: () => number;
+}) {
   const [prompt, setPrompt] = useState("");
   const [open, setOpen] = useState(true);
-  const [elapsed, setElapsed] = useState(0);
-
-  // Counts the seconds while the AI works, so it's clear nothing is stuck.
-  useEffect(() => {
-    if (!props.busy) return;
-    setElapsed(0);
-    const timer = setInterval(() => setElapsed((n) => n + 1), 1000);
-    return () => clearInterval(timer);
-  }, [props.busy]);
+  const busy = props.startedAt !== null;
 
   function ask(text: string) {
     const clean = text.trim();
-    if (!clean || props.busy) return;
+    if (!clean || busy) return;
     props.onAsk(clean);
   }
 
@@ -764,7 +812,7 @@ function AskAi(props: { busy: boolean; error: string | null; onAsk: (prompt: str
     <div className="rounded-xl bg-white p-3 shadow-sm ring-1 ring-violet-200">
       <button onClick={() => setOpen((o) => !o)} className="flex w-full items-center gap-2 text-left text-sm font-semibold">
         ✨ Ask AI about this video
-        {props.busy && <span className="font-normal text-violet-700">Watching the video… this can take a minute</span>}
+        {busy && <span className="font-normal text-violet-700">Watching the video… this can take a minute</span>}
         <span className="ml-auto text-xs font-normal text-slate-500">{open ? "Hide" : "Show"}</span>
       </button>
       {open && (
@@ -774,7 +822,7 @@ function AskAi(props: { busy: boolean; error: string | null; onAsk: (prompt: str
               <button
                 key={p.label}
                 onClick={() => ask(p.prompt)}
-                disabled={props.busy}
+                disabled={busy}
                 className="rounded-full bg-violet-50 px-3 py-1 text-xs text-violet-800 ring-1 ring-violet-200 hover:bg-violet-100 disabled:opacity-50"
               >
                 {p.label}
@@ -784,7 +832,7 @@ function AskAi(props: { busy: boolean; error: string | null; onAsk: (prompt: str
               onClick={() =>
                 ask(`Take a screenshot at ${formatTime(props.currentTime())} and explain it in 2 sentences.`)
               }
-              disabled={props.busy}
+              disabled={busy}
               className="rounded-full bg-violet-50 px-3 py-1 text-xs text-violet-800 ring-1 ring-violet-200 hover:bg-violet-100 disabled:opacity-50"
               title="Explain what's on screen right now, and add a screenshot of it"
             >
@@ -808,18 +856,13 @@ function AskAi(props: { busy: boolean; error: string | null; onAsk: (prompt: str
             />
             <button
               onClick={() => ask(prompt)}
-              disabled={props.busy || !prompt.trim()}
+              disabled={busy || !prompt.trim()}
               className="self-start rounded-lg bg-violet-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-violet-700 disabled:opacity-50"
             >
               Ask
             </button>
           </div>
-          {props.busy && (
-            <p className="rounded-md bg-violet-50 px-2 py-1.5 text-sm text-violet-800 ring-1 ring-violet-200">
-              <span className="mr-2 inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-violet-300 border-t-violet-700 align-[-2px]" />
-              The AI is watching the video ({formatTime(elapsed)}). Long videos can take a few minutes…
-            </p>
-          )}
+          {props.startedAt !== null && <AskAiWorking startedAt={props.startedAt} />}
           {props.error && (
             <p className="rounded-md bg-red-50 px-2 py-1.5 text-sm text-red-700 ring-1 ring-red-200">⚠️ {props.error}</p>
           )}
@@ -830,6 +873,18 @@ function AskAi(props: { busy: boolean; error: string | null; onAsk: (prompt: str
         </div>
       )}
     </div>
+  );
+}
+
+// Counts the seconds while the AI works, so it's clear nothing is stuck.
+function AskAiWorking({ startedAt }: { startedAt: number }) {
+  const elapsed = useSecondsSince(startedAt);
+  return (
+    <p className="rounded-md bg-violet-50 px-2 py-1.5 text-sm text-violet-800 ring-1 ring-violet-200">
+      <span className="mr-2 inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-violet-300 border-t-violet-700 align-[-2px]" />
+      The AI is watching the video ({formatTime(elapsed)}). Long videos can take a few minutes. You can leave this
+      page; the answer is still added to your notes.
+    </p>
   );
 }
 

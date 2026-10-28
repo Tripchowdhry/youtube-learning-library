@@ -9,8 +9,12 @@ import { FolderSortSelect, compareFolders, sortHint, useFolderSort } from "@/com
 import VideoThumb from "@/components/VideoThumb";
 import { createClient } from "@/lib/supabase/client";
 import type { Folder, Video } from "@/lib/types";
+import { onAiJobDone, runAiJob, useAiJobs, useSecondsSince } from "@/lib/ai-jobs";
 import { askVideoAi } from "@/lib/video-ai";
 import { askConfirm } from "./ConfirmDialog";
+
+type AiNote = { videoId: string; note: string; model?: string };
+const aiNoteKey = (videoId: string) => `note:${videoId}`;
 
 type View = { kind: "all" } | { kind: "unsorted" } | { kind: "folder"; id: string };
 
@@ -24,8 +28,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
   const [videos, setVideos] = useState<Video[]>([]);
   const videosRef = useRef(videos);
   videosRef.current = videos;
-  const [aiNoteIds, setAiNoteIds] = useState<Set<string>>(new Set());
-  const [aiNoteErrors, setAiNoteErrors] = useState<Map<string, string>>(new Map());
+  const aiJobs = useAiJobs();
   const [notedVideoIds, setNotedVideoIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<View>({ kind: "all" });
@@ -171,32 +174,41 @@ export default function Library({ userEmail }: { userEmail: string }) {
   }
 
   // Asks the AI to watch the video and fill in its note. New videos do this on their own; if
-  // it fails, the reason shows on the video's row until the next try.
-  async function writeAiNote(video: Video) {
-    setAiNoteIds((prev) => new Set(prev).add(video.id));
-    setAiNoteErrors((prev) => {
-      const next = new Map(prev);
-      next.delete(video.id);
-      return next;
+  // it fails, the reason shows on the video's row until the next try. It keeps going, and
+  // saves the note, even if the person moves to another tab meanwhile.
+  function writeAiNote(video: Video) {
+    runAiJob<AiNote>({
+      key: aiNoteKey(video.id),
+      label: `AI note for "${video.title ?? "your video"}"`,
+      work: async () => {
+        const result = await askVideoAi({ youtubeId: video.youtube_id, title: video.title, task: "note" });
+        if (result.error) return result.code === "no-key" ? {} : { error: result.error };
+        if (!result.text) return {};
+        // Only fills an empty note, so a note typed while the AI was working stays.
+        const { data, error } = await supabase
+          .from("videos")
+          .update({ note: result.text })
+          .eq("id", video.id)
+          .eq("note", "")
+          .select("id");
+        if (error) return { error: error.message };
+        return data.length ? { result: { videoId: video.id, note: result.text, model: result.model } } : {};
+      },
     });
-    const result = await askVideoAi({ youtubeId: video.youtube_id, title: video.title, task: "note" });
-    setAiNoteIds((prev) => {
-      const next = new Set(prev);
-      next.delete(video.id);
-      return next;
-    });
-    if (result.error) {
-      if (result.code === "no-key") return;
-      setAiNoteErrors((prev) => new Map(prev).set(video.id, result.error!));
-      return;
-    }
-    // Don't replace a note typed while the AI was working.
-    const current = videosRef.current.find((v) => v.id === video.id);
-    if (current && !current.note && result.text) {
-      updateVideo(video.id, { note: result.text });
-      if (result.model) notify(`Note written by ${result.model}`);
-    }
   }
+
+  // Shows a finished AI note right away when the library is open.
+  useEffect(
+    () =>
+      onAiJobDone((key, result) => {
+        if (!key.startsWith("note:")) return false;
+        const { videoId, note, model } = result as AiNote;
+        setVideos((prev) => prev.map((v) => (v.id === videoId ? { ...v, note } : v)));
+        if (model) notify(`Note written by ${model}`);
+        return true;
+      }),
+    [notify],
+  );
 
   // Finds the top-level folder named after a channel, creating it the first time.
   async function channelFolder(channel: string): Promise<Folder | null> {
@@ -569,8 +581,8 @@ export default function Library({ userEmail }: { userEmail: string }) {
                     onMove={(folderId) => moveVideo(video.id, folderId)}
                     onEditTags={() => editTags(video)}
                     onSaveNote={(note) => updateVideo(video.id, { note })}
-                    aiNoteBusy={aiNoteIds.has(video.id)}
-                    aiNoteError={aiNoteErrors.get(video.id) ?? null}
+                    aiNoteStartedAt={aiJobs.running.find((j) => j.key === aiNoteKey(video.id))?.startedAt ?? null}
+                    aiNoteError={aiJobs.errors.get(aiNoteKey(video.id)) ?? null}
                     onAiNote={() => writeAiNote(video)}
                     onDelete={() => deleteVideo(video)}
                     onTagClick={(tag) => setQuery(tag)}
@@ -761,7 +773,7 @@ function VideoCard(props: {
   onMove: (folderId: string | null) => void;
   onEditTags: () => void;
   onSaveNote: (note: string) => void;
-  aiNoteBusy: boolean;
+  aiNoteStartedAt: number | null;
   aiNoteError: string | null;
   onAiNote: () => void;
   onDelete: () => void;
@@ -877,12 +889,12 @@ function VideoCard(props: {
               🧹 Clear note
             </SmallButton>
           )}
-          {!video.note && !editingNote && !props.aiNoteBusy && (
+          {!video.note && !editingNote && props.aiNoteStartedAt === null && (
             <SmallButton onClick={props.onAiNote} title="Let AI watch the video and write the note">
               ✨ AI note
             </SmallButton>
           )}
-          {!video.note && props.aiNoteBusy && <AiNoteWorking />}
+          {!video.note && props.aiNoteStartedAt !== null && <AiNoteWorking startedAt={props.aiNoteStartedAt} />}
           <SmallButton onClick={props.onEditTags}>Tags</SmallButton>
           {/* Kept apart from the note buttons so it isn't pressed by mistake. */}
           <span className="ml-auto pl-3">
@@ -897,12 +909,8 @@ function VideoCard(props: {
 }
 
 // Shown in place of the ✨ AI note button while the AI watches the video.
-function AiNoteWorking() {
-  const [seconds, setSeconds] = useState(0);
-  useEffect(() => {
-    const timer = setInterval(() => setSeconds((n) => n + 1), 1000);
-    return () => clearInterval(timer);
-  }, []);
+function AiNoteWorking({ startedAt }: { startedAt: number }) {
+  const seconds = useSecondsSince(startedAt);
   return (
     <span className="flex items-center gap-1.5 rounded-md border border-violet-200 bg-violet-50 px-2 py-1 text-xs text-violet-800">
       <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-violet-300 border-t-violet-700" />
