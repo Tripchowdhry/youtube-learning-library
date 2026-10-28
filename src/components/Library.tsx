@@ -24,6 +24,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
   const videosRef = useRef(videos);
   videosRef.current = videos;
   const [aiNoteIds, setAiNoteIds] = useState<Set<string>>(new Set());
+  const [aiNoteErrors, setAiNoteErrors] = useState<Map<string, string>>(new Map());
   const [notedVideoIds, setNotedVideoIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<View>({ kind: "all" });
@@ -164,14 +165,19 @@ export default function Library({ userEmail }: { userEmail: string }) {
     if (newFolder) setFolders((prev) => [...prev, newFolder!]);
     setVideos((prev) => [...prev, data as Video]);
     notify(folderId && !currentFolderId ? `Saved to ${info.channel}` : `Saved "${info.title}"`);
-    writeAiNote(data as Video, true);
+    writeAiNote(data as Video);
     return true;
   }
 
-  // Asks the AI to watch the video and fill in its note. New videos do this on their own and
-  // stay quiet if it fails; the ✨ AI note button says what went wrong.
-  async function writeAiNote(video: Video, quiet = false) {
+  // Asks the AI to watch the video and fill in its note. New videos do this on their own; if
+  // it fails, the reason shows on the video's row until the next try.
+  async function writeAiNote(video: Video) {
     setAiNoteIds((prev) => new Set(prev).add(video.id));
+    setAiNoteErrors((prev) => {
+      const next = new Map(prev);
+      next.delete(video.id);
+      return next;
+    });
     const result = await askVideoAi({ youtubeId: video.youtube_id, title: video.title, task: "note" });
     setAiNoteIds((prev) => {
       const next = new Set(prev);
@@ -179,7 +185,8 @@ export default function Library({ userEmail }: { userEmail: string }) {
       return next;
     });
     if (result.error) {
-      if (!quiet) notify(result.error, true);
+      if (result.code === "no-key") return;
+      setAiNoteErrors((prev) => new Map(prev).set(video.id, result.error!));
       return;
     }
     // Don't replace a note typed while the AI was working.
@@ -550,6 +557,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
                     onEditTags={() => editTags(video)}
                     onSaveNote={(note) => updateVideo(video.id, { note })}
                     aiNoteBusy={aiNoteIds.has(video.id)}
+                    aiNoteError={aiNoteErrors.get(video.id) ?? null}
                     onAiNote={() => writeAiNote(video)}
                     onDelete={() => deleteVideo(video)}
                     onTagClick={(tag) => setQuery(tag)}
@@ -741,6 +749,7 @@ function VideoCard(props: {
   onEditTags: () => void;
   onSaveNote: (note: string) => void;
   aiNoteBusy: boolean;
+  aiNoteError: string | null;
   onAiNote: () => void;
   onDelete: () => void;
   onTagClick: (tag: string) => void;
@@ -782,6 +791,9 @@ function VideoCard(props: {
           {video.channel && `${video.channel} · `}Added {formatDate(video.created_at)}
         </p>
         <ArticleNote note={video.note} editing={editingNote} setEditing={setEditingNote} onSave={props.onSaveNote} />
+        {props.aiNoteError && !video.note && (
+          <p className="rounded-md bg-red-50 px-2 py-1 text-xs text-red-700 ring-1 ring-red-200">⚠️ {props.aiNoteError}</p>
+        )}
         {video.tags.length > 0 && (
           <div className="flex flex-wrap gap-1">
             {video.tags.map((tag) => (
@@ -836,11 +848,12 @@ function VideoCard(props: {
             </>
           )}
           {!video.note && !editingNote && <SmallButton onClick={() => setEditingNote(true)}>📝 Add note</SmallButton>}
-          {!video.note && !editingNote && (
-            <SmallButton onClick={props.onAiNote} disabled={props.aiNoteBusy} title="Let AI watch the video and write the note">
-              {props.aiNoteBusy ? "✨ Writing note…" : "✨ AI note"}
+          {!video.note && !editingNote && !props.aiNoteBusy && (
+            <SmallButton onClick={props.onAiNote} title="Let AI watch the video and write the note">
+              ✨ AI note
             </SmallButton>
           )}
+          {!video.note && props.aiNoteBusy && <AiNoteWorking />}
           <SmallButton onClick={props.onEditTags}>Tags</SmallButton>
           <SmallButton onClick={props.onDelete} danger>
             🗑 Delete
@@ -848,6 +861,21 @@ function VideoCard(props: {
         </div>
       </div>
     </div>
+  );
+}
+
+// Shown in place of the ✨ AI note button while the AI watches the video.
+function AiNoteWorking() {
+  const [seconds, setSeconds] = useState(0);
+  useEffect(() => {
+    const timer = setInterval(() => setSeconds((n) => n + 1), 1000);
+    return () => clearInterval(timer);
+  }, []);
+  return (
+    <span className="flex items-center gap-1.5 rounded-md border border-violet-200 bg-violet-50 px-2 py-1 text-xs text-violet-800">
+      <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-violet-300 border-t-violet-700" />
+      Writing note… {Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, "0")}
+    </span>
   );
 }
 
