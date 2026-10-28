@@ -1,5 +1,5 @@
-// Asks Google's Gemini about a YouTube video. Gemini watches the video itself from its
-// link, so it sees the slides and screen as well as hearing what's said.
+// Asks Google's Gemini about a YouTube video or an article. Gemini watches the video itself
+// from its link, so it sees the slides and screen as well as hearing what's said.
 // Needs GEMINI_API_KEY (free from Google AI Studio); GEMINI_MODEL is optional.
 
 // When a model is busy (Google's free tier often is) or missing, the next one is tried.
@@ -51,28 +51,25 @@ function videoMetadata(focus: Focus) {
   };
 }
 
-async function callModel(
-  model: string,
-  videoUrl: string,
-  instructions: string,
-  request: string,
-  focus: Focus,
-  customFrames = true,
-) {
+function videoRequest(videoUrl: string, instructions: string, request: string, focus: Focus, customFrames: boolean) {
   const video = {
     file_data: { file_uri: videoUrl },
     ...(customFrames ? { video_metadata: videoMetadata(focus) } : {}),
   };
+  return {
+    systemInstruction: { parts: [{ text: instructions }] },
+    contents: [{ role: "user", parts: [video, { text: request }] }],
+    // Low detail per frame keeps long videos inside the free tier's limits; a short
+    // clip around one moment gets normal detail so text on screen can be read.
+    ...(focus && customFrames ? {} : { generationConfig: { mediaResolution: "MEDIA_RESOLUTION_LOW" } }),
+  };
+}
+
+async function callModel(model: string, body: object) {
   const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
     method: "POST",
     headers: { "Content-Type": "application/json", "x-goog-api-key": process.env.GEMINI_API_KEY ?? "" },
-    body: JSON.stringify({
-      systemInstruction: { parts: [{ text: instructions }] },
-      contents: [{ role: "user", parts: [video, { text: request }] }],
-      // Low detail per frame keeps long videos inside the free tier's limits; a short
-      // clip around one moment gets normal detail so text on screen can be read.
-      ...(focus && customFrames ? {} : { generationConfig: { mediaResolution: "MEDIA_RESOLUTION_LOW" } }),
-    }),
+    body: JSON.stringify(body),
   });
   return { res, data: await res.json().catch(() => null) };
 }
@@ -85,14 +82,14 @@ function modelName(id: string) {
     .join(" ");
 }
 
-// Returns the answer and the name of the Gemini model that wrote it.
-export async function askAboutVideo(videoUrl: string, instructions: string, request: string, focus: Focus = null) {
+// Tries each model in turn. `body(true)` is the full request; a model that turns it down
+// (400) is asked again with `body(false)`, a simpler one. `what` finishes "The AI couldn't…".
+async function generate(body: (full: boolean) => object, what: string) {
   let lastStatus = 0;
   let lastDetail = "";
   for (const model of MODELS) {
-    let { res, data } = await callModel(model, videoUrl, instructions, request, focus);
-    // A model that doesn't accept a custom frame rate or clip gets the plain request instead.
-    if (res.status === 400) ({ res, data } = await callModel(model, videoUrl, instructions, request, focus, false));
+    let { res, data } = await callModel(model, body(true));
+    if (res.status === 400) ({ res, data } = await callModel(model, body(false)));
     if (res.ok) {
       const parts: { text?: string }[] = data?.candidates?.[0]?.content?.parts ?? [];
       const text = parts.map((p) => p.text ?? "").join("").trim();
@@ -110,5 +107,31 @@ export async function askAboutVideo(videoUrl: string, instructions: string, requ
   if (lastStatus === 503 || lastStatus === 500) {
     throw new GeminiError("Google's free AI is busy right now. Please try again in a minute.", 503);
   }
-  throw new GeminiError(`The AI couldn't watch this video (${lastDetail}).`, 502);
+  throw new GeminiError(`The AI couldn't ${what} (${lastDetail}).`, 502);
+}
+
+// Returns the answer and the name of the Gemini model that wrote it.
+// A model that doesn't accept a custom frame rate or clip gets the plain request instead.
+export function askAboutVideo(videoUrl: string, instructions: string, request: string, focus: Focus = null) {
+  return generate((full) => videoRequest(videoUrl, instructions, request, focus, full), "watch this video");
+}
+
+// Asks about an article. With its text, the text is sent; without (a login wall, an X post),
+// Gemini is asked to open the link itself.
+export function askAboutPage(url: string, pageText: string | null, instructions: string, request: string) {
+  const system = { parts: [{ text: instructions }] };
+  if (pageText) {
+    return generate(
+      () => ({ systemInstruction: system, contents: [{ role: "user", parts: [{ text: `${request}\n\nThe page (${url}):\n\n${pageText}` }] }] }),
+      "read this page",
+    );
+  }
+  return generate(
+    () => ({
+      systemInstruction: system,
+      contents: [{ role: "user", parts: [{ text: `${request}\n\nThe page: ${url}` }] }],
+      tools: [{ url_context: {} }],
+    }),
+    "read this page",
+  );
 }

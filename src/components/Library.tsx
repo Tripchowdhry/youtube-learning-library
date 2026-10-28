@@ -3,13 +3,13 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArticleNote, SectionSwitch, formatDate } from "@/components/ReadingLibrary";
+import { AiNoteWorking, ArticleNote, SectionSwitch, formatDate } from "@/components/ReadingLibrary";
 import ContextMenu, { type MenuState } from "@/components/ContextMenu";
 import { FolderSortSelect, compareFolders, sortHint, useFolderSort } from "@/components/FolderSort";
 import VideoThumb from "@/components/VideoThumb";
 import { createClient } from "@/lib/supabase/client";
 import type { Folder, Video } from "@/lib/types";
-import { onAiJobDone, runAiJob, useAiJobs, useSecondsSince } from "@/lib/ai-jobs";
+import { onAiJobDone, runAiJob, useAiJobs } from "@/lib/ai-jobs";
 import { askVideoAi } from "@/lib/video-ai";
 import { askConfirm } from "./ConfirmDialog";
 
@@ -905,17 +905,6 @@ function VideoCard(props: {
         </div>
       </div>
     </div>
-  );
-}
-
-// Shown in place of the ✨ AI note button while the AI watches the video.
-function AiNoteWorking({ startedAt }: { startedAt: number }) {
-  const seconds = useSecondsSince(startedAt);
-  return (
-    <span className="flex items-center gap-1.5 rounded-md border border-violet-200 bg-violet-50 px-2 py-1 text-xs text-violet-800">
-      <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-violet-300 border-t-violet-700" />
-      Writing note… {Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, "0")}
-    </span>
   );
 }
 
