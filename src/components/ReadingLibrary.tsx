@@ -796,9 +796,11 @@ export function ArticleNote(props: {
           <span className={`mr-auto text-xs ${draft.length >= NOTE_MAX ? "text-red-600" : "text-slate-400"}`}>
             {draft.length}/{NOTE_MAX}
           </span>
-          {current && (
+          {(current || draft) && (
             <SmallButton
               onClick={() => {
+                // Nothing saved yet: just empty the box.
+                if (!current) return setDraft("");
                 if (!window.confirm("Remove this note? Only the note is removed.")) return;
                 props.onSave("");
                 props.setEditing(false);
