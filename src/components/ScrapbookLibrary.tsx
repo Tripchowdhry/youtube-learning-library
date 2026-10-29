@@ -4,7 +4,15 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import ContextMenu, { type MenuState } from "@/components/ContextMenu";
-import { FolderSortSelect, compareFolders, sortHint, useFolderSort } from "@/components/FolderSort";
+import {
+  FolderSortSelect,
+  ItemSortSelect,
+  compareFolders,
+  compareItems,
+  sortHint,
+  useFolderSort,
+  useItemSort,
+} from "@/components/FolderSort";
 import {
   NavItem,
   PERIODS,
@@ -87,6 +95,7 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
   // ---------- Category helpers ----------
 
   const [folderSort, setFolderSort] = useFolderSort();
+  const [itemSort, setItemSort] = useItemSort();
   const topCategories = useMemo(
     () => categories.filter((c) => !c.parent_id).sort(compareFolders(folderSort)),
     [categories, folderSort],
@@ -131,7 +140,7 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
   // ---------- Which pages to show ----------
 
   const searching = query.trim().length > 0;
-  const canReorder = !searching && view.kind !== "all";
+  const canReorder = !searching && view.kind !== "all" && itemSort === "custom";
 
   const visibleScraps = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -144,9 +153,8 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
       if (view.kind === "category") return inCategory(s, view.id);
       return true;
     });
-    const newestFirst = (a: ScrapSummary, b: ScrapSummary) => b.created_at.localeCompare(a.created_at);
-    return shown.sort(canReorder ? (a, b) => a.position - b.position || newestFirst(a, b) : newestFirst);
-  }, [scraps, query, period, view, categoryPath, inCategory, canReorder]);
+    return shown.sort(compareItems<ScrapSummary>(itemSort, (s) => s.title, !searching && view.kind !== "all"));
+  }, [scraps, query, period, view, categoryPath, inCategory, searching, itemSort]);
 
   const countIn = (id: string) => scraps.filter((s) => inCategory(s, id)).length;
 
@@ -441,6 +449,7 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
                     </SmallButton>
                   </>
                 )}
+                <ItemSortSelect sort={itemSort} onChange={setItemSort} />
               </div>
 
               {!searching && (

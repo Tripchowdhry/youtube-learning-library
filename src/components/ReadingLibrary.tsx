@@ -4,7 +4,15 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import ContextMenu, { type MenuState } from "@/components/ContextMenu";
-import { FolderSortSelect, compareFolders, sortHint, useFolderSort } from "@/components/FolderSort";
+import {
+  FolderSortSelect,
+  ItemSortSelect,
+  compareFolders,
+  compareItems,
+  sortHint,
+  useFolderSort,
+  useItemSort,
+} from "@/components/FolderSort";
 import { onAiJobDone, runAiJob, useAiJobs, useSecondsSince } from "@/lib/ai-jobs";
 import { linkKey } from "@/lib/links";
 import { createClient } from "@/lib/supabase/client";
@@ -107,6 +115,7 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
   // ---------- Category helpers ----------
 
   const [folderSort, setFolderSort] = useFolderSort();
+  const [itemSort, setItemSort] = useItemSort();
   const topCategories = useMemo(
     () => categories.filter((c) => !c.parent_id).sort(compareFolders(folderSort)),
     [categories, folderSort],
@@ -153,7 +162,7 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
 
   const searching = query.trim().length > 0;
   // Inside a category your own order applies; All reading and search show the newest first.
-  const canReorder = !searching && view.kind !== "all";
+  const canReorder = !searching && view.kind !== "all" && itemSort === "custom";
 
   const visibleArticles = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -168,9 +177,8 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
       if (view.kind === "category") return inCategory(a, view.id);
       return true;
     });
-    const newestFirst = (a: Article, b: Article) => b.created_at.localeCompare(a.created_at);
-    return shown.sort(canReorder ? (a, b) => a.position - b.position || newestFirst(a, b) : newestFirst);
-  }, [articles, query, period, readFilter, view, categoryPath, inCategory, canReorder]);
+    return shown.sort(compareItems<Article>(itemSort, (a) => a.title ?? a.url, !searching && view.kind !== "all"));
+  }, [articles, query, period, readFilter, view, categoryPath, inCategory, searching, itemSort]);
 
   const countIn = (id: string) => articles.filter((a) => inCategory(a, id)).length;
 
@@ -569,6 +577,7 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
                     </SmallButton>
                   </>
                 )}
+                <ItemSortSelect sort={itemSort} onChange={setItemSort} />
               </div>
 
               {!searching && (

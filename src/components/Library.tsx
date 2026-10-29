@@ -5,7 +5,15 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AiNoteWorking, ArticleNote, SectionSwitch, formatDate } from "@/components/ReadingLibrary";
 import ContextMenu, { type MenuState } from "@/components/ContextMenu";
-import { FolderSortSelect, compareFolders, sortHint, useFolderSort } from "@/components/FolderSort";
+import {
+  FolderSortSelect,
+  ItemSortSelect,
+  compareFolders,
+  compareItems,
+  sortHint,
+  useFolderSort,
+  useItemSort,
+} from "@/components/FolderSort";
 import VideoThumb from "@/components/VideoThumb";
 import { createClient } from "@/lib/supabase/client";
 import type { Folder, Video } from "@/lib/types";
@@ -17,8 +25,6 @@ type AiNote = { videoId: string; note: string; model?: string };
 const aiNoteKey = (videoId: string) => `note:${videoId}`;
 
 type View = { kind: "all" } | { kind: "unsorted" } | { kind: "folder"; id: string };
-
-const byPosition = <T extends { position: number }>(a: T, b: T) => a.position - b.position;
 
 export default function Library({ userEmail }: { userEmail: string }) {
   const supabase = useMemo(() => createClient(), []);
@@ -40,6 +46,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
   const closeMenu = useCallback(() => setMenu(null), []);
   const [showFolders, setShowFolders] = useState(false);
   const [folderSort, setFolderSort] = useFolderSort();
+  const [itemSort, setItemSort] = useItemSort();
   const [toast, setToast] = useState<{ text: string; isError?: boolean } | null>(null);
 
   const notify = useCallback((text: string, isError = false) => {
@@ -108,19 +115,20 @@ export default function Library({ userEmail }: { userEmail: string }) {
   // ---------- Which videos to show ----------
 
   const searching = query.trim().length > 0;
-  const canReorder = !searching && view.kind !== "all";
+  const canReorder = !searching && view.kind !== "all" && itemSort === "custom";
 
   const visibleVideos = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (q) {
-      return videos.filter((v) =>
-        [v.title, v.channel, v.note, folderPath(v.folder_id), ...v.tags].some((s) => s?.toLowerCase().includes(q)),
-      );
-    }
-    if (view.kind === "all") return [...videos].sort((a, b) => b.created_at.localeCompare(a.created_at));
     const folderId = view.kind === "folder" ? view.id : null;
-    return videos.filter((v) => v.folder_id === folderId).sort(byPosition);
-  }, [videos, view, query, folderPath]);
+    const shown = q
+      ? videos.filter((v) =>
+          [v.title, v.channel, v.note, folderPath(v.folder_id), ...v.tags].some((s) => s?.toLowerCase().includes(q)),
+        )
+      : view.kind === "all"
+        ? [...videos]
+        : videos.filter((v) => v.folder_id === folderId);
+    return shown.sort(compareItems<Video>(itemSort, (v) => v.title ?? "", !q && view.kind !== "all"));
+  }, [videos, view, query, folderPath, itemSort]);
 
   // New and moved videos go to the top of their folder.
   const topPosition = (folderId: string | null) => {
@@ -524,6 +532,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
                 </SmallButton>
               </>
             )}
+            <ItemSortSelect sort={itemSort} onChange={setItemSort} />
           </div>
 
           {!searching && (
@@ -560,8 +569,9 @@ export default function Library({ userEmail }: { userEmail: string }) {
               )}
               {!canReorder && visibleVideos.length > 1 && (
                 <p className="mb-3 text-xs text-slate-500">
-                  {searching ? "Search results" : "All videos"} show the newest first. To change the order, open a folder
-                  on the left.
+                  {itemSort === "custom"
+                    ? `${searching ? "Search results" : "All videos"} show the newest first. To change the order, open a folder on the left.`
+                    : 'To arrange videos yourself, pick "My order" in Sort.'}
                 </p>
               )}
               <div className="flex flex-col gap-2">
