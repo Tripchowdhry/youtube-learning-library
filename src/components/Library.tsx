@@ -122,9 +122,10 @@ export default function Library({ userEmail }: { userEmail: string }) {
     return videos.filter((v) => v.folder_id === folderId).sort(byPosition);
   }, [videos, view, query, folderPath]);
 
-  const nextPosition = (folderId: string | null) => {
+  // New and moved videos go to the top of their folder.
+  const topPosition = (folderId: string | null) => {
     const siblings = videos.filter((v) => v.folder_id === folderId);
-    return siblings.length ? Math.max(...siblings.map((v) => v.position)) + 1 : 0;
+    return siblings.length ? Math.min(...siblings.map((v) => v.position)) - 1 : 0;
   };
 
   // ---------- Video actions ----------
@@ -159,7 +160,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
 
     const { data, error } = await supabase
       .from("videos")
-      .insert({ ...info, folder_id: folderId, position: nextPosition(folderId) })
+      .insert({ ...info, folder_id: folderId, position: topPosition(folderId) })
       .select()
       .single();
     if (error) {
@@ -242,7 +243,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
   function moveVideo(id: string, folderId: string | null) {
     const video = videos.find((v) => v.id === id);
     if (!video || video.folder_id === folderId) return;
-    updateVideo(id, { folder_id: folderId, position: nextPosition(folderId) });
+    updateVideo(id, { folder_id: folderId, position: topPosition(folderId) });
     notify(`Moved to ${folderId ? folderPath(folderId) : "Unsorted"}`);
   }
 
