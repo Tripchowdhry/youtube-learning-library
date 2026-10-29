@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 export type FolderSort = "custom" | "name" | "newest" | "oldest";
 
 const SORT_KEY = "folder-sort";
+const ITEM_SORT_KEY = "item-sort";
 
 const OPTIONS: { value: FolderSort; label: string }[] = [
   { value: "custom", label: "My order" },
@@ -26,23 +27,45 @@ export function compareFolders(sort: FolderSort) {
   };
 }
 
+// How the videos, links or pages inside a folder are listed. "custom" is your ▲▼ order
+// inside a folder, and newest first everywhere else.
+export function compareItems<T extends { position: number; created_at: string }>(
+  sort: FolderSort,
+  name: (item: T) => string,
+  inFolder: boolean,
+) {
+  return (a: T, b: T) => {
+    const byName = name(a).localeCompare(name(b), undefined, { numeric: true, sensitivity: "base" });
+    const newest = b.created_at.localeCompare(a.created_at);
+    if (sort === "name") return byName || newest;
+    if (sort === "oldest") return -newest || byName;
+    if (sort === "custom" && inFolder) return a.position - b.position || newest;
+    return newest || byName;
+  };
+}
+
 // One choice for the whole app, remembered on this device.
-export function useFolderSort() {
+export function useItemSort() {
+  return useFolderSort(ITEM_SORT_KEY);
+}
+
+// One choice for the whole app, remembered on this device.
+export function useFolderSort(key = SORT_KEY) {
   const [sort, setSort] = useState<FolderSort>("custom");
 
   useEffect(() => {
     try {
-      const stored = localStorage.getItem(SORT_KEY);
+      const stored = localStorage.getItem(key);
       if (OPTIONS.some((o) => o.value === stored)) setSort(stored as FolderSort);
     } catch {
       // Storage can be blocked (private browsing); keep your own order.
     }
-  }, []);
+  }, [key]);
 
   function chooseSort(next: FolderSort) {
     setSort(next);
     try {
-      localStorage.setItem(SORT_KEY, next);
+      localStorage.setItem(key, next);
     } catch {
       // Storage can be blocked (private browsing); the choice just isn't remembered.
     }
@@ -66,6 +89,26 @@ export function FolderSortSelect({ sort, onChange }: { sort: FolderSort; onChang
         </option>
       ))}
     </select>
+  );
+}
+
+// The sort menu above a list of videos, links or pages.
+export function ItemSortSelect({ sort, onChange }: { sort: FolderSort; onChange: (next: FolderSort) => void }) {
+  return (
+    <label className="flex items-center gap-1 text-xs text-slate-500">
+      Sort
+      <select
+        value={sort}
+        onChange={(e) => onChange(e.target.value as FolderSort)}
+        className="rounded-md border border-slate-300 bg-white px-1 py-1 text-xs text-slate-700"
+      >
+        {OPTIONS.map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }
 
