@@ -3,7 +3,16 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AiNoteWorking, ArticleNote, Pills, ReadCheck, SectionSwitch, formatDate } from "@/components/ReadingLibrary";
+import {
+  AiNoteWorking,
+  ArticleNote,
+  PERIODS,
+  type Period,
+  Pills,
+  ReadCheck,
+  SectionSwitch,
+  formatDate,
+} from "@/components/ReadingLibrary";
 import ContextMenu, { type MenuState } from "@/components/ContextMenu";
 import {
   FolderSortSelect,
@@ -48,6 +57,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
   const [folderSort, setFolderSort] = useFolderSort();
   const [itemSort, setItemSort] = useItemSort();
   const [watchFilter, setWatchFilter] = useState<"all" | "unwatched" | "watched">("all");
+  const [period, setPeriod] = useState<Period>("any");
   const [toast, setToast] = useState<{ text: string; isError?: boolean } | null>(null);
 
   const notify = useCallback((text: string, isError = false) => {
@@ -128,10 +138,13 @@ export default function Library({ userEmail }: { userEmail: string }) {
       : view.kind === "all"
         ? [...videos]
         : videos.filter((v) => v.folder_id === folderId);
+    const days = PERIODS.find((p) => p.value === period)!.days;
+    const since = days ? Date.now() - days * 86_400_000 : 0;
     return shown
+      .filter((v) => !since || new Date(v.created_at).getTime() >= since)
       .filter((v) => watchFilter === "all" || (watchFilter === "watched") === Boolean(v.watched_at))
       .sort(compareItems<Video>(itemSort, (v) => v.title ?? "", !q && view.kind !== "all"));
-  }, [videos, view, query, folderPath, itemSort, watchFilter]);
+  }, [videos, view, query, folderPath, itemSort, watchFilter, period]);
 
   // New and moved videos go to the top of their folder.
   const topPosition = (folderId: string | null) => {
@@ -572,6 +585,12 @@ export default function Library({ userEmail }: { userEmail: string }) {
 
           <div className="mb-4 flex flex-wrap items-center gap-2 text-sm">
             <Pills
+              value={period}
+              onChange={setPeriod}
+              options={PERIODS.map((p) => ({ value: p.value, label: p.label }))}
+              label="Added"
+            />
+            <Pills
               value={watchFilter}
               onChange={setWatchFilter}
               options={[
@@ -586,7 +605,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
           {loading ? (
             <p className="text-slate-500">Loading your library…</p>
           ) : visibleVideos.length === 0 ? (
-            <EmptyState searching={searching || watchFilter !== "all"} hasVideos={videos.length > 0} />
+            <EmptyState searching={searching || watchFilter !== "all" || period !== "any"} hasVideos={videos.length > 0} />
           ) : (
             <>
               {canReorder && visibleVideos.length > 1 && (
@@ -996,7 +1015,7 @@ function EmptyState({ searching, hasVideos }: { searching: boolean; hasVideos: b
   return (
     <div className="rounded-xl border border-dashed border-slate-300 p-10 text-center text-slate-500">
       {searching
-        ? "No videos match. Try another search, or pick All above."
+        ? "No videos match. Try another search, or pick Any time and All above."
         : hasVideos
           ? "No videos here yet. Paste a link above, or move videos in from another folder."
           : "Your library is empty. Paste a YouTube link above to save your first video."}
