@@ -10,7 +10,8 @@ const NOTE_MAX = 280;
 // Enough for a long article; the rest is left out.
 const TEXT_MAX = 60_000;
 
-// Writes the short note shown next to an article or tutorial in the library.
+// task "note" (the default): the short note shown next to an article or tutorial in the library.
+// task "ask": answers the person's request for their study notes on the article.
 export async function POST(request: Request) {
   if (!(await isSignedIn())) {
     return NextResponse.json({ error: "Please sign in first." }, { status: 401 });
@@ -29,6 +30,23 @@ export async function POST(request: Request) {
   const text = content.kind === "text" ? content.blocks.map((b) => b.text).join("\n").slice(0, TEXT_MAX) : null;
 
   try {
+    if (body.task === "ask") {
+      const ask = String(body.prompt ?? "").trim().slice(0, 2000);
+      if (!ask) return NextResponse.json({ error: "Type what you'd like the AI to do." }, { status: 400 });
+      const { text: answer, model } = await askAboutPage(
+        url.toString(),
+        text,
+        [
+          `You help someone take study notes on a ${kind} they saved.${title ? ` It is titled "${title}".` : ""}`,
+          `Answer their request from what the ${kind} says. If it doesn't cover it, say so briefly.`,
+          "Your answer is pasted into a plain-text notes box, so don't use markdown: no **, #, or tables.",
+          "Put short headings on their own line, use '- ' for bullet points and '1. ' for steps.",
+        ].join("\n"),
+        ask,
+      );
+      return NextResponse.json({ text: answer, model });
+    }
+
     const { text: note, model } = await askAboutPage(
       url.toString(),
       text,
