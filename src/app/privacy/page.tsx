@@ -1,13 +1,13 @@
 import Link from "next/link";
 
-export const metadata = { title: "Privacy Policy · YouTube Learning Library" };
+export const metadata = { title: "Privacy Policy · StudyShelf" };
 
 export default function PrivacyPage() {
   return (
     <main className="mx-auto max-w-2xl px-4 py-12 leading-relaxed">
       <h1 className="mb-6 text-3xl font-bold">Privacy Policy</h1>
       <p className="mb-4">
-        YouTube Learning Library lets you save and organize links to YouTube videos. This page explains what we
+        StudyShelf lets you save and organize links to YouTube videos, articles and tutorials. This page explains what we
         store and why.
       </p>
       <h2 className="mt-6 mb-2 text-xl font-semibold">What we collect</h2>

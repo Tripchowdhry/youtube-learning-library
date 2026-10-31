@@ -4,8 +4,8 @@ import AiJobsBadge from "@/components/AiJobsBadge";
 import { ConfirmHost } from "@/components/ConfirmDialog";
 
 export const metadata: Metadata = {
-  title: "YouTube Learning Library",
-  description: "Organize the YouTube videos you learn from into folders, on every device.",
+  title: "StudyShelf",
+  description: "Save the videos, articles and tutorials you learn from, with notes and AI help, on every device.",
 };
 
 export const viewport: Viewport = {

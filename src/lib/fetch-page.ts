@@ -25,7 +25,7 @@ export async function fetchPage(start: URL): Promise<string | null> {
       if (!isPublicHost(url.hostname)) return null;
       const res = await fetch(url, {
         headers: {
-          "user-agent": "Mozilla/5.0 (compatible; LearningLibrary/1.0; +https://ytlearnlib.vercel.app)",
+          "user-agent": "Mozilla/5.0 (compatible; StudyShelf/1.0; +https://ytlearnlib.vercel.app)",
           accept: "text/html,application/xhtml+xml",
         },
         redirect: "manual",
