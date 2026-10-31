@@ -26,6 +26,7 @@ import {
   useItemSort,
 } from "@/components/FolderSort";
 import VideoThumb from "@/components/VideoThumb";
+import { findSavedElsewhere } from "@/lib/find-saved";
 import { createClient } from "@/lib/supabase/client";
 import type { Folder, Video } from "@/lib/types";
 import { onAiJobDone, runAiJob, useAiJobs } from "@/lib/ai-jobs";
@@ -159,6 +160,13 @@ export default function Library({ userEmail }: { userEmail: string }) {
   // ---------- Video actions ----------
 
   async function addVideo(link: string) {
+    // A video already saved in Reading or Tutorials isn't saved again here.
+    const elsewhere = await findSavedElsewhere(supabase, [link], "videos");
+    if (elsewhere) {
+      setToast({ text: `Duplicate: this is already saved in ${elsewhere.where}.`, warn: true, href: elsewhere.href });
+      setTimeout(() => setToast(null), 8000);
+      return true;
+    }
     const res = await fetch(`/api/video-info?url=${encodeURIComponent(link)}`);
     const info = await res.json();
     if (!res.ok) {
