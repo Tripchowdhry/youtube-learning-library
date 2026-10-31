@@ -19,6 +19,8 @@ export type Video = {
   thumbnail_url: string | null;
   tags: string[];
   note: string;
+  // Missing until video-watched.sql has been run.
+  watched_at?: string | null;
   position: number;
   created_at: string;
 };

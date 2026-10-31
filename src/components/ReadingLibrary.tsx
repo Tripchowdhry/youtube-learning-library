@@ -702,12 +702,13 @@ export function SectionSwitch({ active }: { active: "videos" | SectionKind | "sc
 }
 
 // The green tick: filled when read, an empty circle when not. Tapping it switches.
-export function ReadCheck({ read, onClick }: { read: boolean; onClick: () => void }) {
+export function ReadCheck({ read, onClick, word = "read" }: { read: boolean; onClick: () => void; word?: string }) {
+  const done = word.charAt(0).toUpperCase() + word.slice(1);
   return (
     <button
       onClick={onClick}
-      title={read ? "Read. Tap to mark unread." : "Not read yet. Tap to mark read."}
-      aria-label={read ? "Mark unread" : "Mark read"}
+      title={read ? `${done}. Tap to mark not ${word}.` : `Not ${word} yet. Tap to mark ${word}.`}
+      aria-label={read ? `Mark not ${word}` : `Mark ${word}`}
       className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 text-sm font-bold ${read ? "border-green-600 bg-green-600 text-white" : "border-slate-300 text-transparent hover:border-green-500"}`}
     >
       ✓
