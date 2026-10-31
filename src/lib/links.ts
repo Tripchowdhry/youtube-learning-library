@@ -48,3 +48,22 @@ export function cleanLink(url: URL): string {
   else for (const key of [...clean.searchParams.keys()]) if (TRACKING_PARAMS.test(key)) clean.searchParams.delete(key);
   return clean.href;
 }
+
+// A link that shows a shared PDF inside the reading page: Dropbox's raw view, Google Drive's
+// preview, or a plain .pdf link. Null for other links.
+export function fileViewLink(input: string): string | null {
+  const url = parseLink(input);
+  if (!url) return null;
+  const host = url.hostname.replace(/^www\./, "").toLowerCase();
+  if (host === "dropbox.com" && /^\/(s|scl\/fi)\//.test(url.pathname)) {
+    const view = new URL(url.href);
+    view.searchParams.delete("dl");
+    view.searchParams.set("raw", "1");
+    return view.href;
+  }
+  if (host === "drive.google.com") {
+    const id = url.pathname.match(/\/file\/d\/([\w-]+)/)?.[1] ?? url.searchParams.get("id");
+    if (id) return `https://drive.google.com/file/d/${id}/preview`;
+  }
+  return /\.pdf$/i.test(url.pathname) ? url.href : null;
+}

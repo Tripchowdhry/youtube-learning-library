@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ArticleNotes from "@/components/ArticleNotes";
 import { ArticleNote, ReadCheck, SECTIONS, formatDate } from "@/components/ReadingLibrary";
+import { fileViewLink } from "@/lib/links";
 import { createClient } from "@/lib/supabase/client";
 import type { Article, ArticleContent } from "@/lib/types";
 
@@ -134,6 +135,9 @@ export default function ReaderPage({ articleId }: { articleId: string }) {
     };
   }, [ready, article, setRead]);
 
+  // A shared PDF (Dropbox, Google Drive) is shown in a frame, wider than text.
+  const showsFile = content?.kind === "none" && Boolean(article && fileViewLink(article.url));
+
   // Older rows have no kind until the database setup is rerun; they belong to Reading.
   const section = SECTIONS[article?.kind ?? "reading"] ?? SECTIONS.reading;
 
@@ -192,7 +196,7 @@ export default function ReaderPage({ articleId }: { articleId: string }) {
             <ArticleNotes article={article} onNotesChange={saveNotes} onClose={() => setShowNotes(false)} />
           </aside>
         )}
-        <main className={showNotes ? "min-w-0" : "mx-auto max-w-2xl px-4 py-6"}>
+        <main className={showNotes ? "min-w-0" : `mx-auto px-4 py-6 ${showsFile ? "max-w-5xl" : "max-w-2xl"}`}>
         {article && (
           <div className="mb-6">
             <h1 className="mb-1 text-2xl font-bold">{article.title}</h1>
@@ -236,6 +240,28 @@ export default function ReaderPage({ articleId }: { articleId: string }) {
               ),
             )}
           </article>
+        ) : article && fileViewLink(article.url) ? (
+          <div className="flex flex-col gap-2">
+            <iframe
+              src={fileViewLink(article.url)!}
+              title={article.title ?? "Shared file"}
+              className="h-[80vh] w-full rounded-xl border border-slate-200 bg-white"
+            />
+            <p className="flex flex-wrap items-center justify-center gap-2 text-sm text-slate-500">
+              Not showing?
+              <a href={article.url} target="_blank" rel="noreferrer" className="text-blue-600 underline">
+                Open it in Dropbox or Drive ↗
+              </a>
+              {!article.read_at && (
+                <button
+                  onClick={() => setRead(true)}
+                  className="ml-2 rounded-md border border-green-600 px-3 py-1 font-semibold text-green-700 hover:bg-green-50"
+                >
+                  ✓ Mark as read
+                </button>
+              )}
+            </p>
+          </div>
         ) : (
           <div className="rounded-xl border border-slate-200 bg-white p-6 text-center">
             <p className="mb-4 text-slate-600">
