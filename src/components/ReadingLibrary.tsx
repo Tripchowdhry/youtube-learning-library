@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import ContextMenu, { type MenuState } from "@/components/ContextMenu";
 import {
@@ -84,11 +84,17 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
   const [draggingCategoryId, setDraggingCategoryId] = useState<string | null>(null);
   const [menu, setMenu] = useState<MenuState | null>(null);
   const closeMenu = useCallback(() => setMenu(null), []);
-  const [toast, setToast] = useState<{ text: string; isError?: boolean } | null>(null);
+  const [toast, setToast] = useState<Toast | null>(null);
+  // The row that was just found as a duplicate, shown with a ring for a few seconds.
+  const [flashId, setFlashId] = useState<string | null>(null);
 
   const notify = useCallback((text: string, isError = false) => {
     setToast({ text, isError });
     setTimeout(() => setToast(null), 3500);
+  }, []);
+  const warn = useCallback((text: string, href?: string) => {
+    setToast({ text, warn: true, href });
+    setTimeout(() => setToast(null), 8000);
   }, []);
 
   const load = useCallback(async () => {
@@ -195,13 +201,40 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
     return key ? articles.find((a) => linkKey(a.url) === key) : undefined;
   };
 
-  // A link that's already saved isn't added twice: it gets today's date and moves to the top of its category.
+  // A link that's already saved isn't added twice: its category opens with the row ringed,
+  // and it gets today's date so it moves to the top.
   function bringToTop(existing: Article) {
+    const where = categoryPath(existing.category_id) || "Uncategorized";
+    const added = formatDate(existing.created_at);
     updateArticle(existing.id, {
       created_at: new Date().toISOString(),
       position: topPosition(existing.category_id, existing.id),
     });
-    notify(`Already saved in ${categoryPath(existing.category_id) || "Uncategorized"}. Moved it to the top.`);
+    openView(existing.category_id ? { kind: "category", id: existing.category_id } : { kind: "uncategorized" });
+    setPeriod("any");
+    setReadFilter("all");
+    setFlashId(existing.id);
+    setTimeout(() => setFlashId((id) => (id === existing.id ? null : id)), 5000);
+    warn(`Duplicate: this is already saved in ${section.name} › ${where} (added ${added}). It's shown at the top.`);
+  }
+
+  // The same link saved in the other section (Reading or Tutorials).
+  async function findInOtherSection(links: string[]) {
+    const keys = new Set(links.map(linkKey).filter(Boolean));
+    const { data } = await supabase.from("articles").select("id, url, kind, category_id").neq("kind", kind);
+    const match = (data ?? []).find((a) => keys.has(linkKey(a.url)));
+    if (!match) return false;
+    let where = "Uncategorized";
+    if (match.category_id) {
+      const { data: cats } = await supabase.from("article_categories").select("id, name, parent_id");
+      const byId = new Map((cats ?? []).map((c) => [c.id, c]));
+      const cat = byId.get(match.category_id);
+      const parent = cat?.parent_id ? byId.get(cat.parent_id) : null;
+      if (cat) where = parent ? `${parent.name} › ${cat.name}` : cat.name;
+    }
+    const other = SECTIONS[match.kind as SectionKind] ?? SECTIONS.reading;
+    warn(`Duplicate: this is already saved in ${other.name} › ${where}.`, `/read/${match.id}`);
+    return true;
   }
 
   async function addArticle(link: string, categoryId: string | null) {
@@ -210,6 +243,7 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
       bringToTop(saved);
       return true;
     }
+    if (await findInOtherSection([link])) return true;
 
     const res = await fetch(`/api/article-info?url=${encodeURIComponent(link)}`);
     const info = await res.json();
@@ -224,6 +258,7 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
       bringToTop(existing);
       return true;
     }
+    if (info.url !== link && (await findInOtherSection([info.url]))) return true;
 
     let title: string | null = info.title;
     if (!title) {
@@ -651,6 +686,7 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
                       aiNoteError={aiJobs.errors.get(aiNoteKey(article.id)) ?? null}
                       onAiNote={() => writeAiNote(article)}
                       onDelete={() => deleteArticle(article)}
+                      flash={flashId === article.id}
                     />
                   ))}
                 </ul>
@@ -663,13 +699,7 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
 
       {menu && <ContextMenu menu={menu} onClose={closeMenu} />}
 
-      {toast && (
-        <div
-          className={`fixed bottom-4 left-1/2 z-30 -translate-x-1/2 rounded-lg px-4 py-2 text-sm text-white shadow-lg ${toast.isError ? "bg-red-600" : "bg-slate-900"}`}
-        >
-          {toast.text}
-        </div>
-      )}
+      {toast && <ToastBox toast={toast} onClose={() => setToast(null)} />}
     </div>
   );
 }
@@ -736,13 +766,19 @@ function ArticleRow(props: {
   aiNoteError: string | null;
   onAiNote: () => void;
   onDelete: () => void;
+  flash: boolean;
 }) {
   const { article } = props;
+  const rowRef = useRef<HTMLLIElement>(null);
+  useEffect(() => {
+    if (props.flash) rowRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [props.flash]);
   const [editingNote, setEditingNote] = useState(false);
   const [over, setOver] = useState(false);
   const hasNotes = Boolean(article.notes?.trim());
   return (
     <li
+      ref={rowRef}
       draggable={!editingNote}
       onDragStart={(e) => {
         e.dataTransfer.effectAllowed = "move";
@@ -761,7 +797,7 @@ function ArticleRow(props: {
         setOver(false);
         props.onDropOnto();
       }}
-      className={`flex cursor-grab items-start gap-3 rounded-xl border bg-white p-3 shadow-sm transition ${props.dragging ? "opacity-40" : ""} ${over ? "border-blue-500 ring-2 ring-blue-500" : "border-slate-200"}`}
+      className={`flex cursor-grab items-start gap-3 rounded-xl border bg-white p-3 shadow-sm transition ${props.dragging ? "opacity-40" : ""} ${over ? "border-blue-500 ring-2 ring-blue-500" : props.flash ? "border-amber-400 ring-4 ring-amber-300" : "border-slate-200"}`}
     >
       <ReadCheck read={Boolean(article.read_at)} onClick={props.onToggleRead} />
       <div className="flex min-w-0 flex-1 flex-col gap-1">
@@ -863,6 +899,34 @@ function ArticleRow(props: {
         </div>
       </div>
     </li>
+  );
+}
+
+export type Toast = { text: string; isError?: boolean; warn?: boolean; href?: string };
+
+// The message at the bottom of the screen. Duplicates show in amber, longer, with a close button.
+export function ToastBox({ toast, onClose }: { toast: Toast; onClose: () => void }) {
+  const color = toast.isError ? "bg-red-600 text-white" : toast.warn ? "bg-amber-400 text-amber-950" : "bg-slate-900 text-white";
+  return (
+    <div
+      role="status"
+      className={`fixed bottom-4 left-1/2 z-30 flex max-w-[calc(100vw-2rem)] -translate-x-1/2 items-center gap-3 rounded-lg px-4 py-2 text-sm shadow-lg ${color}`}
+    >
+      <span>
+        {toast.warn && "⚠️ "}
+        {toast.text}
+      </span>
+      {toast.href && (
+        <Link href={toast.href} className="shrink-0 font-semibold underline">
+          Open it
+        </Link>
+      )}
+      {toast.warn && (
+        <button onClick={onClose} aria-label="Close" className="shrink-0 font-bold opacity-70 hover:opacity-100">
+          ✕
+        </button>
+      )}
+    </div>
   );
 }
 
