@@ -3,7 +3,7 @@ import { isIP } from "node:net";
 const MAX_BYTES = 3_000_000;
 
 // Blocks links to this server or a private network, so the app can't be used to reach them.
-function isPublicHost(hostname: string) {
+export function isPublicHost(hostname: string) {
   const host = hostname.replace(/^\[|\]$/g, "").toLowerCase();
   if (host === "localhost" || host.endsWith(".localhost") || host.endsWith(".internal") || host.endsWith(".local")) {
     return false;

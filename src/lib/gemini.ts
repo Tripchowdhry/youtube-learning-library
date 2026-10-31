@@ -135,3 +135,63 @@ export function askAboutPage(url: string, pageText: string | null, instructions:
     "read this page",
   );
 }
+
+// Files bigger than this are uploaded first, since a request can only carry about 20 MB.
+const INLINE_MAX = 14_000_000;
+
+type StoredFile = { name: string; uri: string; state?: string };
+
+// Puts a big file in Gemini's file store (kept 48 hours) and waits until it's ready.
+async function uploadFile(bytes: Buffer, mimeType: string) {
+  const key = process.env.GEMINI_API_KEY ?? "";
+  const failed = () => new GeminiError("The file couldn't be sent to the AI. Try again.", 502);
+  const start = await fetch("https://generativelanguage.googleapis.com/upload/v1beta/files", {
+    method: "POST",
+    headers: {
+      "x-goog-api-key": key,
+      "X-Goog-Upload-Protocol": "resumable",
+      "X-Goog-Upload-Command": "start",
+      "X-Goog-Upload-Header-Content-Length": String(bytes.length),
+      "X-Goog-Upload-Header-Content-Type": mimeType,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ file: { display_name: "BrainShelf file" } }),
+  });
+  const uploadUrl = start.headers.get("x-goog-upload-url");
+  if (!start.ok || !uploadUrl) throw failed();
+  const done = await fetch(uploadUrl, {
+    method: "POST",
+    headers: { "X-Goog-Upload-Offset": "0", "X-Goog-Upload-Command": "upload, finalize" },
+    body: new Uint8Array(bytes),
+  });
+  const uploaded = (await done.json().catch(() => null))?.file as StoredFile | undefined;
+  if (!done.ok || !uploaded) throw failed();
+  let file: StoredFile = uploaded;
+  for (let i = 0; i < 60 && file.state === "PROCESSING"; i++) {
+    await new Promise((r) => setTimeout(r, 2000));
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/${file.name}`, {
+      headers: { "x-goog-api-key": key },
+    });
+    const latest = (await res.json().catch(() => null)) as StoredFile | null;
+    if (latest) file = latest;
+  }
+  if (file.state === "FAILED") throw new GeminiError("The AI couldn't open this file. It may be damaged or protected.", 422);
+  return file.uri;
+}
+
+// Asks about a PDF or text file, like a book saved in Dropbox.
+export async function askAboutFile(file: { bytes: Buffer; mimeType: string }, instructions: string, request: string) {
+  const system = { parts: [{ text: instructions }] };
+  let part: object;
+  if (file.mimeType === "text/plain") {
+    part = { text: `The file:\n\n${file.bytes.toString("utf8").slice(0, 2_000_000)}` };
+  } else if (file.bytes.length <= INLINE_MAX) {
+    part = { inline_data: { mime_type: file.mimeType, data: file.bytes.toString("base64") } };
+  } else {
+    part = { file_data: { mime_type: file.mimeType, file_uri: await uploadFile(file.bytes, file.mimeType) } };
+  }
+  return generate(
+    () => ({ systemInstruction: system, contents: [{ role: "user", parts: [part, { text: request }] }] }),
+    "read this file",
+  );
+}
