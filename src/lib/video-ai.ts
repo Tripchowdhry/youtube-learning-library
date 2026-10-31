@@ -27,7 +27,14 @@ export async function askVideoAi(body: {
 }
 
 // A short note for an article or tutorial in the library.
-export async function askArticleAi(body: { url: string; title?: string | null; kind: string }): Promise<VideoAiResult> {
+// With task "ask", an answer to the person's request for their study notes.
+export async function askArticleAi(body: {
+  url: string;
+  title?: string | null;
+  kind: string;
+  task?: "note" | "ask";
+  prompt?: string;
+}): Promise<VideoAiResult> {
   try {
     const res = await fetch("/api/article-ai", {
       method: "POST",

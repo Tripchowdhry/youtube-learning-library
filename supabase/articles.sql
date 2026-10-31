@@ -38,6 +38,9 @@ alter table public.articles add column if not exists position double precision n
 alter table public.article_categories add column if not exists kind text not null default 'reading' check (kind in ('reading', 'tutorial'));
 alter table public.articles add column if not exists kind text not null default 'reading' check (kind in ('reading', 'tutorial'));
 
+-- Study notes taken on the reading page were added later still.
+alter table public.articles add column if not exists notes text not null default '';
+
 create index if not exists article_categories_user_idx on public.article_categories (user_id);
 create index if not exists articles_user_idx on public.articles (user_id);
 create index if not exists articles_category_idx on public.articles (category_id);

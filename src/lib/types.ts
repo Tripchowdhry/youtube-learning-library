@@ -91,6 +91,8 @@ export type Article = {
   site: string | null;
   author: string | null;
   note: string;
+  // Study notes typed on the reading page (and AI answers). Missing until the SQL is run.
+  notes?: string;
   position: number;
   kind: SectionKind;
   read_at: string | null;

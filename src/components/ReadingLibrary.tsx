@@ -740,6 +740,7 @@ function ArticleRow(props: {
   const { article } = props;
   const [editingNote, setEditingNote] = useState(false);
   const [over, setOver] = useState(false);
+  const hasNotes = Boolean(article.notes?.trim());
   return (
     <li
       draggable={!editingNote}
@@ -765,6 +766,11 @@ function ArticleRow(props: {
       <ReadCheck read={Boolean(article.read_at)} onClick={props.onToggleRead} />
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <Link href={`/read/${article.id}`} className={`line-clamp-2 font-medium hover:underline ${article.read_at ? "text-slate-500" : ""}`}>
+          {hasNotes && (
+            <span className="mr-1.5 inline-block rounded-md bg-amber-400 px-1.5 py-0.5 align-[1px] text-[11px] font-bold text-amber-950 no-underline">
+              📒 Notes
+            </span>
+          )}
           {article.title || article.url}
         </Link>
         <p className="text-xs text-slate-500">
@@ -782,6 +788,16 @@ function ArticleRow(props: {
           <p className="rounded-md bg-red-50 px-2 py-1 text-xs text-red-700 ring-1 ring-red-200">⚠️ {props.aiNoteError}</p>
         )}
         <div className="mt-1 flex flex-wrap items-center gap-1">
+          <Link
+            href={`/read/${article.id}?notes=1`}
+            className={
+              hasNotes
+                ? "rounded-md border border-amber-300 bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-900 hover:bg-amber-200"
+                : "rounded-md border border-slate-300 px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+            }
+          >
+            {hasNotes ? "📒 Open notes" : "✏️ Take notes"}
+          </Link>
           <select
             value={article.category_id ?? ""}
             onChange={(e) => props.onMove(e.target.value || null)}
