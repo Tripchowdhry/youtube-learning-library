@@ -11,6 +11,8 @@ import {
   Pills,
   ReadCheck,
   SectionSwitch,
+  type Toast,
+  ToastBox,
   formatDate,
 } from "@/components/ReadingLibrary";
 import ContextMenu, { type MenuState } from "@/components/ContextMenu";
@@ -58,7 +60,9 @@ export default function Library({ userEmail }: { userEmail: string }) {
   const [itemSort, setItemSort] = useItemSort();
   const [watchFilter, setWatchFilter] = useState<"all" | "unwatched" | "watched">("all");
   const [period, setPeriod] = useState<Period>("any");
-  const [toast, setToast] = useState<{ text: string; isError?: boolean } | null>(null);
+  const [toast, setToast] = useState<Toast | null>(null);
+  // The video that was just found as a duplicate, shown with a ring for a few seconds.
+  const [flashId, setFlashId] = useState<string | null>(null);
 
   const notify = useCallback((text: string, isError = false) => {
     setToast({ text, isError });
@@ -167,8 +171,16 @@ export default function Library({ userEmail }: { userEmail: string }) {
     if (existing) {
       const siblings = videos.filter((v) => v.folder_id === existing.folder_id && v.id !== existing.id);
       const position = siblings.length ? Math.min(...siblings.map((v) => v.position)) - 1 : 0;
+      const where = existing.folder_id ? folderPath(existing.folder_id) : "Unsorted";
+      const added = formatDate(existing.created_at);
       updateVideo(existing.id, { created_at: new Date().toISOString(), position });
-      notify(`Already saved in ${existing.folder_id ? folderPath(existing.folder_id) : "Unsorted"}. Moved it to the top.`);
+      openView(existing.folder_id ? { kind: "folder", id: existing.folder_id } : { kind: "unsorted" });
+      setPeriod("any");
+      setWatchFilter("all");
+      setFlashId(existing.id);
+      setTimeout(() => setFlashId((id) => (id === existing.id ? null : id)), 5000);
+      setToast({ text: `Duplicate: this video is already saved in ${where} (added ${added}). It's shown at the top.`, warn: true });
+      setTimeout(() => setToast(null), 8000);
       return true;
     }
 
@@ -633,6 +645,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
                     video={video}
                     folderOptions={folderOptions}
                     hasNotes={notedVideoIds.has(video.id)}
+                    flash={flashId === video.id}
                     canReorder={canReorder}
                     dragging={draggingId === video.id}
                     onDragStart={() => setDraggingId(video.id)}
@@ -661,13 +674,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
 
       {menu && <ContextMenu menu={menu} onClose={closeMenu} />}
 
-      {toast && (
-        <div
-          className={`fixed bottom-4 left-1/2 z-30 -translate-x-1/2 rounded-lg px-4 py-2 text-sm text-white shadow-lg ${toast.isError ? "bg-red-600" : "bg-slate-900"}`}
-        >
-          {toast.text}
-        </div>
-      )}
+      {toast && <ToastBox toast={toast} onClose={() => setToast(null)} />}
     </div>
   );
 }
@@ -845,13 +852,19 @@ function VideoCard(props: {
   onAiNote: () => void;
   onDelete: () => void;
   onTagClick: (tag: string) => void;
+  flash: boolean;
 }) {
   const { video } = props;
+  const cardRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (props.flash) cardRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [props.flash]);
   const [over, setOver] = useState(false);
   const [editingNote, setEditingNote] = useState(false);
 
   return (
     <div
+      ref={cardRef}
       draggable={!editingNote}
       onDragStart={(e) => {
         e.dataTransfer.effectAllowed = "move";
@@ -870,7 +883,7 @@ function VideoCard(props: {
         setOver(false);
         props.onDropOnto();
       }}
-      className={`flex gap-3 rounded-xl border bg-white p-3 shadow-sm transition ${props.dragging ? "opacity-40" : ""} ${over ? "border-blue-500 ring-2 ring-blue-500" : "border-slate-200"}`}
+      className={`flex gap-3 rounded-xl border bg-white p-3 shadow-sm transition ${props.dragging ? "opacity-40" : ""} ${over ? "border-blue-500 ring-2 ring-blue-500" : props.flash ? "border-amber-400 ring-4 ring-amber-300" : "border-slate-200"}`}
     >
       <ReadCheck read={Boolean(video.watched_at)} onClick={props.onToggleWatched} word="watched" />
       <div className="w-28 shrink-0 cursor-grab overflow-hidden rounded-lg sm:w-48">
