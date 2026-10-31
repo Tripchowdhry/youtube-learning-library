@@ -453,7 +453,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
         >
           {showFolders ? "Close" : "Folders"}
         </button>
-        <span className="hidden text-lg font-bold sm:inline">📚 Learning Library</span>
+        <span className="hidden text-lg font-bold sm:inline">📚 StudyShelf</span>
         <SectionSwitch active="videos" />
         <input
           type="search"
