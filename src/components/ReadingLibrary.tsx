@@ -202,30 +202,39 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
     return key ? articles.find((a) => linkKey(a.url) === key) : undefined;
   };
 
-  // A link that's already saved isn't added twice: its category opens with the row ringed,
-  // and it gets today's date so it moves to the top.
+  // A link that's already saved isn't added twice: its category opens and the saved one
+  // gets a green ring for a few seconds.
   function bringToTop(existing: Article) {
     const where = categoryPath(existing.category_id) || "Uncategorized";
-    const added = formatDate(existing.created_at);
-    updateArticle(existing.id, {
-      created_at: new Date().toISOString(),
-      position: topPosition(existing.category_id, existing.id),
-    });
     openView(existing.category_id ? { kind: "category", id: existing.category_id } : { kind: "uncategorized" });
     setPeriod("any");
     setReadFilter("all");
     setFlashId(existing.id);
-    setTimeout(() => setFlashId((id) => (id === existing.id ? null : id)), 5000);
-    warn(`Duplicate: this is already saved in ${section.name} › ${where} (added ${added}). It's shown at the top.`);
+    setTimeout(() => setFlashId((id) => (id === existing.id ? null : id)), 4000);
+    warn(`Duplicate: this is already saved here, in ${section.name} › ${where}.`);
   }
 
-  // The same link saved in another tab (Videos, or Reading/Tutorials) isn't added here.
+  // The same link saved in another tab (Videos, or Reading/Tutorials): go there and show it.
   async function findInOtherSection(links: string[]) {
     const found = await findSavedElsewhere(supabase, links, kind);
     if (!found) return false;
-    warn(`Duplicate: this is already saved in ${found.where}.`, found.href);
+    router.push(found.href);
     return true;
   }
+
+  // Arriving from another tab with ?show=id: point at that saved link.
+  const shown = useRef(false);
+  useEffect(() => {
+    if (loading || shown.current) return;
+    shown.current = true;
+    const id = new URLSearchParams(window.location.search).get("show");
+    if (!id) return;
+    window.history.replaceState(null, "", section.path);
+    const article = articles.find((a) => a.id === id);
+    if (article) bringToTop(article);
+    // Runs once, when the list first loads.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading]);
 
   async function addArticle(link: string, categoryId: string | null) {
     const saved = findSaved(link);
@@ -787,7 +796,7 @@ function ArticleRow(props: {
         setOver(false);
         props.onDropOnto();
       }}
-      className={`flex cursor-grab items-start gap-3 rounded-xl border bg-white p-3 shadow-sm transition ${props.dragging ? "opacity-40" : ""} ${over ? "border-blue-500 ring-2 ring-blue-500" : props.flash ? "border-amber-400 ring-4 ring-amber-300" : "border-slate-200"}`}
+      className={`flex cursor-grab items-start gap-3 rounded-xl border bg-white p-3 shadow-sm transition ${props.dragging ? "opacity-40" : ""} ${over ? "border-blue-500 ring-2 ring-blue-500" : props.flash ? "border-green-500 ring-4 ring-green-400" : "border-slate-200"}`}
     >
       <ReadCheck read={Boolean(article.read_at)} onClick={props.onToggleRead} />
       <div className="flex min-w-0 flex-1 flex-col gap-1">

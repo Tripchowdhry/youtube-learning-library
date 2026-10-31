@@ -3,6 +3,7 @@ import { linkKey } from "@/lib/links";
 import { parseYouTubeId } from "@/lib/youtube";
 
 // Where in the app a link is already saved, so it's never saved twice in different tabs.
+// href opens that tab with the saved item shown in its folder (?show=id).
 export type SavedElsewhere = { where: string; href: string };
 
 type Named = { id: string; name: string; parent_id: string | null };
@@ -18,7 +19,10 @@ function pathOf(rows: Named[] | null, id: string | null, none: string) {
   return names.join(" › ") || none;
 }
 
-const SECTION_NAMES: Record<string, string> = { reading: "Reading", tutorial: "Tutorials" };
+const SECTIONS: Record<string, { name: string; path: string }> = {
+  reading: { name: "Reading", path: "/reading" },
+  tutorial: { name: "Tutorials", path: "/tutorials" },
+};
 
 // Looks for the links in every tab except `skip` (the tab doing the adding, which checks its own list).
 // YouTube links match by video, whatever their format; other links by linkKey.
@@ -39,7 +43,7 @@ export async function findSavedElsewhere(
     const video = data?.[0];
     if (video) {
       const { data: folders } = await supabase.from("folders").select("id, name, parent_id");
-      return { where: `Videos › ${pathOf(folders, video.folder_id, "Unsorted")}`, href: `/video/${video.id}` };
+      return { where: `Videos › ${pathOf(folders, video.folder_id, "Unsorted")}`, href: `/?show=${video.id}` };
     }
   }
 
@@ -52,6 +56,9 @@ export async function findSavedElsewhere(
   });
   if (!match) return null;
   const { data: cats } = await supabase.from("article_categories").select("id, name, parent_id");
-  const section = SECTION_NAMES[match.kind] ?? "Reading";
-  return { where: `${section} › ${pathOf(cats, match.category_id, "Uncategorized")}`, href: `/read/${match.id}` };
+  const section = SECTIONS[match.kind] ?? SECTIONS.reading;
+  return {
+    where: `${section.name} › ${pathOf(cats, match.category_id, "Uncategorized")}`,
+    href: `${section.path}?show=${match.id}`,
+  };
 }
