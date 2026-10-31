@@ -159,12 +159,37 @@ export default function Library({ userEmail }: { userEmail: string }) {
 
   // ---------- Video actions ----------
 
+  // Points at a saved video: opens its folder and rings it in green for a few seconds.
+  function showSaved(video: Video) {
+    const where = video.folder_id ? folderPath(video.folder_id) : "Unsorted";
+    openView(video.folder_id ? { kind: "folder", id: video.folder_id } : { kind: "unsorted" });
+    setPeriod("any");
+    setWatchFilter("all");
+    setFlashId(video.id);
+    setTimeout(() => setFlashId((id) => (id === video.id ? null : id)), 4000);
+    setToast({ text: `Duplicate: this video is already saved here, in Videos › ${where}.`, warn: true });
+    setTimeout(() => setToast(null), 8000);
+  }
+
+  // Arriving from another tab with ?show=id: point at that saved video.
+  const shown = useRef(false);
+  useEffect(() => {
+    if (loading || shown.current) return;
+    shown.current = true;
+    const id = new URLSearchParams(window.location.search).get("show");
+    if (!id) return;
+    window.history.replaceState(null, "", "/");
+    const video = videos.find((v) => v.id === id);
+    if (video) showSaved(video);
+    // Runs once, when the list first loads.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading]);
+
   async function addVideo(link: string) {
     // A video already saved in Reading or Tutorials isn't saved again here.
     const elsewhere = await findSavedElsewhere(supabase, [link], "videos");
     if (elsewhere) {
-      setToast({ text: `Duplicate: this is already saved in ${elsewhere.where}.`, warn: true, href: elsewhere.href });
-      setTimeout(() => setToast(null), 8000);
+      router.push(elsewhere.href);
       return true;
     }
     const res = await fetch(`/api/video-info?url=${encodeURIComponent(link)}`);
@@ -174,21 +199,10 @@ export default function Library({ userEmail }: { userEmail: string }) {
       return false;
     }
 
-    // A video that's already saved isn't added twice: it gets today's date and moves to the top of its folder.
+    // A video that's already saved isn't added twice: its folder opens and it gets a green ring.
     const existing = videos.find((v) => v.youtube_id === info.youtube_id);
     if (existing) {
-      const siblings = videos.filter((v) => v.folder_id === existing.folder_id && v.id !== existing.id);
-      const position = siblings.length ? Math.min(...siblings.map((v) => v.position)) - 1 : 0;
-      const where = existing.folder_id ? folderPath(existing.folder_id) : "Unsorted";
-      const added = formatDate(existing.created_at);
-      updateVideo(existing.id, { created_at: new Date().toISOString(), position });
-      openView(existing.folder_id ? { kind: "folder", id: existing.folder_id } : { kind: "unsorted" });
-      setPeriod("any");
-      setWatchFilter("all");
-      setFlashId(existing.id);
-      setTimeout(() => setFlashId((id) => (id === existing.id ? null : id)), 5000);
-      setToast({ text: `Duplicate: this video is already saved in ${where} (added ${added}). It's shown at the top.`, warn: true });
-      setTimeout(() => setToast(null), 8000);
+      showSaved(existing);
       return true;
     }
 
@@ -891,7 +905,7 @@ function VideoCard(props: {
         setOver(false);
         props.onDropOnto();
       }}
-      className={`flex gap-3 rounded-xl border bg-white p-3 shadow-sm transition ${props.dragging ? "opacity-40" : ""} ${over ? "border-blue-500 ring-2 ring-blue-500" : props.flash ? "border-amber-400 ring-4 ring-amber-300" : "border-slate-200"}`}
+      className={`flex gap-3 rounded-xl border bg-white p-3 shadow-sm transition ${props.dragging ? "opacity-40" : ""} ${over ? "border-blue-500 ring-2 ring-blue-500" : props.flash ? "border-green-500 ring-4 ring-green-400" : "border-slate-200"}`}
     >
       <ReadCheck read={Boolean(video.watched_at)} onClick={props.onToggleWatched} word="watched" />
       <div className="w-28 shrink-0 cursor-grab overflow-hidden rounded-lg sm:w-48">
