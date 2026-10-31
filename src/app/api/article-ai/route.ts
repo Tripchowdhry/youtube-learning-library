@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import { readArticle } from "@/lib/article-text";
-import { GeminiError, askAboutPage, geminiConfigured } from "@/lib/gemini";
+import { fetchFile, looksLikeFile, type FetchedFile } from "@/lib/fetch-file";
+import { GeminiError, askAboutFile, askAboutPage, geminiConfigured } from "@/lib/gemini";
 import { parseLink } from "@/lib/links";
 import { isSignedIn } from "@/lib/require-user";
 
-export const maxDuration = 120;
+export const maxDuration = 300;
 
 const NOTE_MAX = 280;
 // Enough for a long article; the rest is left out.
@@ -26,16 +27,31 @@ export async function POST(request: Request) {
   const title = String(body.title ?? "").slice(0, 300);
   const kind = body.kind === "tutorial" ? "tutorial" : "article";
 
-  const content = await readArticle(url);
-  const text = content.kind === "text" ? content.blocks.map((b) => b.text).join("\n").slice(0, TEXT_MAX) : null;
+  // A PDF or text file (like a book shared from Dropbox) is sent to the AI whole.
+  let file: FetchedFile | null = null;
+  let text: string | null = null;
+  if (looksLikeFile(url)) {
+    const result = await fetchFile(url);
+    if (result && "error" in result) return NextResponse.json({ error: result.error }, { status: 422 });
+    file = result;
+  }
+  if (!file) {
+    const content = await readArticle(url);
+    text = content.kind === "text" ? content.blocks.map((b) => b.text).join("\n").slice(0, TEXT_MAX) : null;
+    if (!text) {
+      // Some links to a PDF don't end in .pdf.
+      const result = await fetchFile(url);
+      if (result && !("error" in result)) file = result;
+    }
+  }
+  const askAi = (instructions: string, request: string) =>
+    file ? askAboutFile(file, instructions, request) : askAboutPage(url.toString(), text, instructions, request);
 
   try {
     if (body.task === "ask") {
       const ask = String(body.prompt ?? "").trim().slice(0, 2000);
       if (!ask) return NextResponse.json({ error: "Type what you'd like the AI to do." }, { status: 400 });
-      const { text: answer, model } = await askAboutPage(
-        url.toString(),
-        text,
+      const { text: answer, model } = await askAi(
         [
           `You help someone take study notes on a ${kind} they saved.${title ? ` It is titled "${title}".` : ""}`,
           `Answer their request from what the ${kind} says. If it doesn't cover it, say so briefly.`,
@@ -47,9 +63,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ text: answer, model });
     }
 
-    const { text: note, model } = await askAboutPage(
-      url.toString(),
-      text,
+    const { text: note, model } = await askAi(
       `You write the short note shown next to a saved ${kind} in someone's learning library.${title ? ` It is titled "${title}".` : ""}`,
       `In one or two plain sentences, under ${NOTE_MAX - 30} characters, say what this ${kind} teaches and why it's worth reading. No markdown, no quotes, no emojis.`,
     );
