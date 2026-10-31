@@ -309,6 +309,12 @@ export default function Library({ userEmail }: { userEmail: string }) {
     updateVideo(neighbor.id, { position: video.position });
   }
 
+  function renameVideo(video: Video) {
+    const title = window.prompt("Title:", video.title ?? "")?.trim();
+    if (!title || title === video.title) return;
+    updateVideo(video.id, { title: title.slice(0, 300) });
+  }
+
   function editTags(video: Video) {
     const answer = window.prompt("Tags, separated by commas:", video.tags.join(", "));
     if (answer === null) return;
@@ -637,6 +643,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
                     isLast={index === visibleVideos.length - 1}
                     onMove={(folderId) => moveVideo(video.id, folderId)}
                     onEditTags={() => editTags(video)}
+                    onRename={() => renameVideo(video)}
                     onSaveNote={(note) => updateVideo(video.id, { note })}
                     onToggleWatched={() => toggleWatched(video)}
                     aiNoteStartedAt={aiJobs.running.find((j) => j.key === aiNoteKey(video.id))?.startedAt ?? null}
@@ -830,6 +837,7 @@ function VideoCard(props: {
   isLast: boolean;
   onMove: (folderId: string | null) => void;
   onEditTags: () => void;
+  onRename: () => void;
   onSaveNote: (note: string) => void;
   onToggleWatched: () => void;
   aiNoteStartedAt: number | null;
@@ -972,6 +980,7 @@ function VideoCard(props: {
             </SmallButton>
           )}
           {!video.note && props.aiNoteStartedAt !== null && <AiNoteWorking startedAt={props.aiNoteStartedAt} />}
+          <SmallButton onClick={props.onRename}>Edit title</SmallButton>
           <SmallButton onClick={props.onEditTags}>Tags</SmallButton>
           {/* Kept apart from the note buttons so it isn't pressed by mistake. */}
           <span className="ml-auto pl-3">
