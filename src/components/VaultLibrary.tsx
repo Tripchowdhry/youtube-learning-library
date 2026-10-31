@@ -440,7 +440,7 @@ export default function VaultLibrary({ userEmail }: { userEmail: string }) {
         >
           {showCategories ? "Close" : "Categories"}
         </button>
-        <span className="hidden text-lg font-bold sm:inline">📚 StudyShelf</span>
+        <span className="hidden text-lg font-bold sm:inline">📚 BrainShelf</span>
         <SectionSwitch active="vault" />
         <input
           type="search"

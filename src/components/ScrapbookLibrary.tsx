@@ -354,7 +354,7 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
         >
           {showCategories ? "Close" : "Categories"}
         </button>
-        <span className="hidden text-lg font-bold sm:inline">📚 StudyShelf</span>
+        <span className="hidden text-lg font-bold sm:inline">📚 BrainShelf</span>
         <SectionSwitch active="scrap" />
         <input
           type="search"

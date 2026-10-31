@@ -482,7 +482,7 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
         >
           {showCategories ? "Close" : "Categories"}
         </button>
-        <span className="hidden text-lg font-bold sm:inline">📚 StudyShelf</span>
+        <span className="hidden text-lg font-bold sm:inline">📚 BrainShelf</span>
         <SectionSwitch active={kind} />
         <input
           type="search"

@@ -4,7 +4,7 @@ import AiJobsBadge from "@/components/AiJobsBadge";
 import { ConfirmHost } from "@/components/ConfirmDialog";
 
 export const metadata: Metadata = {
-  title: "StudyShelf",
+  title: "BrainShelf",
   description: "Save the videos, articles and tutorials you learn from, with notes and AI help, on every device.",
 };
 

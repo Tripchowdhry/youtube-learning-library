@@ -1,4 +1,4 @@
--- StudyShelf database setup.
+-- BrainShelf database setup.
 -- Paste this whole file into Supabase > SQL Editor > New query, then click Run.
 -- It is safe to run more than once.
 
