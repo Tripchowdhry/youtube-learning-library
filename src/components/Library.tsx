@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AiNoteWorking, ArticleNote, ReadCheck, SectionSwitch, formatDate } from "@/components/ReadingLibrary";
+import { AiNoteWorking, ArticleNote, Pills, ReadCheck, SectionSwitch, formatDate } from "@/components/ReadingLibrary";
 import ContextMenu, { type MenuState } from "@/components/ContextMenu";
 import {
   FolderSortSelect,
@@ -47,6 +47,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
   const [showFolders, setShowFolders] = useState(false);
   const [folderSort, setFolderSort] = useFolderSort();
   const [itemSort, setItemSort] = useItemSort();
+  const [watchFilter, setWatchFilter] = useState<"all" | "unwatched" | "watched">("all");
   const [toast, setToast] = useState<{ text: string; isError?: boolean } | null>(null);
 
   const notify = useCallback((text: string, isError = false) => {
@@ -127,8 +128,10 @@ export default function Library({ userEmail }: { userEmail: string }) {
       : view.kind === "all"
         ? [...videos]
         : videos.filter((v) => v.folder_id === folderId);
-    return shown.sort(compareItems<Video>(itemSort, (v) => v.title ?? "", !q && view.kind !== "all"));
-  }, [videos, view, query, folderPath, itemSort]);
+    return shown
+      .filter((v) => watchFilter === "all" || (watchFilter === "watched") === Boolean(v.watched_at))
+      .sort(compareItems<Video>(itemSort, (v) => v.title ?? "", !q && view.kind !== "all"));
+  }, [videos, view, query, folderPath, itemSort, watchFilter]);
 
   // New and moved videos go to the top of their folder.
   const topPosition = (folderId: string | null) => {
@@ -567,10 +570,23 @@ export default function Library({ userEmail }: { userEmail: string }) {
             </div>
           )}
 
+          <div className="mb-4 flex flex-wrap items-center gap-2 text-sm">
+            <Pills
+              value={watchFilter}
+              onChange={setWatchFilter}
+              options={[
+                { value: "all", label: "All" },
+                { value: "unwatched", label: "Unwatched" },
+                { value: "watched", label: "✓ Watched" },
+              ]}
+              label="Show"
+            />
+          </div>
+
           {loading ? (
             <p className="text-slate-500">Loading your library…</p>
           ) : visibleVideos.length === 0 ? (
-            <EmptyState searching={searching} hasVideos={videos.length > 0} />
+            <EmptyState searching={searching || watchFilter !== "all"} hasVideos={videos.length > 0} />
           ) : (
             <>
               {canReorder && visibleVideos.length > 1 && (
@@ -968,7 +984,7 @@ function EmptyState({ searching, hasVideos }: { searching: boolean; hasVideos: b
   return (
     <div className="rounded-xl border border-dashed border-slate-300 p-10 text-center text-slate-500">
       {searching
-        ? "No videos match your search."
+        ? "No videos match. Try another search, or pick All above."
         : hasVideos
           ? "No videos here yet. Paste a link above, or move videos in from another folder."
           : "Your library is empty. Paste a YouTube link above to save your first video."}
