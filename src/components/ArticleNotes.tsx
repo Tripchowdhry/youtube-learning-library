@@ -158,7 +158,7 @@ export default function ArticleNotes(props: {
             <button
               onClick={async () => {
                 const ok = await askConfirm({
-                  title: "Clear your notes?",
+                  title: "Clear all your notes?",
                   message: `All the typed notes for this ${word} will be erased. The ${word} stays in your list.`,
                   confirmLabel: "Yes, clear notes",
                   cancelLabel: "Keep them",
@@ -168,7 +168,7 @@ export default function ArticleNotes(props: {
               }}
               className="rounded-md border border-slate-300 bg-white px-2 py-1 text-xs text-slate-700 hover:bg-slate-100"
             >
-              🧹 Clear
+              🧹 Clear my notes
             </button>
           )}
           <button

@@ -267,7 +267,7 @@ export default function ReaderPage({ articleId }: { articleId: string }) {
                     onClick={() => setEditingNote(true)}
                     className="text-sm text-slate-500 hover:underline"
                   >
-                    📝 Add a note for yourself
+                    📝 Add a summary
                   </button>
                 ) : (
                   <ArticleNote
