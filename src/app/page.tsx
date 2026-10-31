@@ -24,7 +24,7 @@ export default async function Home({
   return (
     <main className="mx-auto flex min-h-screen max-w-2xl flex-col items-center justify-center gap-6 px-4 text-center">
       <div className="text-5xl">📚</div>
-      <h1 className="text-3xl font-bold sm:text-4xl">StudyShelf</h1>
+      <h1 className="text-3xl font-bold sm:text-4xl">BrainShelf</h1>
       <p className="text-lg text-slate-600">
         Save the videos, articles and tutorials you learn from, take notes with AI help, and pick them up on any device.
       </p>

@@ -1,4 +1,4 @@
-# StudyShelf
+# BrainShelf
 
 A web app for organizing the YouTube videos you learn from. Anyone can sign in with Google and get their own private library.
 
