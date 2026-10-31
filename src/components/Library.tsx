@@ -847,7 +847,15 @@ function VideoCard(props: {
     >
       <ReadCheck read={Boolean(video.watched_at)} onClick={props.onToggleWatched} word="watched" />
       <div className="w-28 shrink-0 cursor-grab overflow-hidden rounded-lg sm:w-48">
-        <VideoThumb video={video} href={`/video/${video.id}`} />
+        <div className="relative">
+          <VideoThumb video={video} href={`/video/${video.id}`} />
+          {/* Videos with notes get a badge, so they stand out in the list. */}
+          {props.hasNotes && (
+            <span className="pointer-events-none absolute top-1 left-1 rounded-md bg-amber-400 px-1.5 py-0.5 text-[11px] font-bold text-amber-950 shadow">
+              📒 Notes
+            </span>
+          )}
+        </div>
       </div>
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <a
@@ -881,10 +889,14 @@ function VideoCard(props: {
         <div className="mt-1 flex flex-wrap items-center gap-1">
           <a
             href={`/video/${video.id}`}
-            className="rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100"
+            className={
+              props.hasNotes
+                ? "rounded-md border border-amber-300 bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-900 shadow-sm hover:bg-amber-200"
+                : "rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100"
+            }
             draggable={false}
           >
-            ✏️ {props.hasNotes ? "Open notes" : "Take notes"}
+            {props.hasNotes ? "📒 Open notes" : "✏️ Take notes"}
           </a>
           <a
             href={video.url}
