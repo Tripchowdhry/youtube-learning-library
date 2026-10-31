@@ -14,6 +14,7 @@ import {
   useItemSort,
 } from "@/components/FolderSort";
 import { onAiJobDone, runAiJob, useAiJobs, useSecondsSince } from "@/lib/ai-jobs";
+import { findSavedElsewhere } from "@/lib/find-saved";
 import { linkKey } from "@/lib/links";
 import { createClient } from "@/lib/supabase/client";
 import type { Article, ArticleCategory, SectionKind } from "@/lib/types";
@@ -218,22 +219,11 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
     warn(`Duplicate: this is already saved in ${section.name} › ${where} (added ${added}). It's shown at the top.`);
   }
 
-  // The same link saved in the other section (Reading or Tutorials).
+  // The same link saved in another tab (Videos, or Reading/Tutorials) isn't added here.
   async function findInOtherSection(links: string[]) {
-    const keys = new Set(links.map(linkKey).filter(Boolean));
-    const { data } = await supabase.from("articles").select("id, url, kind, category_id").neq("kind", kind);
-    const match = (data ?? []).find((a) => keys.has(linkKey(a.url)));
-    if (!match) return false;
-    let where = "Uncategorized";
-    if (match.category_id) {
-      const { data: cats } = await supabase.from("article_categories").select("id, name, parent_id");
-      const byId = new Map((cats ?? []).map((c) => [c.id, c]));
-      const cat = byId.get(match.category_id);
-      const parent = cat?.parent_id ? byId.get(cat.parent_id) : null;
-      if (cat) where = parent ? `${parent.name} › ${cat.name}` : cat.name;
-    }
-    const other = SECTIONS[match.kind as SectionKind] ?? SECTIONS.reading;
-    warn(`Duplicate: this is already saved in ${other.name} › ${where}.`, `/read/${match.id}`);
+    const found = await findSavedElsewhere(supabase, links, kind);
+    if (!found) return false;
+    warn(`Duplicate: this is already saved in ${found.where}.`, found.href);
     return true;
   }
 
