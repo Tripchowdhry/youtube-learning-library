@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import NotePageCanvas, { PAGE_HEIGHT, type Tool } from "@/components/NotePageCanvas";
 import { DeleteClipButton } from "@/components/ClipButtons";
 import {
@@ -718,6 +718,12 @@ function TypedNotes(props: {
 }) {
   const times = timesIn(props.text);
   const clips = props.clips;
+  const backdrop = useRef<HTMLDivElement>(null);
+  // Keep the drawn text lined up after the box is resized or text is added.
+  useEffect(() => {
+    const box = props.boxRef.current;
+    if (box && backdrop.current) backdrop.current.scrollTop = box.scrollTop;
+  });
   const remove = (index: number) => props.onClipsChange(clips.filter((_, i) => i !== index));
   return (
     <div className="flex flex-col gap-2">
@@ -761,23 +767,39 @@ function TypedNotes(props: {
           ))}
         </div>
       )}
-      <textarea
-        id="typed-notes"
-        ref={props.boxRef}
-        value={props.text}
-        onChange={(e) => props.onChange(e.target.value)}
-        onKeyDown={(e) => {
-          // Ctrl/Cmd + Shift + S stamps the current video time while typing.
-          if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === "s") {
-            e.preventDefault();
-            props.onStamp();
+      <div className="relative rounded-lg bg-white shadow-sm ring-1 ring-slate-200 focus-within:ring-2 focus-within:ring-slate-400">
+        {/* The text is drawn here, behind the (see-through) typing box, so AI prompts can be shown in bold. */}
+        <div ref={backdrop} aria-hidden className="notes-text notes-backdrop">
+          {props.text.split("\n").map((line, i) => (
+            <Fragment key={i}>
+              {i > 0 && "\n"}
+              {line.startsWith("✨") ? <span className="notes-prompt">{line}</span> : line}
+            </Fragment>
+          ))}
+          {/* Keeps a last empty line as tall as in the typing box. */}
+          {" "}
+        </div>
+        <textarea
+          id="typed-notes"
+          ref={props.boxRef}
+          value={props.text}
+          onChange={(e) => props.onChange(e.target.value)}
+          onScroll={(e) => {
+            if (backdrop.current) backdrop.current.scrollTop = e.currentTarget.scrollTop;
+          }}
+          onKeyDown={(e) => {
+            // Ctrl/Cmd + Shift + S stamps the current video time while typing.
+            if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === "s") {
+              e.preventDefault();
+              props.onStamp();
+            }
+          }}
+          placeholder={
+            "Type your notes here…\n\nTip: press ⏱ Stamp time (or Ctrl+Shift+S) to add the video's current time, like [12:34]. Click a time above to jump back to it. Press 📷 Clip to add a picture of the video."
           }
-        }}
-        placeholder={
-          "Type your notes here…\n\nTip: press ⏱ Stamp time (or Ctrl+Shift+S) to add the video's current time, like [12:34]. Click a time above to jump back to it. Press 📷 Clip to add a picture of the video."
-        }
-        className="min-h-[65vh] w-full resize-y rounded-lg bg-white p-4 text-base leading-relaxed shadow-sm ring-1 ring-slate-200 outline-none focus:ring-2 focus:ring-slate-400"
-      />
+          className="notes-text notes-input"
+        />
+      </div>
     </div>
   );
 }

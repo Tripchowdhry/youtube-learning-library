@@ -9,3 +9,64 @@ body {
   color: #0f172a;
   font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
 }
+
+/* Typed notes: a see-through textarea over a copy of its text, so lines can be styled. */
+.notes-text {
+  box-sizing: border-box;
+  width: 100%;
+  margin: 0;
+  border: 0;
+  padding: 1rem;
+  font: inherit;
+  font-size: 1rem;
+  line-height: 1.625;
+  letter-spacing: normal;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  word-break: normal;
+  tab-size: 8;
+  scrollbar-gutter: stable;
+}
+
+.notes-backdrop {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  color: #0f172a;
+}
+
+.notes-input {
+  position: relative;
+  display: block;
+  min-height: 65vh;
+  resize: vertical;
+  overflow-y: auto;
+  background: transparent;
+  color: transparent;
+  caret-color: #0f172a;
+  outline: none;
+  -webkit-text-fill-color: transparent;
+}
+
+.notes-input::placeholder {
+  color: #94a3b8;
+  -webkit-text-fill-color: #94a3b8;
+}
+
+/* An AI question in the notes: bold without changing letter widths, so the typing box stays lined up. */
+.notes-prompt {
+  color: #5b21b6;
+  background: #ede9fe;
+  border-radius: 3px;
+  text-shadow: 0.45px 0 0 currentColor, -0.45px 0 0 currentColor;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
+/* iPhone and iPad Safari indent text inside a textarea by 3px on each side. */
+@supports (-webkit-touch-callout: none) {
+  .notes-backdrop {
+    padding-left: calc(1rem + 3px);
+    padding-right: calc(1rem + 3px);
+  }
+}
