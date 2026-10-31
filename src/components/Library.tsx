@@ -851,7 +851,7 @@ function VideoCard(props: {
           <VideoThumb video={video} href={`/video/${video.id}`} />
           {/* Videos with notes get a badge, so they stand out in the list. */}
           {props.hasNotes && (
-            <span className="pointer-events-none absolute top-1 left-1 rounded-md bg-amber-400 px-1.5 py-0.5 text-[11px] font-bold text-amber-950 shadow">
+            <span className="pointer-events-none absolute top-1 left-1 rounded-md bg-teal-600 px-1.5 py-0.5 text-[11px] font-bold text-white shadow">
               📒 Notes
             </span>
           )}
@@ -891,7 +891,7 @@ function VideoCard(props: {
             href={`/video/${video.id}`}
             className={
               props.hasNotes
-                ? "rounded-md border border-amber-300 bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-900 shadow-sm hover:bg-amber-200"
+                ? "rounded-md border border-teal-600 bg-teal-600 px-2 py-1 text-xs font-semibold text-white shadow-sm hover:bg-teal-700"
                 : "rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100"
             }
             draggable={false}
