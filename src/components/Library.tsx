@@ -829,20 +829,18 @@ function VideoCard(props: {
       }}
       className={`flex gap-3 rounded-xl border bg-white p-3 shadow-sm transition ${props.dragging ? "opacity-40" : ""} ${over ? "border-blue-500 ring-2 ring-blue-500" : "border-slate-200"}`}
     >
+      <ReadCheck read={Boolean(video.watched_at)} onClick={props.onToggleWatched} word="watched" />
       <div className="w-28 shrink-0 cursor-grab overflow-hidden rounded-lg sm:w-48">
         <VideoThumb video={video} href={`/video/${video.id}`} />
       </div>
       <div className="flex min-w-0 flex-1 flex-col gap-1">
-        <div className="flex items-start gap-2">
-          <a
-            href={`/video/${video.id}`}
-            className={`line-clamp-2 flex-1 font-medium hover:underline ${video.watched_at ? "text-slate-500" : ""}`}
-            draggable={false}
-          >
-            {video.title}
-          </a>
-          <ReadCheck read={Boolean(video.watched_at)} onClick={props.onToggleWatched} word="watched" />
-        </div>
+        <a
+          href={`/video/${video.id}`}
+          className={`line-clamp-2 font-medium hover:underline ${video.watched_at ? "text-slate-500" : ""}`}
+          draggable={false}
+        >
+          {video.title}
+        </a>
         <p className="text-xs text-slate-500">
           {video.channel && `${video.channel} · `}Added {formatDate(video.created_at)}
           {video.watched_at && <span className="text-green-700"> · Watched {formatDate(video.watched_at)}</span>}
