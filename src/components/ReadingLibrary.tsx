@@ -13,7 +13,12 @@ import {
   useFolderSort,
   useItemSort,
 } from "@/components/FolderSort";
-import { onAiJobDone, runAiJob, useAiJobs, useSecondsSince } from "@/lib/ai-jobs";
+import {
+  onAiJobDone,
+  runAiJob,
+  useAiJobs,
+  useSecondsSince,
+} from "@/lib/ai-jobs";
 import { linkKey } from "@/lib/links";
 import { createClient } from "@/lib/supabase/client";
 import type { Article, ArticleCategory, SectionKind } from "@/lib/types";
@@ -23,7 +28,10 @@ import { askConfirm } from "./ConfirmDialog";
 type AiNote = { articleId: string; note: string; model?: string };
 const aiNoteKey = (articleId: string) => `article-note:${articleId}`;
 
-type View = { kind: "all" } | { kind: "uncategorized" } | { kind: "category"; id: string };
+type View =
+  | { kind: "all" }
+  | { kind: "uncategorized" }
+  | { kind: "category"; id: string };
 export type Period = "any" | "week" | "month" | "year";
 type ReadFilter = "all" | "unread" | "read";
 
@@ -38,12 +46,24 @@ export const PERIODS: { value: Period; label: string; days: number }[] = [
 export const NOTE_MAX = 280;
 
 export const formatDate = (iso: string) =>
-  new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+  new Date(iso).toLocaleDateString(undefined, {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
 
 // Reading and Tutorials work the same way; each has its own links and categories.
 export const SECTIONS: Record<
   SectionKind,
-  { path: string; icon: string; name: string; all: string; list: string; placeholder: string; example: string }
+  {
+    path: string;
+    icon: string;
+    name: string;
+    all: string;
+    list: string;
+    placeholder: string;
+    example: string;
+  }
 > = {
   reading: {
     path: "/reading",
@@ -65,7 +85,13 @@ export const SECTIONS: Record<
   },
 };
 
-export default function ReadingLibrary({ userEmail, kind }: { userEmail: string; kind: SectionKind }) {
+export default function ReadingLibrary({
+  userEmail,
+  kind,
+}: {
+  userEmail: string;
+  kind: SectionKind;
+}) {
   const section = SECTIONS[kind];
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
@@ -81,10 +107,15 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
   const [readFilter, setReadFilter] = useState<ReadFilter>("all");
   const [showCategories, setShowCategories] = useState(false);
   const [draggingId, setDraggingId] = useState<string | null>(null);
-  const [draggingCategoryId, setDraggingCategoryId] = useState<string | null>(null);
+  const [draggingCategoryId, setDraggingCategoryId] = useState<string | null>(
+    null,
+  );
   const [menu, setMenu] = useState<MenuState | null>(null);
   const closeMenu = useCallback(() => setMenu(null), []);
-  const [toast, setToast] = useState<{ text: string; isError?: boolean } | null>(null);
+  const [toast, setToast] = useState<{
+    text: string;
+    isError?: boolean;
+  } | null>(null);
 
   const notify = useCallback((text: string, isError = false) => {
     setToast({ text, isError });
@@ -93,13 +124,23 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
 
   const load = useCallback(async () => {
     const [c, a] = await Promise.all([
-      supabase.from("article_categories").select("*").eq("kind", kind).order("position").order("name"),
-      supabase.from("articles").select("*").eq("kind", kind).order("created_at", { ascending: false }),
+      supabase
+        .from("article_categories")
+        .select("*")
+        .eq("kind", kind)
+        .order("position")
+        .order("name"),
+      supabase
+        .from("articles")
+        .select("*")
+        .eq("kind", kind)
+        .order("created_at", { ascending: false }),
     ]);
     const error = c.error ?? a.error;
     if (error) {
       // Before supabase/articles.sql has been run, the tables don't exist yet.
-      if (/does not exist|schema cache/i.test(error.message)) setNeedsSetup(true);
+      if (/does not exist|schema cache/i.test(error.message))
+        setNeedsSetup(true);
       else notify(error.message, true);
     } else {
       setCategories(c.data as ArticleCategory[]);
@@ -117,11 +158,15 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
   const [folderSort, setFolderSort] = useFolderSort();
   const [itemSort, setItemSort] = useItemSort();
   const topCategories = useMemo(
-    () => categories.filter((c) => !c.parent_id).sort(compareFolders(folderSort)),
+    () =>
+      categories.filter((c) => !c.parent_id).sort(compareFolders(folderSort)),
     [categories, folderSort],
   );
   const subcategories = useCallback(
-    (parentId: string) => categories.filter((c) => c.parent_id === parentId).sort(compareFolders(folderSort)),
+    (parentId: string) =>
+      categories
+        .filter((c) => c.parent_id === parentId)
+        .sort(compareFolders(folderSort)),
     [categories, folderSort],
   );
 
@@ -149,12 +194,18 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
   const categorySiblings = (category: ArticleCategory) =>
     category.parent_id ? subcategories(category.parent_id) : topCategories;
 
-  const currentCategory = view.kind === "category" ? categories.find((c) => c.id === view.id) ?? null : null;
+  const currentCategory =
+    view.kind === "category"
+      ? (categories.find((c) => c.id === view.id) ?? null)
+      : null;
 
   // A category shows its own articles plus those in its subcategories.
   const inCategory = useCallback(
     (article: Article, id: string) =>
-      article.category_id === id || categories.some((c) => c.id === article.category_id && c.parent_id === id),
+      article.category_id === id ||
+      categories.some(
+        (c) => c.id === article.category_id && c.parent_id === id,
+      ),
     [categories],
   );
 
@@ -172,22 +223,51 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
       if (since && new Date(a.created_at).getTime() < since) return false;
       if (readFilter === "read" && !a.read_at) return false;
       if (readFilter === "unread" && a.read_at) return false;
-      if (q) return [a.title, a.site, a.author, a.url, a.note, categoryPath(a.category_id)].some((s) => s?.toLowerCase().includes(q));
+      if (q)
+        return [
+          a.title,
+          a.site,
+          a.author,
+          a.url,
+          a.note,
+          categoryPath(a.category_id),
+        ].some((s) => s?.toLowerCase().includes(q));
       if (view.kind === "uncategorized") return !a.category_id;
       if (view.kind === "category") return inCategory(a, view.id);
       return true;
     });
-    return shown.sort(compareItems<Article>(itemSort, (a) => a.title ?? a.url, !searching && view.kind !== "all"));
-  }, [articles, query, period, readFilter, view, categoryPath, inCategory, searching, itemSort]);
+    return shown.sort(
+      compareItems<Article>(
+        itemSort,
+        (a) => a.title ?? a.url,
+        !searching && view.kind !== "all",
+      ),
+    );
+  }, [
+    articles,
+    query,
+    period,
+    readFilter,
+    view,
+    categoryPath,
+    inCategory,
+    searching,
+    itemSort,
+  ]);
 
-  const countIn = (id: string) => articles.filter((a) => inCategory(a, id)).length;
+  const countIn = (id: string) =>
+    articles.filter((a) => inCategory(a, id)).length;
 
   // ---------- Article actions ----------
 
   // The position that puts an article first in a category.
   const topPosition = (categoryId: string | null, exceptId?: string) => {
-    const siblings = articles.filter((a) => a.category_id === categoryId && a.id !== exceptId);
-    return siblings.length ? Math.min(...siblings.map((a) => a.position)) - 1 : 0;
+    const siblings = articles.filter(
+      (a) => a.category_id === categoryId && a.id !== exceptId,
+    );
+    return siblings.length
+      ? Math.min(...siblings.map((a) => a.position)) - 1
+      : 0;
   };
 
   const findSaved = (link: string) => {
@@ -201,7 +281,9 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
       created_at: new Date().toISOString(),
       position: topPosition(existing.category_id, existing.id),
     });
-    notify(`Already saved in ${categoryPath(existing.category_id) || "Uncategorized"}. Moved it to the top.`);
+    notify(
+      `Already saved in ${categoryPath(existing.category_id) || "Uncategorized"}. Moved it to the top.`,
+    );
   }
 
   async function addArticle(link: string, categoryId: string | null) {
@@ -211,7 +293,9 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
       return true;
     }
 
-    const res = await fetch(`/api/article-info?url=${encodeURIComponent(link)}`);
+    const res = await fetch(
+      `/api/article-info?url=${encodeURIComponent(link)}`,
+    );
     const info = await res.json();
     if (!res.ok) {
       notify(info.error ?? "Couldn't read that link.", true);
@@ -227,7 +311,13 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
 
     let title: string | null = info.title;
     if (!title) {
-      title = window.prompt("This site didn't share its title. Type one:", info.site ?? "")?.trim() || null;
+      title =
+        window
+          .prompt(
+            "This site didn't share its title. Type one:",
+            info.site ?? "",
+          )
+          ?.trim() || null;
       if (!title) return false;
     }
 
@@ -260,10 +350,15 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
   function writeAiNote(article: Article) {
     runAiJob<AiNote>({
       key: aiNoteKey(article.id),
-      label: `AI note for "${article.title ?? article.site ?? "your link"}"`,
+      label: `AI summary for "${article.title ?? article.site ?? "your link"}"`,
       work: async () => {
-        const result = await askArticleAi({ url: article.url, title: article.title, kind });
-        if (result.error) return result.code === "no-key" ? {} : { error: result.error };
+        const result = await askArticleAi({
+          url: article.url,
+          title: article.title,
+          kind,
+        });
+        if (result.error)
+          return result.code === "no-key" ? {} : { error: result.error };
         if (!result.text) return {};
         // Only fills an empty note, so a note typed while the AI was working stays.
         const { data, error } = await supabase
@@ -273,7 +368,15 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
           .eq("note", "")
           .select("id");
         if (error) return { error: error.message };
-        return data.length ? { result: { articleId: article.id, note: result.text, model: result.model } } : {};
+        return data.length
+          ? {
+              result: {
+                articleId: article.id,
+                note: result.text,
+                model: result.model,
+              },
+            }
+          : {};
       },
     });
   }
@@ -284,7 +387,9 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
       onAiJobDone((key, result) => {
         if (!key.startsWith("article-note:")) return false;
         const { articleId, note, model } = result as AiNote;
-        setArticles((prev) => prev.map((a) => (a.id === articleId ? { ...a, note } : a)));
+        setArticles((prev) =>
+          prev.map((a) => (a.id === articleId ? { ...a, note } : a)),
+        );
         if (model) notify(`Note written by ${model}`);
         return true;
       }),
@@ -292,8 +397,13 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
   );
 
   async function updateArticle(id: string, changes: Partial<Article>) {
-    setArticles((prev) => prev.map((a) => (a.id === id ? { ...a, ...changes } : a)));
-    const { error } = await supabase.from("articles").update(changes).eq("id", id);
+    setArticles((prev) =>
+      prev.map((a) => (a.id === id ? { ...a, ...changes } : a)),
+    );
+    const { error } = await supabase
+      .from("articles")
+      .update(changes)
+      .eq("id", id);
     if (error) {
       notify(error.message, true);
       load();
@@ -303,7 +413,10 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
   function moveArticle(id: string, categoryId: string | null) {
     const article = articles.find((a) => a.id === id);
     if (!article || article.category_id === categoryId) return;
-    updateArticle(id, { category_id: categoryId, position: topPosition(categoryId) });
+    updateArticle(id, {
+      category_id: categoryId,
+      position: topPosition(categoryId),
+    });
     notify(`Moved to ${categoryPath(categoryId) || "Uncategorized"}`);
   }
 
@@ -315,7 +428,11 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
     if (index === -1) return;
     const target = list[index];
     const before = list[index - 1];
-    updateArticle(draggedId, { position: before ? (before.position + target.position) / 2 : target.position - 1 });
+    updateArticle(draggedId, {
+      position: before
+        ? (before.position + target.position) / 2
+        : target.position - 1,
+    });
   }
 
   // Swap an article with its neighbor: -1 moves it up, +1 down.
@@ -334,7 +451,9 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
   }
 
   function toggleRead(article: Article) {
-    updateArticle(article.id, { read_at: article.read_at ? null : new Date().toISOString() });
+    updateArticle(article.id, {
+      read_at: article.read_at ? null : new Date().toISOString(),
+    });
   }
 
   function renameArticle(article: Article) {
@@ -347,14 +466,18 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
     const ok = await askConfirm({
       title: `Delete this from your ${section.list}?`,
       quote: article.title ?? article.url,
-      message: "The link and its note will be gone for good.\n\nOnly want to remove the note? Choose Keep it, then use 🧹 Clear note.",
+      message:
+        "The link, its summary and your notes will be gone for good.\n\nOnly want to remove the summary? Choose Keep it, then use 🧹 Clear summary.",
       confirmLabel: "Yes, delete",
       cancelLabel: "Keep it",
       danger: true,
     });
     if (!ok) return;
     setArticles((prev) => prev.filter((a) => a.id !== article.id));
-    const { error } = await supabase.from("articles").delete().eq("id", article.id);
+    const { error } = await supabase
+      .from("articles")
+      .delete()
+      .eq("id", article.id);
     if (error) {
       notify(error.message, true);
       load();
@@ -365,11 +488,17 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
 
   async function createCategory(parentId: string | null) {
     const name = window
-      .prompt(parentId ? `New subcategory inside "${categoryPath(parentId)}":` : "New category name:")
+      .prompt(
+        parentId
+          ? `New subcategory inside "${categoryPath(parentId)}":`
+          : "New category name:",
+      )
       ?.trim();
     if (!name) return;
     const siblings = categories.filter((c) => c.parent_id === parentId);
-    const position = siblings.length ? Math.max(...siblings.map((c) => c.position)) + 1 : 0;
+    const position = siblings.length
+      ? Math.max(...siblings.map((c) => c.position)) + 1
+      : 0;
     const { data, error } = await supabase
       .from("article_categories")
       .insert({ name: name.slice(0, 100), parent_id: parentId, position, kind })
@@ -384,16 +513,38 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
   async function moveCategoryTo(draggedId: string, targetId: string) {
     const dragged = categories.find((c) => c.id === draggedId);
     const target = categories.find((c) => c.id === targetId);
-    if (!dragged || !target || dragged.id === target.id || dragged.parent_id !== target.parent_id) return;
+    if (
+      !dragged ||
+      !target ||
+      dragged.id === target.id ||
+      dragged.parent_id !== target.parent_id
+    )
+      return;
     const all = categorySiblings(dragged);
     const siblings = all.filter((c) => c.id !== dragged.id);
     const index = siblings.findIndex((c) => c.id === target.id);
     // Dragging down puts it after the target; dragging up puts it before.
-    siblings.splice(all.indexOf(dragged) <= index ? index + 1 : index, 0, dragged);
-    const changed = siblings.map((c, position) => ({ id: c.id, position })).filter((c, i) => siblings[i].position !== c.position);
-    setCategories((prev) => prev.map((c) => ({ ...c, position: changed.find((x) => x.id === c.id)?.position ?? c.position })));
+    siblings.splice(
+      all.indexOf(dragged) <= index ? index + 1 : index,
+      0,
+      dragged,
+    );
+    const changed = siblings
+      .map((c, position) => ({ id: c.id, position }))
+      .filter((c, i) => siblings[i].position !== c.position);
+    setCategories((prev) =>
+      prev.map((c) => ({
+        ...c,
+        position: changed.find((x) => x.id === c.id)?.position ?? c.position,
+      })),
+    );
     const results = await Promise.all(
-      changed.map((c) => supabase.from("article_categories").update({ position: c.position }).eq("id", c.id)),
+      changed.map((c) =>
+        supabase
+          .from("article_categories")
+          .update({ position: c.position })
+          .eq("id", c.id),
+      ),
     );
     const failed = results.find((r) => r.error);
     if (failed) {
@@ -409,8 +560,19 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
       y: e.clientY,
       items: [
         { label: "✏️ Rename", onClick: () => renameCategory(category) },
-        ...(category.parent_id ? [] : [{ label: "🏷️ New subcategory", onClick: () => createCategory(category.id) }]),
-        { label: "🗑 Delete", onClick: () => deleteCategory(category), danger: true },
+        ...(category.parent_id
+          ? []
+          : [
+              {
+                label: "🏷️ New subcategory",
+                onClick: () => createCategory(category.id),
+              },
+            ]),
+        {
+          label: "🗑 Delete",
+          onClick: () => deleteCategory(category),
+          danger: true,
+        },
       ],
     });
   }
@@ -420,7 +582,11 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
   const dropOnCategory = (category: ArticleCategory) => {
     if (draggingId) return () => moveArticle(draggingId, category.id);
     const dragged = categories.find((c) => c.id === draggingCategoryId);
-    if (dragged && dragged.id !== category.id && dragged.parent_id === category.parent_id) {
+    if (
+      dragged &&
+      dragged.id !== category.id &&
+      dragged.parent_id === category.parent_id
+    ) {
       return () => moveCategoryTo(dragged.id, category.id);
     }
     return undefined;
@@ -429,8 +595,13 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
   async function renameCategory(category: ArticleCategory) {
     const name = window.prompt("Rename:", category.name)?.trim();
     if (!name || name === category.name) return;
-    setCategories((prev) => prev.map((c) => (c.id === category.id ? { ...c, name } : c)));
-    const { error } = await supabase.from("article_categories").update({ name }).eq("id", category.id);
+    setCategories((prev) =>
+      prev.map((c) => (c.id === category.id ? { ...c, name } : c)),
+    );
+    const { error } = await supabase
+      .from("article_categories")
+      .update({ name })
+      .eq("id", category.id);
     if (error) {
       notify(error.message, true);
       load();
@@ -443,7 +614,10 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
       `Delete "${category.name}"${subs}?\nThe articles inside will move to Uncategorized, not be deleted.`,
     );
     if (!ok) return;
-    const { error } = await supabase.from("article_categories").delete().eq("id", category.id);
+    const { error } = await supabase
+      .from("article_categories")
+      .delete()
+      .eq("id", category.id);
     if (error) return notify(error.message, true);
     setView({ kind: "all" });
     load();
@@ -482,7 +656,9 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
         >
           {showCategories ? "Close" : "Categories"}
         </button>
-        <span className="hidden text-lg font-bold sm:inline">📚 BrainShelf</span>
+        <span className="hidden text-lg font-bold sm:inline">
+          📚 BrainShelf
+        </span>
         <SectionSwitch active={kind} />
         <input
           type="search"
@@ -493,7 +669,10 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
         />
         <div className="hidden items-center gap-2 text-sm text-slate-500 sm:flex">
           <span className="max-w-40 truncate">{userEmail}</span>
-          <button onClick={signOut} className="rounded-md px-2 py-1 hover:bg-slate-100">
+          <button
+            onClick={signOut}
+            className="rounded-md px-2 py-1 hover:bg-slate-100"
+          >
             Sign out
           </button>
         </div>
@@ -503,34 +682,53 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
         <aside
           className={`${showCategories ? "fixed inset-x-0 top-[57px] bottom-0 z-10 block" : "hidden"} w-full overflow-y-auto border-r border-slate-200 bg-white p-3 md:sticky md:top-[57px] md:block md:h-[calc(100vh-57px)] md:w-72`}
         >
-          <NavItem label={`${section.icon} ${section.all}`} count={articles.length} active={view.kind === "all" && !searching} onClick={() => openView({ kind: "all" })} />
+          <NavItem
+            label={`${section.icon} ${section.all}`}
+            count={articles.length}
+            active={view.kind === "all" && !searching}
+            onClick={() => openView({ kind: "all" })}
+          />
           <NavItem
             label="📥 Uncategorized"
             count={articles.filter((a) => !a.category_id).length}
             active={view.kind === "uncategorized" && !searching}
             onClick={() => openView({ kind: "uncategorized" })}
-            onDropArticle={draggingId ? () => moveArticle(draggingId, null) : undefined}
+            onDropArticle={
+              draggingId ? () => moveArticle(draggingId, null) : undefined
+            }
           />
 
           <div className="mt-4 mb-1 flex items-center justify-between px-2 text-xs font-semibold tracking-wide text-slate-500 uppercase">
             Categories
             <FolderSortSelect sort={folderSort} onChange={setFolderSort} />
-            <button onClick={() => createCategory(null)} className="rounded px-1.5 text-base text-slate-700 hover:bg-slate-100" title="New category">
+            <button
+              onClick={() => createCategory(null)}
+              className="rounded px-1.5 text-base text-slate-700 hover:bg-slate-100"
+              title="New category"
+            >
               +
             </button>
           </div>
           {topCategories.length === 0 && (
-            <p className="px-2 text-sm text-slate-500">No categories yet. Click + to make one, like &quot;AI news&quot;.</p>
+            <p className="px-2 text-sm text-slate-500">
+              No categories yet. Click + to make one, like &quot;AI news&quot;.
+            </p>
           )}
           {topCategories.map((cat) => (
             <div key={cat.id}>
               <NavItem
                 label={`🏷️ ${cat.name}`}
                 count={countIn(cat.id)}
-                active={!searching && view.kind === "category" && view.id === cat.id}
+                active={
+                  !searching && view.kind === "category" && view.id === cat.id
+                }
                 onClick={() => openView({ kind: "category", id: cat.id })}
                 onDropArticle={dropOnCategory(cat)}
-                onDragStart={canDragCategories ? () => setDraggingCategoryId(cat.id) : undefined}
+                onDragStart={
+                  canDragCategories
+                    ? () => setDraggingCategoryId(cat.id)
+                    : undefined
+                }
                 onDragEnd={() => setDraggingCategoryId(null)}
                 onContextMenu={(e) => openCategoryMenu(cat, e)}
               />
@@ -540,10 +738,16 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
                   label={sub.name}
                   count={countIn(sub.id)}
                   indent={1}
-                  active={!searching && view.kind === "category" && view.id === sub.id}
+                  active={
+                    !searching && view.kind === "category" && view.id === sub.id
+                  }
                   onClick={() => openView({ kind: "category", id: sub.id })}
                   onDropArticle={dropOnCategory(sub)}
-                  onDragStart={canDragCategories ? () => setDraggingCategoryId(sub.id) : undefined}
+                  onDragStart={
+                    canDragCategories
+                      ? () => setDraggingCategoryId(sub.id)
+                      : undefined
+                  }
                   onDragEnd={() => setDraggingCategoryId(null)}
                   onContextMenu={(e) => openCategoryMenu(sub, e)}
                 />
@@ -551,10 +755,15 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
             </div>
           ))}
           {topCategories.length > 1 && (
-            <p className="mt-3 px-2 text-xs text-slate-400">{sortHint(folderSort, "categories")}</p>
+            <p className="mt-3 px-2 text-xs text-slate-400">
+              {sortHint(folderSort, "categories")}
+            </p>
           )}
 
-          <button onClick={signOut} className="mt-6 px-2 text-sm text-slate-500 underline sm:hidden">
+          <button
+            onClick={signOut}
+            className="mt-6 px-2 text-sm text-slate-500 underline sm:hidden"
+          >
             Sign out
           </button>
         </aside>
@@ -569,10 +778,21 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
                 {currentCategory && !searching && (
                   <>
                     {!currentCategory.parent_id && (
-                      <SmallButton onClick={() => createCategory(currentCategory.id)}>+ Subcategory</SmallButton>
+                      <SmallButton
+                        onClick={() => createCategory(currentCategory.id)}
+                      >
+                        + Subcategory
+                      </SmallButton>
                     )}
-                    <SmallButton onClick={() => renameCategory(currentCategory)}>Rename</SmallButton>
-                    <SmallButton onClick={() => deleteCategory(currentCategory)} danger>
+                    <SmallButton
+                      onClick={() => renameCategory(currentCategory)}
+                    >
+                      Rename
+                    </SmallButton>
+                    <SmallButton
+                      onClick={() => deleteCategory(currentCategory)}
+                      danger
+                    >
                       Delete
                     </SmallButton>
                   </>
@@ -594,7 +814,10 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
                 <Pills
                   value={period}
                   onChange={setPeriod}
-                  options={PERIODS.map((p) => ({ value: p.value, label: p.label }))}
+                  options={PERIODS.map((p) => ({
+                    value: p.value,
+                    label: p.label,
+                  }))}
                   label="Added"
                 />
                 <Pills
@@ -621,39 +844,57 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
                 </div>
               ) : (
                 <>
-                {visibleArticles.length > 1 && (
-                  <p className="mb-3 text-xs text-slate-500">
-                    {canReorder
-                      ? "Tip: drag an article onto another, or use ▲ ▼, to change the order. Drop it on a category to move it."
-                      : `${searching ? "Search results" : section.all} show the newest first. To change the order, open a category on the left.`}
-                  </p>
-                )}
-                <ul className="flex flex-col gap-2">
-                  {visibleArticles.map((article, index) => (
-                    <ArticleRow
-                      key={article.id}
-                      article={article}
-                      categoryLabel={categoryPath(article.category_id) || "Uncategorized"}
-                      categoryOptions={categoryOptions}
-                      onToggleRead={() => toggleRead(article)}
-                      onMove={(categoryId) => moveArticle(article.id, categoryId)}
-                      canReorder={canReorder}
-                      dragging={draggingId === article.id}
-                      onDragStart={() => setDraggingId(article.id)}
-                      onDragEnd={() => setDraggingId(null)}
-                      onDropOnto={() => draggingId && reorderArticle(draggingId, article.id)}
-                      onShift={canReorder ? (step) => shiftArticle(article.id, step) : null}
-                      isFirst={index === 0}
-                      isLast={index === visibleArticles.length - 1}
-                      onRename={() => renameArticle(article)}
-                      onSaveNote={(note) => updateArticle(article.id, { note })}
-                      aiNoteStartedAt={aiJobs.running.find((j) => j.key === aiNoteKey(article.id))?.startedAt ?? null}
-                      aiNoteError={aiJobs.errors.get(aiNoteKey(article.id)) ?? null}
-                      onAiNote={() => writeAiNote(article)}
-                      onDelete={() => deleteArticle(article)}
-                    />
-                  ))}
-                </ul>
+                  {visibleArticles.length > 1 && (
+                    <p className="mb-3 text-xs text-slate-500">
+                      {canReorder
+                        ? "Tip: drag an article onto another, or use ▲ ▼, to change the order. Drop it on a category to move it."
+                        : `${searching ? "Search results" : section.all} show the newest first. To change the order, open a category on the left.`}
+                    </p>
+                  )}
+                  <ul className="flex flex-col gap-2">
+                    {visibleArticles.map((article, index) => (
+                      <ArticleRow
+                        key={article.id}
+                        article={article}
+                        categoryLabel={
+                          categoryPath(article.category_id) || "Uncategorized"
+                        }
+                        categoryOptions={categoryOptions}
+                        onToggleRead={() => toggleRead(article)}
+                        onMove={(categoryId) =>
+                          moveArticle(article.id, categoryId)
+                        }
+                        canReorder={canReorder}
+                        dragging={draggingId === article.id}
+                        onDragStart={() => setDraggingId(article.id)}
+                        onDragEnd={() => setDraggingId(null)}
+                        onDropOnto={() =>
+                          draggingId && reorderArticle(draggingId, article.id)
+                        }
+                        onShift={
+                          canReorder
+                            ? (step) => shiftArticle(article.id, step)
+                            : null
+                        }
+                        isFirst={index === 0}
+                        isLast={index === visibleArticles.length - 1}
+                        onRename={() => renameArticle(article)}
+                        onSaveNote={(note) =>
+                          updateArticle(article.id, { note })
+                        }
+                        aiNoteStartedAt={
+                          aiJobs.running.find(
+                            (j) => j.key === aiNoteKey(article.id),
+                          )?.startedAt ?? null
+                        }
+                        aiNoteError={
+                          aiJobs.errors.get(aiNoteKey(article.id)) ?? null
+                        }
+                        onAiNote={() => writeAiNote(article)}
+                        onDelete={() => deleteArticle(article)}
+                      />
+                    ))}
+                  </ul>
                 </>
               )}
             </>
@@ -677,7 +918,11 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
 // ---------- Pieces ----------
 
 // The Videos | Reading | Tutorials | ScrapBook switch in the header of every section.
-export function SectionSwitch({ active }: { active: "videos" | SectionKind | "scrap" | "vault" }) {
+export function SectionSwitch({
+  active,
+}: {
+  active: "videos" | SectionKind | "scrap" | "vault";
+}) {
   const tab = (on: boolean) =>
     `rounded-md px-2.5 py-1 text-sm font-medium ${on ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:text-slate-900"}`;
   return (
@@ -686,12 +931,21 @@ export function SectionSwitch({ active }: { active: "videos" | SectionKind | "sc
         🎬<span className="hidden sm:inline"> Videos</span>
       </Link>
       {(Object.keys(SECTIONS) as SectionKind[]).map((k) => (
-        <Link key={k} href={SECTIONS[k].path} className={tab(active === k)} title={SECTIONS[k].name}>
+        <Link
+          key={k}
+          href={SECTIONS[k].path}
+          className={tab(active === k)}
+          title={SECTIONS[k].name}
+        >
           {SECTIONS[k].icon}
           <span className="hidden sm:inline"> {SECTIONS[k].name}</span>
         </Link>
       ))}
-      <Link href="/scrapbook" className={tab(active === "scrap")} title="ScrapBook">
+      <Link
+        href="/scrapbook"
+        className={tab(active === "scrap")}
+        title="ScrapBook"
+      >
         📒<span className="hidden sm:inline"> ScrapBook</span>
       </Link>
       <Link href="/vault" className={tab(active === "vault")} title="Vault">
@@ -702,12 +956,24 @@ export function SectionSwitch({ active }: { active: "videos" | SectionKind | "sc
 }
 
 // The green tick: filled when read, an empty circle when not. Tapping it switches.
-export function ReadCheck({ read, onClick, word = "read" }: { read: boolean; onClick: () => void; word?: string }) {
+export function ReadCheck({
+  read,
+  onClick,
+  word = "read",
+}: {
+  read: boolean;
+  onClick: () => void;
+  word?: string;
+}) {
   const done = word.charAt(0).toUpperCase() + word.slice(1);
   return (
     <button
       onClick={onClick}
-      title={read ? `${done}. Tap to mark not ${word}.` : `Not ${word} yet. Tap to mark ${word}.`}
+      title={
+        read
+          ? `${done}. Tap to mark not ${word}.`
+          : `Not ${word} yet. Tap to mark ${word}.`
+      }
       aria-label={read ? `Mark not ${word}` : `Mark ${word}`}
       className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 text-sm font-bold ${read ? "border-green-600 bg-green-600 text-white" : "border-slate-300 text-transparent hover:border-green-500"}`}
     >
@@ -765,7 +1031,10 @@ function ArticleRow(props: {
     >
       <ReadCheck read={Boolean(article.read_at)} onClick={props.onToggleRead} />
       <div className="flex min-w-0 flex-1 flex-col gap-1">
-        <Link href={`/read/${article.id}`} className={`line-clamp-2 font-medium hover:underline ${article.read_at ? "text-slate-500" : ""}`}>
+        <Link
+          href={`/read/${article.id}`}
+          className={`line-clamp-2 font-medium hover:underline ${article.read_at ? "text-slate-500" : ""}`}
+        >
           {hasNotes && (
             <span className="mr-1.5 inline-block rounded-md bg-amber-400 px-1.5 py-0.5 align-[1px] text-[11px] font-bold text-amber-950 no-underline">
               📒 Notes
@@ -776,7 +1045,12 @@ function ArticleRow(props: {
         <p className="text-xs text-slate-500">
           {[article.site, article.author].filter(Boolean).join(" · ")}
           {" · "}Added {formatDate(article.created_at)}
-          {article.read_at && <span className="text-green-700"> · Read {formatDate(article.read_at)}</span>}
+          {article.read_at && (
+            <span className="text-green-700">
+              {" "}
+              · Read {formatDate(article.read_at)}
+            </span>
+          )}
         </p>
         <ArticleNote
           note={article.note}
@@ -785,7 +1059,9 @@ function ArticleRow(props: {
           onSave={props.onSaveNote}
         />
         {props.aiNoteError && !article.note && (
-          <p className="rounded-md bg-red-50 px-2 py-1 text-xs text-red-700 ring-1 ring-red-200">⚠️ {props.aiNoteError}</p>
+          <p className="rounded-md bg-red-50 px-2 py-1 text-xs text-red-700 ring-1 ring-red-200">
+            ⚠️ {props.aiNoteError}
+          </p>
         )}
         <div className="mt-1 flex flex-wrap items-center gap-1">
           <Link
@@ -822,37 +1098,55 @@ function ArticleRow(props: {
           </a>
           {props.onShift && (
             <>
-              <SmallButton onClick={() => props.onShift!(-1)} disabled={props.isFirst} title="Move up">
+              <SmallButton
+                onClick={() => props.onShift!(-1)}
+                disabled={props.isFirst}
+                title="Move up"
+              >
                 ▲
               </SmallButton>
-              <SmallButton onClick={() => props.onShift!(1)} disabled={props.isLast} title="Move down">
+              <SmallButton
+                onClick={() => props.onShift!(1)}
+                disabled={props.isLast}
+                title="Move down"
+              >
                 ▼
               </SmallButton>
             </>
           )}
-          {!article.note && !editingNote && <SmallButton onClick={() => setEditingNote(true)}>📝 Add note</SmallButton>}
+          {!article.note && !editingNote && (
+            <SmallButton onClick={() => setEditingNote(true)}>
+              📝 Add summary
+            </SmallButton>
+          )}
           {article.note && !editingNote && (
             <SmallButton
               onClick={async () => {
                 const ok = await askConfirm({
-                  title: "Clear this note?",
+                  title: "Clear this summary?",
                   quote: article.note,
-                  message: "Only the note goes away. The link stays in your list.",
-                  confirmLabel: "Yes, clear note",
+                  message:
+                    "Only the summary goes away. Your notes and the link stay.",
+                  confirmLabel: "Yes, clear summary",
                   cancelLabel: "Keep it",
                 });
                 if (ok) props.onSaveNote("");
               }}
             >
-              🧹 Clear note
+              🧹 Clear summary
             </SmallButton>
           )}
           {!article.note && !editingNote && props.aiNoteStartedAt === null && (
-            <SmallButton onClick={props.onAiNote} title="Let AI read the page and write the note">
-              ✨ AI note
+            <SmallButton
+              onClick={props.onAiNote}
+              title="Let AI read the page and write the summary"
+            >
+              ✨ AI summary
             </SmallButton>
           )}
-          {!article.note && props.aiNoteStartedAt !== null && <AiNoteWorking startedAt={props.aiNoteStartedAt} />}
+          {!article.note && props.aiNoteStartedAt !== null && (
+            <AiNoteWorking startedAt={props.aiNoteStartedAt} />
+          )}
           <SmallButton onClick={props.onRename}>Edit title</SmallButton>
           {/* Kept apart from the note buttons so it isn't pressed by mistake. */}
           <span className="ml-auto pl-3">
@@ -866,13 +1160,14 @@ function ArticleRow(props: {
   );
 }
 
-// Shown in place of the ✨ AI note button while the AI writes the note.
+// Shown in place of the ✨ AI summary button while the AI writes the note.
 export function AiNoteWorking({ startedAt }: { startedAt: number }) {
   const seconds = useSecondsSince(startedAt);
   return (
     <span className="flex items-center gap-1.5 rounded-md border border-violet-200 bg-violet-50 px-2 py-1 text-xs text-violet-800">
       <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-violet-300 border-t-violet-700" />
-      Writing note… {Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, "0")}
+      Writing summary… {Math.floor(seconds / 60)}:
+      {String(seconds % 60).padStart(2, "0")}
     </span>
   );
 }
@@ -917,7 +1212,9 @@ export function ArticleNote(props: {
           className="w-full rounded-md border border-amber-300 bg-amber-50 px-2 py-1.5 text-sm"
         />
         <div className="flex items-center gap-1">
-          <span className={`mr-auto text-xs ${draft.length >= NOTE_MAX ? "text-red-600" : "text-slate-400"}`}>
+          <span
+            className={`mr-auto text-xs ${draft.length >= NOTE_MAX ? "text-red-600" : "text-slate-400"}`}
+          >
             {draft.length}/{NOTE_MAX}
           </span>
           {(current || draft) && (
@@ -926,10 +1223,11 @@ export function ArticleNote(props: {
                 // Nothing saved yet: just empty the box.
                 if (!current) return setDraft("");
                 const ok = await askConfirm({
-                  title: "Clear this note?",
+                  title: "Clear this summary?",
                   quote: current,
-                  message: "Only the note goes away. The article stays in your list.",
-                  confirmLabel: "Yes, clear note",
+                  message:
+                    "Only the summary goes away. Your notes and the article stay.",
+                  confirmLabel: "Yes, clear summary",
                   cancelLabel: "Keep it",
                 });
                 if (!ok) return;
@@ -937,15 +1235,17 @@ export function ArticleNote(props: {
                 props.setEditing(false);
               }}
             >
-              🧹 Clear note
+              🧹 Clear summary
             </SmallButton>
           )}
-          <SmallButton onClick={() => props.setEditing(false)}>Cancel</SmallButton>
+          <SmallButton onClick={() => props.setEditing(false)}>
+            Cancel
+          </SmallButton>
           <button
             onClick={save}
             className="rounded-md bg-slate-900 px-2 py-1 text-xs font-medium text-white hover:bg-slate-700"
           >
-            Save note
+            Save summary
           </button>
         </div>
       </div>
@@ -956,7 +1256,7 @@ export function ArticleNote(props: {
   return (
     <button
       onClick={() => props.setEditing(true)}
-      title="Tap to edit your note"
+      title="Tap to edit the summary"
       className="rounded-md bg-amber-50 px-2 py-1 text-left text-sm whitespace-pre-wrap text-slate-700 hover:bg-amber-100"
     >
       📝 {current}
@@ -1075,7 +1375,11 @@ export function NavItem(props: {
     >
       <span className="truncate">{props.label}</span>
       {props.count !== undefined && (
-        <span className={`ml-auto text-xs ${props.active ? "text-slate-300" : "text-slate-400"}`}>{props.count}</span>
+        <span
+          className={`ml-auto text-xs ${props.active ? "text-slate-300" : "text-slate-400"}`}
+        >
+          {props.count}
+        </span>
       )}
     </button>
   );
@@ -1112,8 +1416,10 @@ export function SetupNotice({ file = "articles.sql" }: { file?: string }) {
     <div className="max-w-xl rounded-xl border border-amber-300 bg-amber-50 p-5 text-slate-800">
       <h2 className="mb-2 text-lg font-semibold">One quick setup step</h2>
       <p>
-        This section needs the latest database setup. In Supabase, open <b>SQL Editor</b> → <b>New query</b>, paste the
-        whole <code>supabase/{file}</code> file, and click <b>Run</b>. Then reload this page.
+        This section needs the latest database setup. In Supabase, open{" "}
+        <b>SQL Editor</b> → <b>New query</b>, paste the whole{" "}
+        <code>supabase/{file}</code> file, and click <b>Run</b>. Then reload
+        this page.
       </p>
     </div>
   );

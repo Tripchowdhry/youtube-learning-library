@@ -33,7 +33,10 @@ import { askConfirm } from "./ConfirmDialog";
 type AiNote = { videoId: string; note: string; model?: string };
 const aiNoteKey = (videoId: string) => `note:${videoId}`;
 
-type View = { kind: "all" } | { kind: "unsorted" } | { kind: "folder"; id: string };
+type View =
+  | { kind: "all" }
+  | { kind: "unsorted" }
+  | { kind: "folder"; id: string };
 
 export default function Library({ userEmail }: { userEmail: string }) {
   const supabase = useMemo(() => createClient(), []);
@@ -56,9 +59,14 @@ export default function Library({ userEmail }: { userEmail: string }) {
   const [showFolders, setShowFolders] = useState(false);
   const [folderSort, setFolderSort] = useFolderSort();
   const [itemSort, setItemSort] = useItemSort();
-  const [watchFilter, setWatchFilter] = useState<"all" | "unwatched" | "watched">("all");
+  const [watchFilter, setWatchFilter] = useState<
+    "all" | "unwatched" | "watched"
+  >("all");
   const [period, setPeriod] = useState<Period>("any");
-  const [toast, setToast] = useState<{ text: string; isError?: boolean } | null>(null);
+  const [toast, setToast] = useState<{
+    text: string;
+    isError?: boolean;
+  } | null>(null);
 
   const notify = useCallback((text: string, isError = false) => {
     setToast({ text, isError });
@@ -72,7 +80,8 @@ export default function Library({ userEmail }: { userEmail: string }) {
       supabase.from("notes").select("video_id"),
     ]);
     // Notes are optional: ignore errors so the library still loads before the notes table exists.
-    if (!n.error) setNotedVideoIds(new Set(n.data.map((row) => row.video_id as string)));
+    if (!n.error)
+      setNotedVideoIds(new Set(n.data.map((row) => row.video_id as string)));
     if (f.error || v.error) {
       notify((f.error ?? v.error)!.message, true);
     } else {
@@ -90,7 +99,9 @@ export default function Library({ userEmail }: { userEmail: string }) {
 
   const childFolders = useCallback(
     (parentId: string | null) =>
-      folders.filter((f) => f.parent_id === parentId).sort(compareFolders(folderSort)),
+      folders
+        .filter((f) => f.parent_id === parentId)
+        .sort(compareFolders(folderSort)),
     [folders, folderSort],
   );
 
@@ -120,7 +131,10 @@ export default function Library({ userEmail }: { userEmail: string }) {
     return out;
   }, [childFolders]);
 
-  const currentFolder = view.kind === "folder" ? folders.find((f) => f.id === view.id) ?? null : null;
+  const currentFolder =
+    view.kind === "folder"
+      ? (folders.find((f) => f.id === view.id) ?? null)
+      : null;
   const currentFolderId = view.kind === "folder" ? view.id : null;
 
   // ---------- Which videos to show ----------
@@ -133,7 +147,9 @@ export default function Library({ userEmail }: { userEmail: string }) {
     const folderId = view.kind === "folder" ? view.id : null;
     const shown = q
       ? videos.filter((v) =>
-          [v.title, v.channel, v.note, folderPath(v.folder_id), ...v.tags].some((s) => s?.toLowerCase().includes(q)),
+          [v.title, v.channel, v.note, folderPath(v.folder_id), ...v.tags].some(
+            (s) => s?.toLowerCase().includes(q),
+          ),
         )
       : view.kind === "all"
         ? [...videos]
@@ -142,14 +158,26 @@ export default function Library({ userEmail }: { userEmail: string }) {
     const since = days ? Date.now() - days * 86_400_000 : 0;
     return shown
       .filter((v) => !since || new Date(v.created_at).getTime() >= since)
-      .filter((v) => watchFilter === "all" || (watchFilter === "watched") === Boolean(v.watched_at))
-      .sort(compareItems<Video>(itemSort, (v) => v.title ?? "", !q && view.kind !== "all"));
+      .filter(
+        (v) =>
+          watchFilter === "all" ||
+          (watchFilter === "watched") === Boolean(v.watched_at),
+      )
+      .sort(
+        compareItems<Video>(
+          itemSort,
+          (v) => v.title ?? "",
+          !q && view.kind !== "all",
+        ),
+      );
   }, [videos, view, query, folderPath, itemSort, watchFilter, period]);
 
   // New and moved videos go to the top of their folder.
   const topPosition = (folderId: string | null) => {
     const siblings = videos.filter((v) => v.folder_id === folderId);
-    return siblings.length ? Math.min(...siblings.map((v) => v.position)) - 1 : 0;
+    return siblings.length
+      ? Math.min(...siblings.map((v) => v.position)) - 1
+      : 0;
   };
 
   // ---------- Video actions ----------
@@ -165,10 +193,19 @@ export default function Library({ userEmail }: { userEmail: string }) {
     // A video that's already saved isn't added twice: it gets today's date and moves to the top of its folder.
     const existing = videos.find((v) => v.youtube_id === info.youtube_id);
     if (existing) {
-      const siblings = videos.filter((v) => v.folder_id === existing.folder_id && v.id !== existing.id);
-      const position = siblings.length ? Math.min(...siblings.map((v) => v.position)) - 1 : 0;
-      updateVideo(existing.id, { created_at: new Date().toISOString(), position });
-      notify(`Already saved in ${existing.folder_id ? folderPath(existing.folder_id) : "Unsorted"}. Moved it to the top.`);
+      const siblings = videos.filter(
+        (v) => v.folder_id === existing.folder_id && v.id !== existing.id,
+      );
+      const position = siblings.length
+        ? Math.min(...siblings.map((v) => v.position)) - 1
+        : 0;
+      updateVideo(existing.id, {
+        created_at: new Date().toISOString(),
+        position,
+      });
+      notify(
+        `Already saved in ${existing.folder_id ? folderPath(existing.folder_id) : "Unsorted"}. Moved it to the top.`,
+      );
       return true;
     }
 
@@ -193,7 +230,11 @@ export default function Library({ userEmail }: { userEmail: string }) {
     }
     if (newFolder) setFolders((prev) => [...prev, newFolder!]);
     setVideos((prev) => [...prev, data as Video]);
-    notify(folderId && !currentFolderId ? `Saved to ${info.channel}` : `Saved "${info.title}"`);
+    notify(
+      folderId && !currentFolderId
+        ? `Saved to ${info.channel}`
+        : `Saved "${info.title}"`,
+    );
     writeAiNote(data as Video);
     return true;
   }
@@ -204,10 +245,15 @@ export default function Library({ userEmail }: { userEmail: string }) {
   function writeAiNote(video: Video) {
     runAiJob<AiNote>({
       key: aiNoteKey(video.id),
-      label: `AI note for "${video.title ?? "your video"}"`,
+      label: `AI summary for "${video.title ?? "your video"}"`,
       work: async () => {
-        const result = await askVideoAi({ youtubeId: video.youtube_id, title: video.title, task: "note" });
-        if (result.error) return result.code === "no-key" ? {} : { error: result.error };
+        const result = await askVideoAi({
+          youtubeId: video.youtube_id,
+          title: video.title,
+          task: "note",
+        });
+        if (result.error)
+          return result.code === "no-key" ? {} : { error: result.error };
         if (!result.text) return {};
         // Only fills an empty note, so a note typed while the AI was working stays.
         const { data, error } = await supabase
@@ -217,7 +263,15 @@ export default function Library({ userEmail }: { userEmail: string }) {
           .eq("note", "")
           .select("id");
         if (error) return { error: error.message };
-        return data.length ? { result: { videoId: video.id, note: result.text, model: result.model } } : {};
+        return data.length
+          ? {
+              result: {
+                videoId: video.id,
+                note: result.text,
+                model: result.model,
+              },
+            }
+          : {};
       },
     });
   }
@@ -228,7 +282,9 @@ export default function Library({ userEmail }: { userEmail: string }) {
       onAiJobDone((key, result) => {
         if (!key.startsWith("note:")) return false;
         const { videoId, note, model } = result as AiNote;
-        setVideos((prev) => prev.map((v) => (v.id === videoId ? { ...v, note } : v)));
+        setVideos((prev) =>
+          prev.map((v) => (v.id === videoId ? { ...v, note } : v)),
+        );
         if (model) notify(`Note written by ${model}`);
         return true;
       }),
@@ -238,11 +294,16 @@ export default function Library({ userEmail }: { userEmail: string }) {
   // Finds the top-level folder named after a channel, creating it the first time.
   async function channelFolder(channel: string): Promise<Folder | null> {
     const name = channel.trim().slice(0, 100);
-    const existing = folders.find((f) => f.parent_id === null && f.name.toLowerCase() === name.toLowerCase());
+    const existing = folders.find(
+      (f) =>
+        f.parent_id === null && f.name.toLowerCase() === name.toLowerCase(),
+    );
     if (existing) return existing;
 
     const topLevel = folders.filter((f) => f.parent_id === null);
-    const position = topLevel.length ? Math.max(...topLevel.map((f) => f.position)) + 1 : 0;
+    const position = topLevel.length
+      ? Math.max(...topLevel.map((f) => f.position)) + 1
+      : 0;
     const { data, error } = await supabase
       .from("folders")
       .insert({ name, parent_id: null, position })
@@ -256,8 +317,13 @@ export default function Library({ userEmail }: { userEmail: string }) {
   }
 
   async function updateVideo(id: string, changes: Partial<Video>) {
-    setVideos((prev) => prev.map((v) => (v.id === id ? { ...v, ...changes } : v)));
-    const { error } = await supabase.from("videos").update(changes).eq("id", id);
+    setVideos((prev) =>
+      prev.map((v) => (v.id === id ? { ...v, ...changes } : v)),
+    );
+    const { error } = await supabase
+      .from("videos")
+      .update(changes)
+      .eq("id", id);
     if (error) {
       notify(error.message, true);
       load();
@@ -267,11 +333,21 @@ export default function Library({ userEmail }: { userEmail: string }) {
   // The green tick on a video row. Needs the column from video-watched.sql.
   async function toggleWatched(video: Video) {
     const watched_at = video.watched_at ? null : new Date().toISOString();
-    setVideos((prev) => prev.map((v) => (v.id === video.id ? { ...v, watched_at } : v)));
-    const { error } = await supabase.from("videos").update({ watched_at }).eq("id", video.id);
+    setVideos((prev) =>
+      prev.map((v) => (v.id === video.id ? { ...v, watched_at } : v)),
+    );
+    const { error } = await supabase
+      .from("videos")
+      .update({ watched_at })
+      .eq("id", video.id);
     if (!error) return;
     const missing = /watched_at/.test(error.message);
-    notify(missing ? "One setup step first: run supabase/video-watched.sql in Supabase." : error.message, true);
+    notify(
+      missing
+        ? "One setup step first: run supabase/video-watched.sql in Supabase."
+        : error.message,
+      true,
+    );
     load();
   }
 
@@ -290,7 +366,9 @@ export default function Library({ userEmail }: { userEmail: string }) {
     if (index === -1) return;
     const target = list[index];
     const before = list[index - 1];
-    const position = before ? (before.position + target.position) / 2 : target.position - 1;
+    const position = before
+      ? (before.position + target.position) / 2
+      : target.position - 1;
     updateVideo(draggedId, { position, folder_id: target.folder_id });
   }
 
@@ -316,9 +394,19 @@ export default function Library({ userEmail }: { userEmail: string }) {
   }
 
   function editTags(video: Video) {
-    const answer = window.prompt("Tags, separated by commas:", video.tags.join(", "));
+    const answer = window.prompt(
+      "Tags, separated by commas:",
+      video.tags.join(", "),
+    );
     if (answer === null) return;
-    const tags = Array.from(new Set(answer.split(",").map((t) => t.trim()).filter(Boolean)));
+    const tags = Array.from(
+      new Set(
+        answer
+          .split(",")
+          .map((t) => t.trim())
+          .filter(Boolean),
+      ),
+    );
     updateVideo(video.id, { tags });
   }
 
@@ -327,7 +415,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
       title: "Delete this whole video?",
       quote: video.title ?? undefined,
       message:
-        "The video, its short note and everything on its notes page will be gone for good.\n\nOnly want to remove the short note? Choose Keep the video, then use 🧹 Clear note.",
+        "The video, its summary and all its notes will be gone for good.\n\nOnly want to remove the summary? Choose Keep the video, then use 🧹 Clear summary.",
       confirmLabel: "Yes, delete video",
       cancelLabel: "Keep the video",
       danger: true,
@@ -344,10 +432,16 @@ export default function Library({ userEmail }: { userEmail: string }) {
   // ---------- Folder actions ----------
 
   async function createFolder(parentId: string | null) {
-    const name = window.prompt(parentId ? `New folder inside "${folderPath(parentId)}":` : "New folder name:");
+    const name = window.prompt(
+      parentId
+        ? `New folder inside "${folderPath(parentId)}":`
+        : "New folder name:",
+    );
     if (!name?.trim()) return;
     const siblings = folders.filter((f) => f.parent_id === parentId);
-    const position = siblings.length ? Math.max(...siblings.map((f) => f.position)) + 1 : 0;
+    const position = siblings.length
+      ? Math.max(...siblings.map((f) => f.position)) + 1
+      : 0;
     const { data, error } = await supabase
       .from("folders")
       .insert({ name: name.trim(), parent_id: parentId, position })
@@ -363,16 +457,38 @@ export default function Library({ userEmail }: { userEmail: string }) {
   async function moveFolderTo(draggedId: string, targetId: string) {
     const dragged = folders.find((f) => f.id === draggedId);
     const target = folders.find((f) => f.id === targetId);
-    if (!dragged || !target || dragged.id === target.id || dragged.parent_id !== target.parent_id) return;
-    const siblings = childFolders(dragged.parent_id).filter((f) => f.id !== dragged.id);
+    if (
+      !dragged ||
+      !target ||
+      dragged.id === target.id ||
+      dragged.parent_id !== target.parent_id
+    )
+      return;
+    const siblings = childFolders(dragged.parent_id).filter(
+      (f) => f.id !== dragged.id,
+    );
     const index = siblings.findIndex((f) => f.id === target.id);
-    const draggedIndex = childFolders(dragged.parent_id).findIndex((f) => f.id === dragged.id);
+    const draggedIndex = childFolders(dragged.parent_id).findIndex(
+      (f) => f.id === dragged.id,
+    );
     // Dragging down puts it after the target; dragging up puts it before.
     siblings.splice(draggedIndex <= index ? index + 1 : index, 0, dragged);
-    const changed = siblings.map((f, position) => ({ id: f.id, position })).filter((f, i) => siblings[i].position !== f.position);
-    setFolders((prev) => prev.map((f) => ({ ...f, position: changed.find((c) => c.id === f.id)?.position ?? f.position })));
+    const changed = siblings
+      .map((f, position) => ({ id: f.id, position }))
+      .filter((f, i) => siblings[i].position !== f.position);
+    setFolders((prev) =>
+      prev.map((f) => ({
+        ...f,
+        position: changed.find((c) => c.id === f.id)?.position ?? f.position,
+      })),
+    );
     const results = await Promise.all(
-      changed.map((c) => supabase.from("folders").update({ position: c.position }).eq("id", c.id)),
+      changed.map((c) =>
+        supabase
+          .from("folders")
+          .update({ position: c.position })
+          .eq("id", c.id),
+      ),
     );
     const failed = results.find((r) => r.error);
     if (failed) {
@@ -389,7 +505,11 @@ export default function Library({ userEmail }: { userEmail: string }) {
       items: [
         { label: "✏️ Rename", onClick: () => renameFolder(folder) },
         { label: "📁 New subfolder", onClick: () => createFolder(folder.id) },
-        { label: "🗑 Delete", onClick: () => deleteFolder(folder), danger: true },
+        {
+          label: "🗑 Delete",
+          onClick: () => deleteFolder(folder),
+          danger: true,
+        },
       ],
     });
   }
@@ -397,8 +517,13 @@ export default function Library({ userEmail }: { userEmail: string }) {
   async function renameFolder(folder: Folder) {
     const name = window.prompt("Rename folder:", folder.name);
     if (!name?.trim() || name.trim() === folder.name) return;
-    setFolders((prev) => prev.map((f) => (f.id === folder.id ? { ...f, name: name.trim() } : f)));
-    const { error } = await supabase.from("folders").update({ name: name.trim() }).eq("id", folder.id);
+    setFolders((prev) =>
+      prev.map((f) => (f.id === folder.id ? { ...f, name: name.trim() } : f)),
+    );
+    const { error } = await supabase
+      .from("folders")
+      .update({ name: name.trim() })
+      .eq("id", folder.id);
     if (error) {
       notify(error.message, true);
       load();
@@ -410,7 +535,10 @@ export default function Library({ userEmail }: { userEmail: string }) {
       `Delete "${folder.name}" and any folders inside it?\nThe videos inside will move to Unsorted, not be deleted.`,
     );
     if (!ok) return;
-    const { error } = await supabase.from("folders").delete().eq("id", folder.id);
+    const { error } = await supabase
+      .from("folders")
+      .delete()
+      .eq("id", folder.id);
     if (error) return notify(error.message, true);
     setView({ kind: "all" });
     load();
@@ -418,17 +546,32 @@ export default function Library({ userEmail }: { userEmail: string }) {
 
   async function toggleShare(folder: Folder) {
     if (folder.share_token) {
-      if (!window.confirm("Turn off the share link? People with the old link won't be able to see it anymore.")) return;
-      const { error } = await supabase.from("folders").update({ share_token: null }).eq("id", folder.id);
+      if (
+        !window.confirm(
+          "Turn off the share link? People with the old link won't be able to see it anymore.",
+        )
+      )
+        return;
+      const { error } = await supabase
+        .from("folders")
+        .update({ share_token: null })
+        .eq("id", folder.id);
       if (error) return notify(error.message, true);
-      setFolders((prev) => prev.map((f) => (f.id === folder.id ? { ...f, share_token: null } : f)));
+      setFolders((prev) =>
+        prev.map((f) => (f.id === folder.id ? { ...f, share_token: null } : f)),
+      );
       notify("Sharing turned off");
       return;
     }
     const token = crypto.randomUUID();
-    const { error } = await supabase.from("folders").update({ share_token: token }).eq("id", folder.id);
+    const { error } = await supabase
+      .from("folders")
+      .update({ share_token: token })
+      .eq("id", folder.id);
     if (error) return notify(error.message, true);
-    setFolders((prev) => prev.map((f) => (f.id === folder.id ? { ...f, share_token: token } : f)));
+    setFolders((prev) =>
+      prev.map((f) => (f.id === folder.id ? { ...f, share_token: token } : f)),
+    );
     copyShareLink(token);
   }
 
@@ -472,7 +615,9 @@ export default function Library({ userEmail }: { userEmail: string }) {
         >
           {showFolders ? "Close" : "Folders"}
         </button>
-        <span className="hidden text-lg font-bold sm:inline">📚 BrainShelf</span>
+        <span className="hidden text-lg font-bold sm:inline">
+          📚 BrainShelf
+        </span>
         <SectionSwitch active="videos" />
         <input
           type="search"
@@ -490,7 +635,10 @@ export default function Library({ userEmail }: { userEmail: string }) {
         </Link>
         <div className="hidden items-center gap-2 text-sm text-slate-500 sm:flex">
           <span className="max-w-40 truncate">{userEmail}</span>
-          <button onClick={signOut} className="rounded-md px-2 py-1 hover:bg-slate-100">
+          <button
+            onClick={signOut}
+            className="rounded-md px-2 py-1 hover:bg-slate-100"
+          >
             Sign out
           </button>
         </div>
@@ -500,7 +648,12 @@ export default function Library({ userEmail }: { userEmail: string }) {
         <aside
           className={`${showFolders ? "fixed inset-x-0 top-[57px] bottom-0 z-10 block" : "hidden"} w-full overflow-y-auto border-r border-slate-200 bg-white p-3 md:sticky md:top-[57px] md:block md:h-[calc(100vh-57px)] md:w-72`}
         >
-          <NavItem label="🗂️ All videos" count={videos.length} active={view.kind === "all" && !searching} onClick={() => openView({ kind: "all" })} />
+          <NavItem
+            label="🗂️ All videos"
+            count={videos.length}
+            active={view.kind === "all" && !searching}
+            onClick={() => openView({ kind: "all" })}
+          />
           <NavItem
             label="📥 Unsorted"
             count={videos.filter((v) => !v.folder_id).length}
@@ -513,12 +666,19 @@ export default function Library({ userEmail }: { userEmail: string }) {
           <div className="mt-4 mb-1 flex items-center justify-between px-2 text-xs font-semibold tracking-wide text-slate-500 uppercase">
             Folders
             <FolderSortSelect sort={folderSort} onChange={setFolderSort} />
-            <button onClick={() => createFolder(null)} className="rounded px-1.5 text-base text-slate-700 hover:bg-slate-100" title="New folder">
+            <button
+              onClick={() => createFolder(null)}
+              className="rounded px-1.5 text-base text-slate-700 hover:bg-slate-100"
+              title="New folder"
+            >
               +
             </button>
           </div>
           {childFolders(null).length === 0 && (
-            <p className="px-2 text-sm text-slate-500">No folders yet. Click + to make one, like &quot;LLMs&quot; or &quot;Agents&quot;.</p>
+            <p className="px-2 text-sm text-slate-500">
+              No folders yet. Click + to make one, like &quot;LLMs&quot; or
+              &quot;Agents&quot;.
+            </p>
           )}
           <FolderTree
             parentId={null}
@@ -530,19 +690,30 @@ export default function Library({ userEmail }: { userEmail: string }) {
             activeId={!searching && view.kind === "folder" ? view.id : null}
             onOpen={(id) => openView({ kind: "folder", id })}
             draggingId={draggingId}
-            onDropVideo={(folderId) => draggingId && moveVideo(draggingId, folderId)}
-            draggingFolder={folders.find((f) => f.id === draggingFolderId) ?? null}
+            onDropVideo={(folderId) =>
+              draggingId && moveVideo(draggingId, folderId)
+            }
+            draggingFolder={
+              folders.find((f) => f.id === draggingFolderId) ?? null
+            }
             onFolderDragStart={setDraggingFolderId}
             onFolderDragEnd={() => setDraggingFolderId(null)}
-            onDropFolder={(targetId) => draggingFolderId && moveFolderTo(draggingFolderId, targetId)}
+            onDropFolder={(targetId) =>
+              draggingFolderId && moveFolderTo(draggingFolderId, targetId)
+            }
             canDragFolders={folderSort === "custom"}
             onFolderMenu={openFolderMenu}
           />
           {childFolders(null).length > 1 && (
-            <p className="mt-3 px-2 text-xs text-slate-400">{sortHint(folderSort, "folders")}</p>
+            <p className="mt-3 px-2 text-xs text-slate-400">
+              {sortHint(folderSort, "folders")}
+            </p>
           )}
 
-          <button onClick={signOut} className="mt-6 px-2 text-sm text-slate-500 underline sm:hidden">
+          <button
+            onClick={signOut}
+            className="mt-6 px-2 text-sm text-slate-500 underline sm:hidden"
+          >
             Sign out
           </button>
         </aside>
@@ -552,13 +723,21 @@ export default function Library({ userEmail }: { userEmail: string }) {
             <h1 className="mr-auto text-2xl font-bold">{title}</h1>
             {currentFolder && !searching && (
               <>
-                <SmallButton onClick={() => createFolder(currentFolder.id)}>+ Subfolder</SmallButton>
-                <SmallButton onClick={() => renameFolder(currentFolder)}>Rename</SmallButton>
+                <SmallButton onClick={() => createFolder(currentFolder.id)}>
+                  + Subfolder
+                </SmallButton>
+                <SmallButton onClick={() => renameFolder(currentFolder)}>
+                  Rename
+                </SmallButton>
                 <SmallButton onClick={() => toggleShare(currentFolder)}>
                   {currentFolder.share_token ? "Stop sharing" : "Share"}
                 </SmallButton>
                 {currentFolder.share_token && (
-                  <SmallButton onClick={() => copyShareLink(currentFolder.share_token!)}>Copy link</SmallButton>
+                  <SmallButton
+                    onClick={() => copyShareLink(currentFolder.share_token!)}
+                  >
+                    Copy link
+                  </SmallButton>
                 )}
                 <SmallButton onClick={() => deleteFolder(currentFolder)} danger>
                   Delete
@@ -575,19 +754,21 @@ export default function Library({ userEmail }: { userEmail: string }) {
             />
           )}
 
-          {currentFolder && !searching && childFolders(currentFolder.id).length > 0 && (
-            <div className="mb-4 flex flex-wrap gap-2">
-              {childFolders(currentFolder.id).map((f) => (
-                <button
-                  key={f.id}
-                  onClick={() => openView({ kind: "folder", id: f.id })}
-                  className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm hover:bg-slate-50"
-                >
-                  📁 {f.name}
-                </button>
-              ))}
-            </div>
-          )}
+          {currentFolder &&
+            !searching &&
+            childFolders(currentFolder.id).length > 0 && (
+              <div className="mb-4 flex flex-wrap gap-2">
+                {childFolders(currentFolder.id).map((f) => (
+                  <button
+                    key={f.id}
+                    onClick={() => openView({ kind: "folder", id: f.id })}
+                    className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm hover:bg-slate-50"
+                  >
+                    📁 {f.name}
+                  </button>
+                ))}
+              </div>
+            )}
 
           <div className="mb-4 flex flex-wrap items-center gap-2 text-sm">
             <Pills
@@ -611,12 +792,16 @@ export default function Library({ userEmail }: { userEmail: string }) {
           {loading ? (
             <p className="text-slate-500">Loading your library…</p>
           ) : visibleVideos.length === 0 ? (
-            <EmptyState searching={searching || watchFilter !== "all" || period !== "any"} hasVideos={videos.length > 0} />
+            <EmptyState
+              searching={searching || watchFilter !== "all" || period !== "any"}
+              hasVideos={videos.length > 0}
+            />
           ) : (
             <>
               {canReorder && visibleVideos.length > 1 && (
                 <p className="mb-3 text-xs text-slate-500">
-                  Tip: use ▲ ▼ on a video, or drag it onto another, to change the order. Drop it on a folder to move it.
+                  Tip: use ▲ ▼ on a video, or drag it onto another, to change
+                  the order. Drop it on a folder to move it.
                 </p>
               )}
               {!canReorder && visibleVideos.length > 1 && (
@@ -637,8 +822,12 @@ export default function Library({ userEmail }: { userEmail: string }) {
                     dragging={draggingId === video.id}
                     onDragStart={() => setDraggingId(video.id)}
                     onDragEnd={() => setDraggingId(null)}
-                    onDropOnto={() => draggingId && reorderVideo(draggingId, video.id)}
-                    onShift={canReorder ? (step) => shiftVideo(video.id, step) : null}
+                    onDropOnto={() =>
+                      draggingId && reorderVideo(draggingId, video.id)
+                    }
+                    onShift={
+                      canReorder ? (step) => shiftVideo(video.id, step) : null
+                    }
                     isFirst={index === 0}
                     isLast={index === visibleVideos.length - 1}
                     onMove={(folderId) => moveVideo(video.id, folderId)}
@@ -646,7 +835,10 @@ export default function Library({ userEmail }: { userEmail: string }) {
                     onRename={() => renameVideo(video)}
                     onSaveNote={(note) => updateVideo(video.id, { note })}
                     onToggleWatched={() => toggleWatched(video)}
-                    aiNoteStartedAt={aiJobs.running.find((j) => j.key === aiNoteKey(video.id))?.startedAt ?? null}
+                    aiNoteStartedAt={
+                      aiJobs.running.find((j) => j.key === aiNoteKey(video.id))
+                        ?.startedAt ?? null
+                    }
                     aiNoteError={aiJobs.errors.get(aiNoteKey(video.id)) ?? null}
                     onAiNote={() => writeAiNote(video)}
                     onDelete={() => deleteVideo(video)}
@@ -714,10 +906,17 @@ function NavItem(props: {
       }}
     >
       {props.leading}
-      <button onClick={props.onClick} className="flex min-w-0 flex-1 items-center gap-2 px-2 py-1.5 text-left">
+      <button
+        onClick={props.onClick}
+        className="flex min-w-0 flex-1 items-center gap-2 px-2 py-1.5 text-left"
+      >
         <span className="truncate">{props.label}</span>
         {props.count !== undefined && (
-          <span className={`ml-auto text-xs ${props.active ? "text-slate-300" : "text-slate-400"}`}>{props.count}</span>
+          <span
+            className={`ml-auto text-xs ${props.active ? "text-slate-300" : "text-slate-400"}`}
+          >
+            {props.count}
+          </span>
         )}
       </button>
     </div>
@@ -744,7 +943,8 @@ function FolderTree(props: {
 }) {
   const { draggingFolder } = props;
   const inTree = (folderId: string | null, rootId: string): boolean =>
-    folderId === rootId || props.childFolders(rootId).some((f) => inTree(folderId, f.id));
+    folderId === rootId ||
+    props.childFolders(rootId).some((f) => inTree(folderId, f.id));
   return (
     <>
       {props.childFolders(props.parentId).map((folder) => {
@@ -762,17 +962,33 @@ function FolderTree(props: {
             <NavItem
               label={`${folder.share_token ? "🔗" : "📁"} ${folder.name}`}
               // A top-level folder counts the videos in all its subfolders too; a subfolder counts only its own.
-              count={props.videos.filter((v) => (props.depth === 0 ? inTree(v.folder_id, folder.id) : v.folder_id === folder.id)).length}
+              count={
+                props.videos.filter((v) =>
+                  props.depth === 0
+                    ? inTree(v.folder_id, folder.id)
+                    : v.folder_id === folder.id,
+                ).length
+              }
               active={props.activeId === folder.id}
               onClick={() => props.onOpen(folder.id)}
               indent={props.depth}
               // A dragged video drops into the folder; a dragged folder reorders among folders next to it.
               dropTarget={
                 props.draggingId !== null ||
-                (draggingFolder !== null && draggingFolder.id !== folder.id && draggingFolder.parent_id === folder.parent_id)
+                (draggingFolder !== null &&
+                  draggingFolder.id !== folder.id &&
+                  draggingFolder.parent_id === folder.parent_id)
               }
-              onDrop={() => (draggingFolder ? props.onDropFolder(folder.id) : props.onDropVideo(folder.id))}
-              onDragStart={props.canDragFolders ? () => props.onFolderDragStart(folder.id) : undefined}
+              onDrop={() =>
+                draggingFolder
+                  ? props.onDropFolder(folder.id)
+                  : props.onDropVideo(folder.id)
+              }
+              onDragStart={
+                props.canDragFolders
+                  ? () => props.onFolderDragStart(folder.id)
+                  : undefined
+              }
               onDragEnd={props.onFolderDragEnd}
               onContextMenu={(e) => props.onFolderMenu(folder, e)}
               leading={
@@ -785,7 +1001,13 @@ function FolderTree(props: {
                 </button>
               }
             />
-            {hasChildren && isOpen && <FolderTree {...props} parentId={folder.id} depth={props.depth + 1} />}
+            {hasChildren && isOpen && (
+              <FolderTree
+                {...props}
+                parentId={folder.id}
+                depth={props.depth + 1}
+              />
+            )}
           </div>
         );
       })}
@@ -793,7 +1015,13 @@ function FolderTree(props: {
   );
 }
 
-function AddVideoForm({ onAdd, destination }: { onAdd: (link: string) => Promise<boolean>; destination: string | null }) {
+function AddVideoForm({
+  onAdd,
+  destination,
+}: {
+  onAdd: (link: string) => Promise<boolean>;
+  destination: string | null;
+}) {
   const [link, setLink] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -872,7 +1100,11 @@ function VideoCard(props: {
       }}
       className={`flex gap-3 rounded-xl border bg-white p-3 shadow-sm transition ${props.dragging ? "opacity-40" : ""} ${over ? "border-blue-500 ring-2 ring-blue-500" : "border-slate-200"}`}
     >
-      <ReadCheck read={Boolean(video.watched_at)} onClick={props.onToggleWatched} word="watched" />
+      <ReadCheck
+        read={Boolean(video.watched_at)}
+        onClick={props.onToggleWatched}
+        word="watched"
+      />
       <div className="w-28 shrink-0 cursor-grab overflow-hidden rounded-lg sm:w-48">
         <div className="relative">
           <VideoThumb video={video} href={`/video/${video.id}`} />
@@ -893,12 +1125,25 @@ function VideoCard(props: {
           {video.title}
         </a>
         <p className="text-xs text-slate-500">
-          {video.channel && `${video.channel} · `}Added {formatDate(video.created_at)}
-          {video.watched_at && <span className="text-green-700"> · Watched {formatDate(video.watched_at)}</span>}
+          {video.channel && `${video.channel} · `}Added{" "}
+          {formatDate(video.created_at)}
+          {video.watched_at && (
+            <span className="text-green-700">
+              {" "}
+              · Watched {formatDate(video.watched_at)}
+            </span>
+          )}
         </p>
-        <ArticleNote note={video.note} editing={editingNote} setEditing={setEditingNote} onSave={props.onSaveNote} />
+        <ArticleNote
+          note={video.note}
+          editing={editingNote}
+          setEditing={setEditingNote}
+          onSave={props.onSaveNote}
+        />
         {props.aiNoteError && !video.note && (
-          <p className="rounded-md bg-red-50 px-2 py-1 text-xs text-red-700 ring-1 ring-red-200">⚠️ {props.aiNoteError}</p>
+          <p className="rounded-md bg-red-50 px-2 py-1 text-xs text-red-700 ring-1 ring-red-200">
+            ⚠️ {props.aiNoteError}
+          </p>
         )}
         {video.tags.length > 0 && (
           <div className="flex flex-wrap gap-1">
@@ -949,37 +1194,55 @@ function VideoCard(props: {
           </select>
           {props.onShift && (
             <>
-              <SmallButton onClick={() => props.onShift!(-1)} disabled={props.isFirst} title="Move up">
+              <SmallButton
+                onClick={() => props.onShift!(-1)}
+                disabled={props.isFirst}
+                title="Move up"
+              >
                 ▲
               </SmallButton>
-              <SmallButton onClick={() => props.onShift!(1)} disabled={props.isLast} title="Move down">
+              <SmallButton
+                onClick={() => props.onShift!(1)}
+                disabled={props.isLast}
+                title="Move down"
+              >
                 ▼
               </SmallButton>
             </>
           )}
-          {!video.note && !editingNote && <SmallButton onClick={() => setEditingNote(true)}>📝 Add note</SmallButton>}
+          {!video.note && !editingNote && (
+            <SmallButton onClick={() => setEditingNote(true)}>
+              📝 Add summary
+            </SmallButton>
+          )}
           {video.note && !editingNote && (
             <SmallButton
               onClick={async () => {
                 const ok = await askConfirm({
-                  title: "Clear this note?",
+                  title: "Clear this summary?",
                   quote: video.note,
-                  message: "Only this short note goes away. The video and your notes page stay as they are.",
-                  confirmLabel: "Yes, clear note",
+                  message:
+                    "Only the summary goes away. The video and your notes stay as they are.",
+                  confirmLabel: "Yes, clear summary",
                   cancelLabel: "Keep it",
                 });
                 if (ok) props.onSaveNote("");
               }}
             >
-              🧹 Clear note
+              🧹 Clear summary
             </SmallButton>
           )}
           {!video.note && !editingNote && props.aiNoteStartedAt === null && (
-            <SmallButton onClick={props.onAiNote} title="Let AI watch the video and write the note">
-              ✨ AI note
+            <SmallButton
+              onClick={props.onAiNote}
+              title="Let AI watch the video and write the summary"
+            >
+              ✨ AI summary
             </SmallButton>
           )}
-          {!video.note && props.aiNoteStartedAt !== null && <AiNoteWorking startedAt={props.aiNoteStartedAt} />}
+          {!video.note && props.aiNoteStartedAt !== null && (
+            <AiNoteWorking startedAt={props.aiNoteStartedAt} />
+          )}
           <SmallButton onClick={props.onRename}>Edit title</SmallButton>
           <SmallButton onClick={props.onEditTags}>Tags</SmallButton>
           {/* Kept apart from the note buttons so it isn't pressed by mistake. */}
@@ -1020,7 +1283,13 @@ function SmallButton({
   );
 }
 
-function EmptyState({ searching, hasVideos }: { searching: boolean; hasVideos: boolean }) {
+function EmptyState({
+  searching,
+  hasVideos,
+}: {
+  searching: boolean;
+  hasVideos: boolean;
+}) {
   return (
     <div className="rounded-xl border border-dashed border-slate-300 p-10 text-center text-slate-500">
       {searching
