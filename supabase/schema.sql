@@ -33,6 +33,9 @@ create table if not exists public.videos (
 -- A short personal note on each video (added later; see video-note.sql).
 alter table public.videos add column if not exists note text not null default '' check (char_length(note) <= 280);
 
+-- When the video was ticked as watched (added later; see video-watched.sql).
+alter table public.videos add column if not exists watched_at timestamptz;
+
 create index if not exists folders_user_idx on public.folders (user_id);
 create index if not exists folders_parent_idx on public.folders (parent_id);
 create index if not exists videos_user_idx on public.videos (user_id);

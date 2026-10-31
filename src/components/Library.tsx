@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AiNoteWorking, ArticleNote, SectionSwitch, formatDate } from "@/components/ReadingLibrary";
+import { AiNoteWorking, ArticleNote, ReadCheck, SectionSwitch, formatDate } from "@/components/ReadingLibrary";
 import ContextMenu, { type MenuState } from "@/components/ContextMenu";
 import {
   FolderSortSelect,
@@ -246,6 +246,17 @@ export default function Library({ userEmail }: { userEmail: string }) {
       notify(error.message, true);
       load();
     }
+  }
+
+  // The green tick on a video row. Needs the column from video-watched.sql.
+  async function toggleWatched(video: Video) {
+    const watched_at = video.watched_at ? null : new Date().toISOString();
+    setVideos((prev) => prev.map((v) => (v.id === video.id ? { ...v, watched_at } : v)));
+    const { error } = await supabase.from("videos").update({ watched_at }).eq("id", video.id);
+    if (!error) return;
+    const missing = /watched_at/.test(error.message);
+    notify(missing ? "One setup step first: run supabase/video-watched.sql in Supabase." : error.message, true);
+    load();
   }
 
   function moveVideo(id: string, folderId: string | null) {
@@ -592,6 +603,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
                     onMove={(folderId) => moveVideo(video.id, folderId)}
                     onEditTags={() => editTags(video)}
                     onSaveNote={(note) => updateVideo(video.id, { note })}
+                    onToggleWatched={() => toggleWatched(video)}
                     aiNoteStartedAt={aiJobs.running.find((j) => j.key === aiNoteKey(video.id))?.startedAt ?? null}
                     aiNoteError={aiJobs.errors.get(aiNoteKey(video.id)) ?? null}
                     onAiNote={() => writeAiNote(video)}
@@ -784,6 +796,7 @@ function VideoCard(props: {
   onMove: (folderId: string | null) => void;
   onEditTags: () => void;
   onSaveNote: (note: string) => void;
+  onToggleWatched: () => void;
   aiNoteStartedAt: number | null;
   aiNoteError: string | null;
   onAiNote: () => void;
@@ -820,11 +833,19 @@ function VideoCard(props: {
         <VideoThumb video={video} href={`/video/${video.id}`} />
       </div>
       <div className="flex min-w-0 flex-1 flex-col gap-1">
-        <a href={`/video/${video.id}`} className="line-clamp-2 font-medium hover:underline" draggable={false}>
-          {video.title}
-        </a>
+        <div className="flex items-start gap-2">
+          <a
+            href={`/video/${video.id}`}
+            className={`line-clamp-2 flex-1 font-medium hover:underline ${video.watched_at ? "text-slate-500" : ""}`}
+            draggable={false}
+          >
+            {video.title}
+          </a>
+          <ReadCheck read={Boolean(video.watched_at)} onClick={props.onToggleWatched} word="watched" />
+        </div>
         <p className="text-xs text-slate-500">
           {video.channel && `${video.channel} · `}Added {formatDate(video.created_at)}
+          {video.watched_at && <span className="text-green-700"> · Watched {formatDate(video.watched_at)}</span>}
         </p>
         <ArticleNote note={video.note} editing={editingNote} setEditing={setEditingNote} onSave={props.onSaveNote} />
         {props.aiNoteError && !video.note && (
