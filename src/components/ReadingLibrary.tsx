@@ -622,7 +622,6 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
               {!searching && !loading && (
                 <ChecklistCard
                   id={kind}
-                  onShowTour={tour.start}
                   steps={[
                     {
                       done: articles.length > 0,
