@@ -20,16 +20,17 @@ export function useSectionTour(id: TourId, ready: boolean, email = "") {
   return { open, start: () => setOpen(true), close, steps: TOURS[id] as TourStep[] };
 }
 
-// The small "?" in a header that replays the tour.
+// The "Quick tour" button in a header that replays the tour.
 export function TourButton({ onClick }: { onClick: () => void }) {
   return (
     <button
       onClick={onClick}
       title="Show the tour"
       aria-label="Show the tour"
-      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-semibold text-slate-500 ring-1 ring-slate-300 hover:bg-slate-100 hover:text-slate-800"
+      className="flex h-7 shrink-0 items-center gap-1 rounded-full px-2.5 text-sm font-medium text-slate-600 ring-1 ring-slate-300 hover:bg-slate-100 hover:text-slate-900"
     >
-      ?
+      <span aria-hidden>🧭</span>
+      <span>Quick tour</span>
     </button>
   );
 }
