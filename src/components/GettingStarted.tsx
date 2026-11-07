@@ -118,8 +118,9 @@ export function ChecklistCard(props: {
           <h2 className="font-semibold">{headline(doneCount, steps.length)}</h2>
           <div className="mt-2 flex items-center gap-2">
             <div className="flex flex-1 gap-1">
-              {steps.map((s, i) => (
-                <span key={i} className={`h-1.5 flex-1 rounded-full ${s.done ? "bg-emerald-400" : "bg-slate-100"}`} />
+              {/* Fills from the left by how many are done, whichever steps they are. */}
+              {steps.map((_, i) => (
+                <span key={i} className={`h-1.5 flex-1 rounded-full ${i < doneCount ? "bg-emerald-400" : "bg-slate-100"}`} />
               ))}
             </div>
             <span className="text-xs whitespace-nowrap text-slate-400">
