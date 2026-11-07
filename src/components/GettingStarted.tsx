@@ -43,3 +43,38 @@ function Feature({ title, text }: { title: string; text: string }) {
     </div>
   );
 }
+
+// ---------- Welcome for an empty Reading, Tutorials or ScrapBook ----------
+
+// Puts the cursor in the box the welcome points to (the add form above the list).
+function focusBox(target: string) {
+  const input = document.querySelector<HTMLInputElement>(`[data-tour="${target}"] input`);
+  if (!input) return;
+  input.scrollIntoView({ block: "center", behavior: "smooth" });
+  input.focus({ preventScroll: true });
+}
+
+export function SectionWelcome(props: {
+  title: string;
+  text: string;
+  features: { title: string; text: string }[];
+  action: { label: string; target: string };
+}) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-sm sm:p-10">
+      <h2 className="text-2xl font-bold">{props.title}</h2>
+      <p className="mx-auto mt-2 max-w-md text-slate-600">{props.text}</p>
+      <div className="mx-auto mt-6 grid max-w-2xl gap-3 text-left sm:grid-cols-3">
+        {props.features.map((f) => (
+          <Feature key={f.title} title={f.title} text={f.text} />
+        ))}
+      </div>
+      <button
+        onClick={() => focusBox(props.action.target)}
+        className="mt-6 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+      >
+        {props.action.label}
+      </button>
+    </div>
+  );
+}

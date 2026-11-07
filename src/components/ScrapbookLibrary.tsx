@@ -25,6 +25,7 @@ import {
   formatDate,
   type Period,
 } from "@/components/ReadingLibrary";
+import { SectionWelcome } from "@/components/GettingStarted";
 import { createClient } from "@/lib/supabase/client";
 import type { ArticleCategory, Scrap } from "@/lib/types";
 
@@ -478,13 +479,22 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
 
               {loading ? (
                 <p className="text-slate-500">Loading your ScrapBook…</p>
+              ) : scraps.length === 0 && !searching && period === "any" ? (
+                <SectionWelcome
+                  title="Start your ScrapBook"
+                  text="Pages of your own for ideas, plans and sketches. Give your first page a title above and tap + New page."
+                  features={[
+                    { title: "Write or draw", text: "Type freely, or draw and handwrite on the page." },
+                    { title: "Sort", text: "Group pages into categories, like \"Ideas\" or \"Projects\"." },
+                    { title: "Find", text: "Search finds any page by its title or text." },
+                  ]}
+                  action={{ label: "Name your first page", target: "new-page" }}
+                />
               ) : visibleScraps.length === 0 ? (
                 <div className="rounded-xl border border-dashed border-slate-300 p-10 text-center text-slate-500">
                   {searching || period !== "any"
                     ? "Nothing matches. Try another search or a longer time range."
-                    : scraps.length
-                      ? "Nothing here yet. Start a new page above, or move pages in from another category."
-                      : "Your ScrapBook is empty. Give your first page a title above and tap + New page."}
+                    : "Nothing here yet. Start a new page above, or move pages in from another category."}
                 </div>
               ) : (
                 <>

@@ -22,6 +22,7 @@ import { createClient } from "@/lib/supabase/client";
 import type { Article, ArticleCategory, SectionKind } from "@/lib/types";
 import { askArticleAi } from "@/lib/video-ai";
 import { askConfirm } from "./ConfirmDialog";
+import { SectionWelcome } from "./GettingStarted";
 
 type AiNote = { articleId: string; note: string; model?: string };
 const aiNoteKey = (articleId: string) => `article-note:${articleId}`;
@@ -650,13 +651,25 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
 
               {loading ? (
                 <p className="text-slate-500">Loading your {section.list}…</p>
+              ) : articles.length === 0 && !searching && !filtered ? (
+                <SectionWelcome
+                  title={kind === "tutorial" ? "Start your tutorials list" : "Start your reading list"}
+                  text={`Paste a link in the box above, like ${section.example}. BrainShelf fills in the title and site for you.`}
+                  features={[
+                    {
+                      title: "Save",
+                      text: kind === "tutorial" ? "Keep every course and how-to in one place." : "Keep posts and articles from anywhere in one place.",
+                    },
+                    { title: "Note why", text: "Add a short note on each, so you remember what mattered." },
+                    { title: "Tick it off", text: "Mark it ✓ read when you finish, or get an ✨ AI summary." },
+                  ]}
+                  action={{ label: "Paste your first link", target: "add-article" }}
+                />
               ) : visibleArticles.length === 0 ? (
                 <div className="rounded-xl border border-dashed border-slate-300 p-10 text-center text-slate-500">
                   {searching || filtered
                     ? "Nothing matches. Try another search or a longer time range."
-                    : articles.length
-                      ? "Nothing here yet. Paste a link above, or move articles in from another category."
-                      : `Your ${section.list} is empty. Paste a link above, like ${section.example}.`}
+                    : "Nothing here yet. Paste a link above, or move articles in from another category."}
                 </div>
               ) : (
                 <>
