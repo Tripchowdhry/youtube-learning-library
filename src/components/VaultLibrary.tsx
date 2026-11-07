@@ -1,5 +1,6 @@
 "use client";
 
+import { ChecklistCard } from "@/components/GettingStarted";
 import { Tour, TourButton, useSectionTour } from "@/components/Tour";
 import BrandMark from "@/components/BrandMark";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -562,6 +563,28 @@ export default function VaultLibrary({ userEmail }: { userEmail: string }) {
                   </>
                 )}
               </div>
+
+              {!searching && (
+                <ChecklistCard
+                  id="vault"
+                  onShowTour={tour.start}
+                  steps={[
+                    { done: true, label: "Choose your passphrase", hint: "" },
+                    {
+                      done: entries.length > 0,
+                      label: "Save your first login or API key",
+                      hint: key ? "Tap + New entry below." : "Unlock the vault below, then tap + New entry.",
+                      action: key ? { label: "+ New entry", onClick: () => setEditing("new") } : undefined,
+                    },
+                    {
+                      done: categories.length > 0,
+                      label: "Make a category",
+                      hint: "Group entries, like \"API keys\" or \"Work\".",
+                      action: { label: "+ New category", onClick: () => createCategory(null) },
+                    },
+                  ]}
+                />
+              )}
 
               {key ? (
                 <div className="mb-4 flex flex-wrap items-center gap-2">

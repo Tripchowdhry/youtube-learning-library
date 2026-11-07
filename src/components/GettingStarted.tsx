@@ -47,83 +47,145 @@ function Feature({ title, text }: { title: string; text: string }) {
 
 // ---------- Getting-started checklist ----------
 
-export function GettingStartedChecklist(props: {
-  userEmail: string;
-  hasVideo: boolean;
-  firstVideoId: string | null;
-  hasNote: boolean;
-  hasArticle: boolean;
-  onShowTour: () => void;
-}) {
-  const { userEmail, hasVideo, firstVideoId, hasNote, hasArticle, onShowTour } = props;
-  const [hidden, setHidden] = useState(true);
-  const [triedAi, setTriedAi] = useState(false);
-  useEffect(() => {
-    setHidden(onboarding.checklistHidden(userEmail));
-    setTriedAi(onboarding.triedAi());
-  }, [userEmail]);
+export type ChecklistStep = {
+  done: boolean;
+  label: string;
+  hint: string;
+  // What the highlighted "next step" button does: open a page, or run something here.
+  action?: { label: string; href?: string | null; onClick?: () => void };
+};
 
-  const studyLink = firstVideoId ? `/video/${firstVideoId}` : null;
-  const steps = [
-    { done: hasVideo, label: "Save your first video", hint: "Paste a link in the box above." },
-    { done: hasNote, label: "Take a note on a video", hint: "Open a video and write or draw beside it.", href: studyLink },
-    { done: triedAi, label: "Ask AI about a video", hint: "On a video's page, tap Ask AI for a summary.", href: studyLink },
-    { done: hasArticle, label: "Save an article to Reading", hint: "Switch to Reading and paste any web link.", href: "/reading" },
-  ];
+function headline(done: number, total: number) {
+  const left = total - done;
+  if (done === 0) return "Let's get you started";
+  if (left === 1) return "One step left!";
+  if (done * 2 === total) return "Halfway there";
+  return done * 2 < total ? "Nice start!" : "Almost there";
+}
+
+// A friendly "Getting started" card. Finished steps get a green tick, the next one is highlighted
+// with a button, and finishing everything shows a short celebration once before the card goes away.
+export function ChecklistCard(props: {
+  id: string;
+  userEmail?: string;
+  steps: ChecklistStep[];
+  onShowTour?: () => void;
+}) {
+  const { id, userEmail = "", steps, onShowTour } = props;
+  const [hidden, setHidden] = useState(true);
+  const [celebrate, setCelebrate] = useState(false);
   const doneCount = steps.filter((s) => s.done).length;
-  if (hidden || doneCount === steps.length) return null;
+  const allDone = doneCount === steps.length;
+
+  useEffect(() => {
+    setHidden(onboarding.checklistHidden(id, userEmail));
+  }, [id, userEmail]);
+
+  // The moment everything is done: celebrate this once, and don't show the card again after.
+  useEffect(() => {
+    if (!allDone || hidden) return;
+    setCelebrate(true);
+    onboarding.hideChecklist(id, userEmail);
+  }, [allDone, hidden, id, userEmail]);
+
+  if (celebrate) {
+    return (
+      <section className="mb-5 flex items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+        <span className="text-2xl" aria-hidden>
+          🎉
+        </span>
+        <div className="flex-1">
+          <p className="font-semibold text-emerald-900">You&apos;re all set!</p>
+          <p className="text-sm text-emerald-800">You&apos;ve tried everything here. Enjoy learning.</p>
+        </div>
+        <button
+          onClick={() => setCelebrate(false)}
+          className="rounded-md px-3 py-1.5 text-sm font-medium text-emerald-900 hover:bg-emerald-100"
+        >
+          Close
+        </button>
+      </section>
+    );
+  }
+  if (hidden || allDone) return null;
+
+  const next = steps.findIndex((s) => !s.done);
 
   return (
-    <section className="mb-5 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2">
-        <h2 className="whitespace-nowrap font-semibold">Getting started</h2>
-        <span className="whitespace-nowrap text-sm text-slate-500">
-          {doneCount} of {steps.length} done
-        </span>
-        <div className="order-last h-1.5 basis-full overflow-hidden rounded-full bg-slate-100 sm:order-none sm:basis-0 sm:flex-1">
-          <div className="h-full rounded-full bg-emerald-500" style={{ width: `${(doneCount / steps.length) * 100}%` }} />
+    <section className="mb-5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="flex items-start gap-3">
+        <div className="flex-1">
+          <h2 className="font-semibold">{headline(doneCount, steps.length)}</h2>
+          <div className="mt-2 flex items-center gap-2">
+            <div className="flex flex-1 gap-1">
+              {steps.map((s, i) => (
+                <span key={i} className={`h-1.5 flex-1 rounded-full ${s.done ? "bg-emerald-400" : "bg-slate-100"}`} />
+              ))}
+            </div>
+            <span className="text-xs whitespace-nowrap text-slate-400">
+              {doneCount} of {steps.length}
+            </span>
+          </div>
         </div>
-        <span className="ml-auto flex gap-3 sm:ml-0">
-          <button onClick={onShowTour} className="text-sm text-slate-500 underline hover:text-slate-800">
-            Show tour
-          </button>
+        <div className="flex shrink-0 items-center gap-1">
+          {onShowTour && (
+            <button
+              onClick={onShowTour}
+              className="rounded-md px-2 py-1 text-xs text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+            >
+              Tour
+            </button>
+          )}
           <button
             onClick={() => {
-              onboarding.hideChecklist(userEmail);
+              onboarding.hideChecklist(id, userEmail);
               setHidden(true);
             }}
-            className="text-sm text-slate-500 underline hover:text-slate-800"
+            aria-label="Hide getting started"
+            title="Hide"
+            className="rounded-md px-2 py-1 text-sm text-slate-400 hover:bg-slate-100 hover:text-slate-700"
           >
-            Hide
+            ✕
           </button>
-        </span>
+        </div>
       </div>
-      <ul className="grid gap-2 sm:grid-cols-2">
-        {steps.map((s) => {
-          const body = (
-            <>
+
+      <ul className="mt-3 grid gap-1.5 sm:grid-cols-2">
+        {steps.map((s, i) => {
+          const isNext = i === next;
+          const a = s.action;
+          return (
+            <li
+              key={s.label}
+              className={`flex flex-wrap items-start gap-2.5 rounded-xl p-2.5 sm:flex-nowrap ${isNext ? "bg-emerald-50 ring-1 ring-emerald-200 sm:col-span-2" : ""}`}
+            >
               <span
-                className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-xs ${
-                  s.done ? "border-emerald-500 bg-emerald-500 text-white" : "border-slate-300"
+                className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+                  s.done ? "bg-emerald-500 text-white" : isNext ? "border-2 border-emerald-400 bg-white" : "border-2 border-slate-200"
                 }`}
               >
                 {s.done ? "✓" : ""}
               </span>
-              <span>
-                <span className={`block text-sm font-medium ${s.done ? "text-slate-400 line-through" : ""}`}>{s.label}</span>
+              <span className="min-w-0 flex-1 basis-40">
+                <span className={`block text-sm ${s.done ? "text-slate-500" : "font-medium text-slate-800"}`}>{s.label}</span>
                 {!s.done && <span className="block text-xs text-slate-500">{s.hint}</span>}
               </span>
-            </>
-          );
-          const cls = "flex items-start gap-2 rounded-lg p-2";
-          return (
-            <li key={s.label}>
-              {!s.done && s.href ? (
-                <Link href={s.href} className={`${cls} hover:bg-slate-50`}>
-                  {body}
-                </Link>
-              ) : (
-                <div className={cls}>{body}</div>
+              {isNext && a && (a.href || a.onClick) && (
+                a.href ? (
+                  <Link
+                    href={a.href}
+                    className="ml-7 shrink-0 self-center rounded-lg bg-emerald-600 sm:ml-0 px-3 py-1.5 text-sm font-semibold text-white hover:bg-emerald-700"
+                  >
+                    {a.label}
+                  </Link>
+                ) : (
+                  <button
+                    onClick={a.onClick}
+                    className="ml-7 shrink-0 self-center rounded-lg bg-emerald-600 sm:ml-0 px-3 py-1.5 text-sm font-semibold text-white hover:bg-emerald-700"
+                  >
+                    {a.label}
+                  </button>
+                )
               )}
             </li>
           );

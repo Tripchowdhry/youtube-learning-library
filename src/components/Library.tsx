@@ -1,9 +1,9 @@
 "use client";
 
 import BrandMark from "@/components/BrandMark";
-import { GettingStartedChecklist, WelcomePanel } from "@/components/GettingStarted";
+import { ChecklistCard, WelcomePanel } from "@/components/GettingStarted";
 import { Tour, TourButton, useSectionTour } from "@/components/Tour";
-import { SAMPLE_VIDEO } from "@/lib/onboarding";
+import { onboarding, SAMPLE_VIDEO } from "@/lib/onboarding";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -70,6 +70,8 @@ export default function Library({ userEmail }: { userEmail: string }) {
   const [flashId, setFlashId] = useState<string | null>(null);
   // First-run guide: the short tour, and whether anything is saved in Reading or Tutorials yet.
   const [hasArticle, setHasArticle] = useState(false);
+  const [triedAi, setTriedAi] = useState(false);
+  useEffect(() => setTriedAi(onboarding.triedAi()), []);
 
   const notify = useCallback((text: string, isError = false) => {
     setToast({ text, isError });
@@ -102,6 +104,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
 
   // New here: show the short tour once the library has loaded.
   const tour = useSectionTour("videos", !loading, userEmail);
+  const firstStudy = videos[0] ? `/video/${videos[0].id}` : null;
 
   // ---------- Folder helpers ----------
 
@@ -619,13 +622,36 @@ export default function Library({ userEmail }: { userEmail: string }) {
           </div>
 
           {!searching && !loading && (
-            <GettingStartedChecklist
+            <ChecklistCard
+              id="videos"
               userEmail={userEmail}
-              hasVideo={videos.length > 0}
-              firstVideoId={videos[0]?.id ?? null}
-              hasNote={notedVideoIds.size > 0}
-              hasArticle={hasArticle}
               onShowTour={tour.start}
+              steps={[
+                {
+                  done: videos.length > 0,
+                  label: "Save your first video",
+                  hint: "Paste a YouTube link in the box below.",
+                  action: { label: "Try a sample", onClick: () => addVideo(SAMPLE_VIDEO.link) },
+                },
+                {
+                  done: notedVideoIds.size > 0,
+                  label: "Take a note on a video",
+                  hint: "Open a video and write or draw beside it.",
+                  action: { label: "Open a video →", href: firstStudy },
+                },
+                {
+                  done: triedAi,
+                  label: "Ask AI about a video",
+                  hint: "On a video's page, tap Ask AI for a summary.",
+                  action: { label: "✨ Try Ask AI →", href: firstStudy },
+                },
+                {
+                  done: hasArticle,
+                  label: "Save an article to Reading",
+                  hint: "Switch to Reading and paste any web link.",
+                  action: { label: "Go to Reading →", href: "/reading" },
+                },
+              ]}
             />
           )}
 
