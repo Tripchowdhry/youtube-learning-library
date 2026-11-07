@@ -1,5 +1,6 @@
 "use client";
 
+import { ChecklistCard } from "@/components/GettingStarted";
 import { Tour, TourButton, useSectionTour } from "@/components/Tour";
 import BrandMark from "@/components/BrandMark";
 import Link from "next/link";
@@ -617,6 +618,36 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
                 )}
                 <ItemSortSelect sort={itemSort} onChange={setItemSort} />
               </div>
+
+              {!searching && !loading && (
+                <ChecklistCard
+                  id={kind}
+                  onShowTour={tour.start}
+                  steps={[
+                    {
+                      done: articles.length > 0,
+                      label: kind === "tutorial" ? "Save your first tutorial" : "Save your first article",
+                      hint: "Paste a link in the box below.",
+                    },
+                    {
+                      done: categories.length > 0,
+                      label: "Make a category",
+                      hint: kind === "tutorial" ? "Group tutorials by topic, like \"Python\"." : "Group what you read by topic, like \"AI news\".",
+                      action: { label: "+ New category", onClick: () => createCategory(null) },
+                    },
+                    {
+                      done: articles.some((a) => a.note.trim() !== ""),
+                      label: "Add a note on why you saved it",
+                      hint: "Each item has a short note, so you remember what mattered.",
+                    },
+                    {
+                      done: articles.some((a) => a.read_at),
+                      label: "Finish one and tick it ✓",
+                      hint: "Read to the end in the app, or tap the ✓ yourself.",
+                    },
+                  ]}
+                />
+              )}
 
               {!searching && (
                 <AddArticleForm
