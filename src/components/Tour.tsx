@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { onboarding } from "@/lib/onboarding";
 import { TOURS, type TourId, type TourStep } from "@/lib/tours";
 
@@ -49,6 +49,7 @@ function findTarget(target: string | undefined) {
 export function Tour({ open, steps, onClose }: { open: boolean; steps: TourStep[]; onClose: () => void }) {
   const [step, setStep] = useState(0);
   const [box, setBox] = useState<Box | null>(null);
+  const tipRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (open) setStep(0);
@@ -74,11 +75,20 @@ export function Tour({ open, steps, onClose }: { open: boolean; steps: TourStep[
     };
   }, [open, step, steps]);
 
+  // The tour never blocks the page: a click anywhere outside the tip closes it and still
+  // goes through, so tabs, links and buttons keep working.
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    const onPointer = (e: PointerEvent) => {
+      if (!tipRef.current?.contains(e.target as Node)) onClose();
+    };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    document.addEventListener("pointerdown", onPointer, true);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.removeEventListener("pointerdown", onPointer, true);
+    };
   }, [open, onClose]);
 
   if (!open || !steps[step]) return null;
@@ -98,7 +108,7 @@ export function Tour({ open, steps, onClose }: { open: boolean; steps: TourStep[
   }
 
   return (
-    <div className="fixed inset-0 z-50" role="dialog" aria-label="Quick tour">
+    <div className="pointer-events-none fixed inset-0 z-50" role="dialog" aria-label="Quick tour">
       {box ? (
         <div
           className="pointer-events-none absolute rounded-lg ring-4 ring-emerald-400 transition-all"
@@ -113,7 +123,7 @@ export function Tour({ open, steps, onClose }: { open: boolean; steps: TourStep[
       ) : (
         <div className="absolute inset-0 bg-slate-900/45" />
       )}
-      <div className="absolute rounded-xl bg-white p-4 shadow-xl" style={tipStyle}>
+      <div ref={tipRef} className="pointer-events-auto absolute rounded-xl bg-white p-4 shadow-xl" style={tipStyle}>
         {steps.length > 1 && (
           <p className="text-xs font-medium text-slate-500">
             {step + 1} of {steps.length}
