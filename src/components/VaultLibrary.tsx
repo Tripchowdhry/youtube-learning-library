@@ -567,7 +567,6 @@ export default function VaultLibrary({ userEmail }: { userEmail: string }) {
               {!searching && (
                 <ChecklistCard
                   id="vault"
-                  onShowTour={tour.start}
                   steps={[
                     { done: true, label: "Choose your passphrase", hint: "" },
                     {

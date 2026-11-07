@@ -461,7 +461,6 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
               {!searching && !loading && (
                 <ChecklistCard
                   id="scrapbook"
-                  onShowTour={tour.start}
                   steps={[
                     {
                       done: scraps.length > 0,

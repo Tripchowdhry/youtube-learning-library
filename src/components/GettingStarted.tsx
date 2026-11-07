@@ -69,9 +69,8 @@ export function ChecklistCard(props: {
   id: string;
   userEmail?: string;
   steps: ChecklistStep[];
-  onShowTour?: () => void;
 }) {
-  const { id, userEmail = "", steps, onShowTour } = props;
+  const { id, userEmail = "", steps } = props;
   const [hidden, setHidden] = useState(true);
   const [celebrate, setCelebrate] = useState(false);
   const doneCount = steps.filter((s) => s.done).length;
@@ -129,14 +128,6 @@ export function ChecklistCard(props: {
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-1">
-          {onShowTour && (
-            <button
-              onClick={onShowTour}
-              className="rounded-md px-2 py-1 text-xs text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-            >
-              Tour
-            </button>
-          )}
           <button
             onClick={() => {
               onboarding.hideChecklist(id, userEmail);

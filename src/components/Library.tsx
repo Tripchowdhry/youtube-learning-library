@@ -631,7 +631,6 @@ export default function Library({ userEmail }: { userEmail: string }) {
             <ChecklistCard
               id="videos"
               userEmail={userEmail}
-              onShowTour={tour.start}
               steps={[
                 {
                   done: videos.length > 0,
