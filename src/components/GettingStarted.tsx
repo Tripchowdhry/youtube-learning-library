@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { onboarding, SAMPLE_VIDEO } from "@/lib/onboarding";
+import { useState } from "react";
+import { SAMPLE_VIDEO } from "@/lib/onboarding";
 
 // ---------- Welcome screen for an empty library ----------
 
@@ -65,29 +65,14 @@ function headline(done: number, total: number) {
 
 // A friendly "Getting started" card. Finished steps get a green tick, the next one is highlighted
 // with a button, and finishing everything shows a short celebration once before the card goes away.
-export function ChecklistCard(props: {
-  id: string;
-  userEmail?: string;
-  steps: ChecklistStep[];
-}) {
-  const { id, userEmail = "", steps } = props;
-  const [hidden, setHidden] = useState(true);
-  const [celebrate, setCelebrate] = useState(false);
+// Shown only while open (it opens with the tour); the ✕ closes it.
+export function ChecklistCard(props: { open: boolean; onClose: () => void; steps: ChecklistStep[] }) {
+  const { open, onClose, steps } = props;
   const doneCount = steps.filter((s) => s.done).length;
   const allDone = doneCount === steps.length;
+  if (!open) return null;
 
-  useEffect(() => {
-    setHidden(onboarding.checklistHidden(id, userEmail));
-  }, [id, userEmail]);
-
-  // The moment everything is done: celebrate this once, and don't show the card again after.
-  useEffect(() => {
-    if (!allDone || hidden) return;
-    setCelebrate(true);
-    onboarding.hideChecklist(id, userEmail);
-  }, [allDone, hidden, id, userEmail]);
-
-  if (celebrate) {
+  if (allDone) {
     return (
       <section className="mb-5 flex items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
         <span className="text-2xl" aria-hidden>
@@ -98,7 +83,7 @@ export function ChecklistCard(props: {
           <p className="text-sm text-emerald-800">You&apos;ve tried everything here. Enjoy learning.</p>
         </div>
         <button
-          onClick={() => setCelebrate(false)}
+          onClick={onClose}
           className="rounded-md px-3 py-1.5 text-sm font-medium text-emerald-900 hover:bg-emerald-100"
         >
           Close
@@ -106,8 +91,6 @@ export function ChecklistCard(props: {
       </section>
     );
   }
-  if (hidden || allDone) return null;
-
   const next = steps.findIndex((s) => !s.done);
 
   return (
@@ -129,10 +112,7 @@ export function ChecklistCard(props: {
         </div>
         <div className="flex shrink-0 items-center gap-1">
           <button
-            onClick={() => {
-              onboarding.hideChecklist(id, userEmail);
-              setHidden(true);
-            }}
+            onClick={onClose}
             aria-label="Hide getting started"
             title="Hide"
             className="rounded-md px-2 py-1 text-sm text-slate-400 hover:bg-slate-100 hover:text-slate-700"

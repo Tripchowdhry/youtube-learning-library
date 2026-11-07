@@ -460,7 +460,8 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
 
               {!searching && !loading && (
                 <ChecklistCard
-                  id="scrapbook"
+                  open={tour.checklistOpen}
+                  onClose={tour.closeChecklist}
                   steps={[
                     {
                       done: scraps.length > 0,

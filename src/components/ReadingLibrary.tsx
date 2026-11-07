@@ -621,7 +621,8 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
 
               {!searching && !loading && (
                 <ChecklistCard
-                  id={kind}
+                  open={tour.checklistOpen}
+                  onClose={tour.closeChecklist}
                   steps={[
                     {
                       done: articles.length > 0,

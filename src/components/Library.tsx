@@ -629,8 +629,8 @@ export default function Library({ userEmail }: { userEmail: string }) {
 
           {!searching && !loading && (
             <ChecklistCard
-              id="videos"
-              userEmail={userEmail}
+              open={tour.checklistOpen}
+              onClose={tour.closeChecklist}
               steps={[
                 {
                   done: videos.length > 0,
