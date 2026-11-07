@@ -20,6 +20,8 @@ import {
   newSalt,
   suggestPassphrase,
 } from "@/lib/vault-crypto";
+import { Inbox, KeyRound, Lock, LockKeyhole, LockKeyholeOpen, Pencil, Tag, Trash2 } from "lucide-react";
+import { Ico } from "@/components/Icon";
 
 type View = { kind: "all" } | { kind: "uncategorized" } | { kind: "category"; id: string };
 type Secret = "password" | "api_key";
@@ -370,9 +372,11 @@ export default function VaultLibrary({ userEmail }: { userEmail: string }) {
       x: e.clientX,
       y: e.clientY,
       items: [
-        { label: "✏️ Rename", onClick: () => renameCategory(category) },
-        ...(category.parent_id ? [] : [{ label: "🏷️ New subcategory", onClick: () => createCategory(category.id) }]),
-        { label: "🗑 Delete", onClick: () => deleteCategory(category), danger: true },
+        { label: "Rename", icon: Pencil, tone: "yellow" as const, onClick: () => renameCategory(category) },
+        ...(category.parent_id
+          ? []
+          : [{ label: "New subcategory", icon: Tag, tone: "orange" as const, onClick: () => createCategory(category.id) }]),
+        { label: "Delete", icon: Trash2, tone: "red" as const, onClick: () => deleteCategory(category), danger: true },
       ],
     });
   }
@@ -465,9 +469,11 @@ export default function VaultLibrary({ userEmail }: { userEmail: string }) {
         <aside
           className={`${showCategories ? "fixed inset-x-0 top-[57px] bottom-0 z-10 block" : "hidden"} w-full overflow-y-auto border-r border-slate-200 bg-white p-3 md:sticky md:top-[57px] md:block md:h-[calc(100vh-57px)] md:w-72`}
         >
-          <NavItem label="🔐 All entries" count={entries.length} active={view.kind === "all" && !searching} onClick={() => openView({ kind: "all" })} />
+          <NavItem icon={LockKeyhole} tone="yellow" label="All entries" count={entries.length} active={view.kind === "all" && !searching} onClick={() => openView({ kind: "all" })} />
           <NavItem
-            label="📥 Uncategorized"
+            icon={Inbox}
+            tone="blue"
+            label="Uncategorized"
             count={entries.filter((e) => !e.category_id).length}
             active={view.kind === "uncategorized" && !searching}
             onClick={() => openView({ kind: "uncategorized" })}
@@ -487,7 +493,9 @@ export default function VaultLibrary({ userEmail }: { userEmail: string }) {
           {topCategories.map((cat) => (
             <div key={cat.id}>
               <NavItem
-                label={`🏷️ ${cat.name}`}
+                icon={Tag}
+                tone="orange"
+                label={cat.name}
                 count={countIn(cat.id)}
                 active={!searching && view.kind === "category" && view.id === cat.id}
                 onClick={() => openView({ kind: "category", id: cat.id })}
@@ -537,7 +545,10 @@ export default function VaultLibrary({ userEmail }: { userEmail: string }) {
             <p className="text-slate-500">Loading your vault…</p>
           ) : !vaultKey ? (
             <div className="max-w-xl rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-              <h1 className="mb-2 text-2xl font-bold">🔐 Set up your vault</h1>
+              <h1 className="mb-2 flex items-center gap-2 text-2xl font-bold">
+                <Ico icon={LockKeyhole} tone="yellow" size={24} />
+                Set up your vault
+              </h1>
               <p className="mb-4 text-sm text-slate-600">
                 Pick a passphrase. Passwords and API keys are locked with it in your browser before they are saved, so
                 nobody else can read them, not even the app. Web addresses and user IDs are not locked, so you can still
@@ -572,8 +583,13 @@ export default function VaultLibrary({ userEmail }: { userEmail: string }) {
                   >
                     + New entry
                   </button>
-                  <span className="text-sm text-green-700">🔓 Unlocked. It locks itself after 5 idle minutes.</span>
-                  <SmallButton onClick={lock}>🔒 Lock now</SmallButton>
+                  <span className="flex items-center gap-1 text-sm text-green-700">
+                    <Ico icon={LockKeyholeOpen} tone="green" size={15} />
+                    Unlocked. It locks itself after 5 idle minutes.
+                  </span>
+                  <SmallButton onClick={lock} icon={Lock} tone="yellow">
+                    Lock now
+                  </SmallButton>
                 </div>
               ) : (
                 <UnlockForm onCheck={checkPassphrase} onUnlock={setKey} onForgot={() => setResetting(true)} />
@@ -677,9 +693,7 @@ function EntryRow(props: {
       onDragEnd={props.onDragEnd}
       className={`flex cursor-grab items-start gap-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm transition ${props.dragging ? "opacity-40" : ""}`}
     >
-      <span className="mt-0.5 text-xl" aria-hidden>
-        🔑
-      </span>
+      <Ico icon={KeyRound} tone="yellow" size={22} className="mt-0.5" />
       <div className="flex min-w-0 flex-1 flex-col gap-1.5">
         <p className="font-medium">{entry.name}</p>
         {entry.url && (
@@ -707,7 +721,10 @@ function EntryRow(props: {
                   <SmallButton onClick={() => props.onCopySecret(field)}>Copy</SmallButton>
                 </>
               ) : (
-                <span className="text-slate-400">🔒 Locked</span>
+                <span className="flex items-center gap-1 text-slate-400">
+                  <Ico icon={Lock} tone="slate" size={13} />
+                  Locked
+                </span>
               )}
             </PlainLine>
           );
@@ -722,16 +739,16 @@ function EntryRow(props: {
             aria-label="Category"
             title={props.categoryLabel}
           >
-            <option value="">📥 Uncategorized</option>
+            <option value="">Uncategorized</option>
             {props.categoryOptions.map((c) => (
               <option key={c.id} value={c.id}>
-                🏷️ {c.label}
+                {c.label}
               </option>
             ))}
           </select>
           {props.unlocked && <SmallButton onClick={props.onEdit}>Edit</SmallButton>}
-          <SmallButton onClick={props.onDelete} danger title="Delete">
-            🗑 Delete
+          <SmallButton onClick={props.onDelete} danger title="Delete" icon={Trash2}>
+            Delete
           </SmallButton>
         </div>
       </div>
@@ -772,8 +789,9 @@ function UnlockForm(props: {
 
   return (
     <NoSaveForm onSubmit={submit} className="mb-4 rounded-xl border border-amber-300 bg-amber-50 p-4">
-      <p className="mb-2 text-sm text-slate-700">
-        🔒 Your vault is locked. Enter your passphrase to see, copy or change passwords and API keys.
+      <p className="mb-2 flex items-start gap-1.5 text-sm text-slate-700">
+        <Ico icon={Lock} tone="yellow" size={16} className="mt-0.5" />
+        Your vault is locked. Enter your passphrase to see, copy or change passwords and API keys.
       </p>
       <div className="flex flex-col gap-2 sm:flex-row">
         <input
@@ -976,7 +994,7 @@ function EntryEditor(props: {
             className={input}
           />
         </Field>
-        <Field label="Password 🔒" hint="Encrypted">
+        <Field label="Password" locked hint="Encrypted">
           <div className="flex gap-2">
             <input
               {...secretInput(showSecrets)}
@@ -999,7 +1017,7 @@ function EntryEditor(props: {
             </button>
           </div>
         </Field>
-        <Field label="API key 🔒" hint="Encrypted">
+        <Field label="API key" locked hint="Encrypted">
           <input
             {...secretInput(showSecrets)}
             value={apiKey}
@@ -1018,10 +1036,10 @@ function EntryEditor(props: {
         </Field>
         <Field label="Category">
           <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} className={input}>
-            <option value="">📥 Uncategorized</option>
+            <option value="">Uncategorized</option>
             {props.categoryOptions.map((c) => (
               <option key={c.id} value={c.id}>
-                🏷️ {c.label}
+                {c.label}
               </option>
             ))}
           </select>
@@ -1044,11 +1062,22 @@ function EntryEditor(props: {
   );
 }
 
-function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+function Field({
+  label,
+  hint,
+  locked,
+  children,
+}: {
+  label: string;
+  hint?: string;
+  locked?: boolean;
+  children: React.ReactNode;
+}) {
   return (
     <div className="flex flex-col gap-1">
-      <span className="text-sm font-medium">
+      <span className="flex items-center gap-1 text-sm font-medium">
         {label}
+        {locked && <Ico icon={Lock} tone="yellow" size={13} />}
         {hint && <span className="ml-2 text-xs font-normal text-slate-500">{hint}</span>}
       </span>
       {children}

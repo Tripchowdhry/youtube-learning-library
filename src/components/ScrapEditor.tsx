@@ -8,6 +8,8 @@ import NotePageCanvas, { type Tool } from "@/components/NotePageCanvas";
 import { formatDate } from "@/components/ReadingLibrary";
 import { createClient } from "@/lib/supabase/client";
 import type { ArticleCategory, NotePage, NoteStroke, Scrap } from "@/lib/types";
+import { Keyboard, PenLine, Trash2 } from "lucide-react";
+import { Ico } from "@/components/Icon";
 
 const PEN_COLORS = ["#111827", "#2563eb", "#dc2626", "#16a34a"];
 const HIGHLIGHT_COLORS = ["#facc15", "#4ade80", "#f472b6", "#60a5fa"];
@@ -270,9 +272,10 @@ export default function ScrapEditor({ scrapId }: { scrapId: string }) {
         <SaveBadge state={saveState} onRetry={save} />
         <button
           onClick={deleteScrap}
-          className="shrink-0 rounded-md border border-red-200 px-2 py-1 text-xs text-red-600 hover:bg-red-50"
+          className="inline-flex shrink-0 items-center gap-1 rounded-md border border-red-200 px-2 py-1 text-xs text-red-600 hover:bg-red-50"
         >
-          🗑 Delete
+          <Ico icon={Trash2} tone="red" size={14} />
+          Delete
         </button>
       </header>
 
@@ -303,10 +306,10 @@ export default function ScrapEditor({ scrapId }: { scrapId: string }) {
                   className="max-w-56 rounded-md border border-slate-300 bg-white px-2 py-1 text-sm text-slate-700"
                   aria-label="Category"
                 >
-                  <option value="">📥 Uncategorized</option>
+                  <option value="">Uncategorized</option>
                   {categoryOptions.map((c) => (
                     <option key={c.id} value={c.id}>
-                      🏷️ {c.label}
+                      {c.label}
                     </option>
                   ))}
                 </select>
@@ -318,15 +321,16 @@ export default function ScrapEditor({ scrapId }: { scrapId: string }) {
               <div className="flex overflow-hidden rounded-lg bg-slate-100 p-0.5">
                 {(
                   [
-                    ["type", "⌨️ Typing"],
-                    ["write", "✍️ Handwriting"],
+                    ["type", "Typing", Keyboard],
+                    ["write", "Handwriting", PenLine],
                   ] as const
-                ).map(([id, label]) => (
+                ).map(([id, label, icon]) => (
                   <button
                     key={id}
                     onClick={() => chooseMode(id)}
-                    className={`rounded-md px-3 py-1 text-sm ${mode === id ? "bg-white font-semibold shadow-sm" : "text-slate-600"}`}
+                    className={`flex items-center gap-1.5 rounded-md px-3 py-1 text-sm ${mode === id ? "bg-white font-semibold shadow-sm" : "text-slate-600"}`}
                   >
+                    <Ico icon={icon} tone={id === "write" ? "indigo" : "slate"} size={15} />
                     {label}
                   </button>
                 ))}

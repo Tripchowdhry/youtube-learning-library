@@ -20,6 +20,8 @@ import type { NoteImage, NotePage, NoteStroke, Video } from "@/lib/types";
 import { onAiJobDone, runAiJob, useAiJobs, useSecondsSince } from "@/lib/ai-jobs";
 import { askVideoAi } from "@/lib/video-ai";
 import { askConfirm } from "./ConfirmDialog";
+import { Brush, Camera, ClipboardPaste, FileText, Footprints, Keyboard, Lightbulb, List, PenLine, Sparkles, Timer, Trash2, TriangleAlert, type LucideIcon } from "lucide-react";
+import { Ico, type Tone } from "@/components/Icon";
 
 const PEN_COLORS = ["#111827", "#2563eb", "#dc2626", "#16a34a"];
 const HIGHLIGHT_COLORS = ["#facc15", "#4ade80", "#f472b6", "#60a5fa"];
@@ -799,7 +801,7 @@ function TypedNotes(props: {
             }
           }}
           placeholder={
-            "Type your notes here…\n\nTip: press ⏱ Stamp time (or Ctrl+Shift+S) to add the video's current time, like [12:34]. Click a time above to jump back to it. Press 📷 Clip to add a picture of the video."
+            "Type your notes here…\n\nTip: press Stamp time (or Ctrl+Shift+S) to add the video's current time, like [12:34]. Click a time above to jump back to it. Press Clip to add a picture of the video."
           }
           className="notes-text notes-input"
         />
@@ -809,14 +811,16 @@ function TypedNotes(props: {
 }
 
 const AI_PRESETS = [
-  { label: "📝 Summary in 100 words", prompt: "Summarize the video in 100 words." },
+  { label: "Summary in 100 words", icon: FileText, tone: "sky", prompt: "Summarize the video in 100 words." },
   {
-    label: "💡 Key innovations",
+    label: "Key innovations",
+    icon: Lightbulb,
+    tone: "yellow",
     prompt: "Write a short report highlighting the key innovations in this video, with the time each one comes up.",
   },
-  { label: "🪜 How to use it in 3 steps", prompt: "Explain in 3 steps how to use what this video shows." },
-  { label: "• Report in bullets", prompt: "Write a report on this video in bullet points." },
-];
+  { label: "How to use it in 3 steps", icon: Footprints, tone: "green", prompt: "Explain in 3 steps how to use what this video shows." },
+  { label: "Report in bullets", icon: List, tone: "slate", prompt: "Write a report on this video in bullet points." },
+] satisfies { label: string; icon: LucideIcon; tone: Tone; prompt: string }[];
 
 function AskAi(props: {
   startedAt: number | null;
@@ -837,7 +841,8 @@ function AskAi(props: {
   return (
     <div data-tour="ask-ai" className="rounded-xl bg-white p-3 shadow-sm ring-1 ring-violet-200">
       <button onClick={() => setOpen((o) => !o)} className="flex w-full items-center gap-2 text-left text-sm font-semibold">
-        ✨ Ask AI about this video
+        <Ico icon={Sparkles} tone="yellow" />
+        Ask AI about this video
         {busy && <span className="font-normal text-violet-700">Watching the video… this can take a minute</span>}
         <span className="ml-auto text-xs font-normal text-slate-500">{open ? "Hide" : "Show"}</span>
       </button>
@@ -849,8 +854,9 @@ function AskAi(props: {
                 key={p.label}
                 onClick={() => ask(p.prompt)}
                 disabled={busy}
-                className="rounded-full bg-violet-50 px-3 py-1 text-xs text-violet-800 ring-1 ring-violet-200 hover:bg-violet-100 disabled:opacity-50"
+                className="inline-flex items-center gap-1 rounded-full bg-violet-50 px-3 py-1 text-xs text-violet-800 ring-1 ring-violet-200 hover:bg-violet-100 disabled:opacity-50"
               >
+                <Ico icon={p.icon} tone={p.tone} size={14} />
                 {p.label}
               </button>
             ))}
@@ -859,10 +865,11 @@ function AskAi(props: {
                 ask(`Take a screenshot at ${formatTime(props.currentTime())} and explain it in 2 sentences.`)
               }
               disabled={busy}
-              className="rounded-full bg-violet-50 px-3 py-1 text-xs text-violet-800 ring-1 ring-violet-200 hover:bg-violet-100 disabled:opacity-50"
+              className="inline-flex items-center gap-1 rounded-full bg-violet-50 px-3 py-1 text-xs text-violet-800 ring-1 ring-violet-200 hover:bg-violet-100 disabled:opacity-50"
               title="Explain what's on screen right now, and add a screenshot of it"
             >
-              📷 Explain this moment
+              <Ico icon={Camera} tone="slate" size={14} />
+              Explain this moment
             </button>
           </div>
           <div className="flex gap-2">
@@ -890,11 +897,14 @@ function AskAi(props: {
           </div>
           {props.startedAt !== null && <AskAiWorking startedAt={props.startedAt} />}
           {props.error && (
-            <p className="rounded-md bg-red-50 px-2 py-1.5 text-sm text-red-700 ring-1 ring-red-200">⚠️ {props.error}</p>
+            <p className="flex items-center gap-1.5 rounded-md bg-red-50 px-2 py-1.5 text-sm text-red-700 ring-1 ring-red-200">
+              <Ico icon={TriangleAlert} tone="red" size={15} />
+              {props.error}
+            </p>
           )}
           <p className="text-xs text-slate-500">
             Answers are added to the end of your typed notes, where you can edit them. Ask for a screenshot at a time and
-            the video jumps there so 📷 Clip can add the picture.
+            the video jumps there so Clip can add the picture.
           </p>
         </div>
       )}
@@ -947,15 +957,16 @@ function Toolbar(props: {
       <div data-tour="note-mode" className="flex overflow-hidden rounded-lg bg-slate-100 p-0.5">
         {(
           [
-            ["write", "✍️ Handwriting"],
-            ["type", "⌨️ Typing"],
+            ["write", "Handwriting", PenLine],
+            ["type", "Typing", Keyboard],
           ] as const
-        ).map(([id, label]) => (
+        ).map(([id, label, icon]) => (
           <button
             key={id}
             onClick={() => props.setMode(id)}
-            className={`rounded-md px-3 py-1 text-sm ${props.mode === id ? "bg-white font-semibold shadow-sm" : "text-slate-600"}`}
+            className={`flex items-center gap-1.5 rounded-md px-3 py-1 text-sm ${props.mode === id ? "bg-white font-semibold shadow-sm" : "text-slate-600"}`}
           >
+            <Ico icon={icon} tone={id === "write" ? "indigo" : "slate"} size={15} />
             {label}
           </button>
         ))}
@@ -1013,22 +1024,24 @@ function Toolbar(props: {
       <button
         data-tour="stamp"
         onClick={props.onStamp}
-        className="rounded-lg bg-red-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-red-700"
+        className="flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-red-700"
         title="Pin the video's current time onto your notes"
       >
-        ⏱ Stamp time
+        <Timer size={16} aria-hidden />
+        Stamp time
       </button>
       <button
         onClick={props.onClip}
         disabled={props.clipBusy}
-        className="rounded-lg px-3 py-1.5 text-sm font-semibold ring-1 ring-slate-300 hover:bg-slate-100 disabled:opacity-50"
+        className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold ring-1 ring-slate-300 hover:bg-slate-100 disabled:opacity-50"
         title={
           props.waitingForPaste
             ? "Take a screenshot of the video and tap Copy, then tap here to paste it"
             : "Put a screenshot of the video into your notes"
         }
       >
-        {props.waitingForPaste ? "📋 Paste clip" : "📷 Clip"}
+        <Ico icon={props.waitingForPaste ? ClipboardPaste : Camera} tone={props.waitingForPaste ? "amber" : "slate"} size={16} />
+        {props.waitingForPaste ? "Paste clip" : "Clip"}
       </button>
       {props.waitingForPaste && (
         <button
@@ -1041,19 +1054,21 @@ function Toolbar(props: {
       {props.mode === "type" && props.onClearTyped && (
         <button
           onClick={props.onClearTyped}
-          className="rounded-lg px-3 py-1.5 text-sm text-slate-700 ring-1 ring-slate-300 hover:bg-slate-100"
+          className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm text-slate-700 ring-1 ring-slate-300 hover:bg-slate-100"
           title="Remove all the text you typed for this video"
         >
-          🧹 Clear typed notes
+          <Ico icon={Brush} tone="orange" size={15} />
+          Clear typed notes
         </button>
       )}
       {props.clipCount > 0 && (
         <button
           onClick={props.onDeleteAllClips}
-          className="rounded-lg px-3 py-1.5 text-sm text-red-700 ring-1 ring-slate-300 hover:bg-red-50"
+          className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm text-red-700 ring-1 ring-slate-300 hover:bg-red-50"
           title="Delete every clip in this video's notes"
         >
-          🗑 Delete all clips
+          <Ico icon={Trash2} tone="red" size={15} />
+          Delete all clips
         </button>
       )}
       {props.mode === "write" && (

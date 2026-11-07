@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { type AiJob, useAiJobs, useSecondsSince } from "@/lib/ai-jobs";
 import { formatTime } from "@/lib/youtube-player";
+import { CircleCheck } from "lucide-react";
+import { Ico } from "@/components/Icon";
 
 // A small reminder in the corner of every page that the AI is still working, and a
 // note when something it was asked for has been saved.
@@ -22,8 +24,9 @@ export default function AiJobsBadge() {
     <div className="pointer-events-none fixed bottom-3 left-3 z-50 flex max-w-[calc(100vw-1.5rem)] flex-col gap-1.5">
       {running.length > 0 && <Working job={running[0]} more={running.length - 1} />}
       {finished && shownFinish === finished.at && (
-        <p className="truncate rounded-full bg-green-50 px-3 py-1.5 text-xs text-green-800 shadow ring-1 ring-green-200">
-          ✅ {finished.label} is saved
+        <p className="flex items-center gap-1.5 truncate rounded-full bg-green-50 px-3 py-1.5 text-xs text-green-800 shadow ring-1 ring-green-200">
+          <Ico icon={CircleCheck} tone="green" size={14} />
+          <span className="truncate">{finished.label} is saved</span>
         </p>
       )}
     </div>

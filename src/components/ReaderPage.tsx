@@ -7,6 +7,8 @@ import { ArticleNote, ReadCheck, SECTIONS, formatDate } from "@/components/Readi
 import { fileViewLink } from "@/lib/links";
 import { createClient } from "@/lib/supabase/client";
 import type { Article, ArticleContent } from "@/lib/types";
+import { ExternalLink, FilePen, NotebookText, Pencil } from "lucide-react";
+import { Ico } from "@/components/Icon";
 
 // How long the end of the article must stay on screen before it counts as read.
 const END_SEEN_MS = 1500;
@@ -165,21 +167,25 @@ export default function ReaderPage({ articleId }: { articleId: string }) {
               href={article.url}
               target="_blank"
               rel="noreferrer"
-              className="hidden shrink-0 rounded-md border border-slate-300 px-2 py-1 text-xs text-slate-700 hover:bg-slate-100 sm:block"
+              className="hidden shrink-0 items-center gap-1 rounded-md border border-slate-300 px-2 py-1 text-xs text-slate-700 hover:bg-slate-100 sm:inline-flex"
             >
-              Original ↗
+              <Ico icon={ExternalLink} tone="sky" size={14} />
+              Original
             </a>
             <button
               onClick={() => setShowNotes((s) => !s)}
               className={
                 showNotes
-                  ? "shrink-0 rounded-md border border-slate-300 px-2 py-1 text-xs text-slate-700 hover:bg-slate-100"
+                  ? "inline-flex shrink-0 items-center gap-1 rounded-md border border-slate-300 px-2 py-1 text-xs text-slate-700 hover:bg-slate-100"
                   : article.notes?.trim()
-                    ? "shrink-0 rounded-md border border-amber-300 bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-900 hover:bg-amber-200"
-                    : "shrink-0 rounded-md border border-slate-300 px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                    ? "inline-flex shrink-0 items-center gap-1 rounded-md border border-amber-300 bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-900 hover:bg-amber-200"
+                    : "inline-flex shrink-0 items-center gap-1 rounded-md border border-slate-300 px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100"
               }
             >
-              {showNotes ? "Hide notes" : article.notes?.trim() ? "📒 Open notes" : "✏️ Take notes"}
+              {!showNotes && (
+                <Ico icon={article.notes?.trim() ? NotebookText : Pencil} tone={article.notes?.trim() ? "amber" : "yellow"} size={14} />
+              )}
+              {showNotes ? "Hide notes" : article.notes?.trim() ? "Open notes" : "Take notes"}
             </button>
             <ReadCheck read={Boolean(article.read_at)} onClick={() => setRead(!article.read_at)} />
           </>
@@ -206,8 +212,9 @@ export default function ReaderPage({ articleId }: { articleId: string }) {
             </p>
             <div className="mt-3">
               {!article.note && !editingNote ? (
-                <button onClick={() => setEditingNote(true)} className="text-sm text-slate-500 hover:underline">
-                  📝 Add a summary
+                <button onClick={() => setEditingNote(true)} className="inline-flex items-center gap-1 text-sm text-slate-500 hover:underline">
+                  <Ico icon={FilePen} tone="sky" size={15} />
+                  Add a summary
                 </button>
               ) : (
                 <ArticleNote note={article.note} editing={editingNote} setEditing={setEditingNote} onSave={saveNote} />

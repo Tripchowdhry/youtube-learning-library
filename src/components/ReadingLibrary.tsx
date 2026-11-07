@@ -22,6 +22,25 @@ import { createClient } from "@/lib/supabase/client";
 import type { Article, ArticleCategory, SectionKind } from "@/lib/types";
 import { askArticleAi } from "@/lib/video-ai";
 import { askConfirm } from "./ConfirmDialog";
+import { Ico, type Tone } from "./Icon";
+import {
+  Brush,
+  FilePen,
+  ExternalLink,
+  FileText,
+  GraduationCap,
+  Inbox,
+  LockKeyhole,
+  NotebookPen,
+  NotebookText,
+  Pencil,
+  Clapperboard,
+  Sparkles,
+  Tag,
+  Trash2,
+  TriangleAlert,
+  type LucideIcon,
+} from "lucide-react";
 import { SectionWelcome } from "./GettingStarted";
 
 type AiNote = { articleId: string; note: string; model?: string };
@@ -47,11 +66,10 @@ export const formatDate = (iso: string) =>
 // Reading and Tutorials work the same way; each has its own links and categories.
 export const SECTIONS: Record<
   SectionKind,
-  { path: string; icon: string; name: string; all: string; list: string; placeholder: string; example: string }
+  { path: string; name: string; all: string; list: string; placeholder: string; example: string }
 > = {
   reading: {
     path: "/reading",
-    icon: "📄",
     name: "Reading",
     all: "All reading",
     list: "reading list",
@@ -60,7 +78,6 @@ export const SECTIONS: Record<
   },
   tutorial: {
     path: "/tutorials",
-    icon: "🎓",
     name: "Tutorials",
     all: "All tutorials",
     list: "tutorials list",
@@ -385,7 +402,7 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
     const ok = await askConfirm({
       title: `Delete this from your ${section.list}?`,
       quote: article.title ?? article.url,
-      message: "The link, its summary and your notes will be gone for good.\n\nOnly want to remove the summary? Choose Keep it, then use 🧹 Clear summary.",
+      message: "The link, its summary and your notes will be gone for good.\n\nOnly want to remove the summary? Choose Keep it, then use Clear summary.",
       confirmLabel: "Yes, delete",
       cancelLabel: "Keep it",
       danger: true,
@@ -446,9 +463,11 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
       x: e.clientX,
       y: e.clientY,
       items: [
-        { label: "✏️ Rename", onClick: () => renameCategory(category) },
-        ...(category.parent_id ? [] : [{ label: "🏷️ New subcategory", onClick: () => createCategory(category.id) }]),
-        { label: "🗑 Delete", onClick: () => deleteCategory(category), danger: true },
+        { label: "Rename", icon: Pencil, tone: "yellow" as const, onClick: () => renameCategory(category) },
+        ...(category.parent_id
+          ? []
+          : [{ label: "New subcategory", icon: Tag, tone: "orange" as const, onClick: () => createCategory(category.id) }]),
+        { label: "Delete", icon: Trash2, tone: "red" as const, onClick: () => deleteCategory(category), danger: true },
       ],
     });
   }
@@ -541,9 +560,11 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
         <aside
           className={`${showCategories ? "fixed inset-x-0 top-[57px] bottom-0 z-10 block" : "hidden"} w-full overflow-y-auto border-r border-slate-200 bg-white p-3 md:sticky md:top-[57px] md:block md:h-[calc(100vh-57px)] md:w-72`}
         >
-          <NavItem label={`${section.icon} ${section.all}`} count={articles.length} active={view.kind === "all" && !searching} onClick={() => openView({ kind: "all" })} />
+          <NavItem icon={kind === "tutorial" ? GraduationCap : FileText} tone={kind === "tutorial" ? "indigo" : "sky"} label={section.all} count={articles.length} active={view.kind === "all" && !searching} onClick={() => openView({ kind: "all" })} />
           <NavItem
-            label="📥 Uncategorized"
+            icon={Inbox}
+            tone="blue"
+            label="Uncategorized"
             count={articles.filter((a) => !a.category_id).length}
             active={view.kind === "uncategorized" && !searching}
             onClick={() => openView({ kind: "uncategorized" })}
@@ -563,7 +584,9 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
           {topCategories.map((cat) => (
             <div key={cat.id}>
               <NavItem
-                label={`🏷️ ${cat.name}`}
+                icon={Tag}
+                tone="orange"
+                label={cat.name}
                 count={countIn(cat.id)}
                 active={!searching && view.kind === "category" && view.id === cat.id}
                 onClick={() => openView({ kind: "category", id: cat.id })}
@@ -661,7 +684,7 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
                       text: kind === "tutorial" ? "Keep every course and how-to in one place." : "Keep posts and articles from anywhere in one place.",
                     },
                     { title: "Note why", text: "Add a short note on each, so you remember what mattered." },
-                    { title: "Tick it off", text: "Mark it ✓ read when you finish, or get an ✨ AI summary." },
+                    { title: "Tick it off", text: "Mark it ✓ read when you finish, or get an AI summary." },
                   ]}
                   action={{ label: "Paste your first link", target: "add-article" }}
                 />
@@ -727,24 +750,22 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
 // The Videos | Reading | Tutorials | ScrapBook switch in the header of every section.
 export function SectionSwitch({ active }: { active: "videos" | SectionKind | "scrap" | "vault" }) {
   const tab = (on: boolean) =>
-    `rounded-md px-2.5 py-1 text-sm font-medium ${on ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:text-slate-900"}`;
+    `flex items-center gap-1.5 rounded-md px-2.5 py-1 text-sm font-medium ${on ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:text-slate-900"}`;
+  const items: { key: string; href: string; name: string; Icon: LucideIcon; tone: Tone }[] = [
+    { key: "videos", href: "/", name: "Videos", Icon: Clapperboard, tone: "violet" },
+    { key: "reading", href: "/reading", name: "Reading", Icon: FileText, tone: "sky" },
+    { key: "tutorial", href: "/tutorials", name: "Tutorials", Icon: GraduationCap, tone: "indigo" },
+    { key: "scrap", href: "/scrapbook", name: "ScrapBook", Icon: NotebookPen, tone: "amber" },
+    { key: "vault", href: "/vault", name: "Vault", Icon: LockKeyhole, tone: "yellow" },
+  ];
   return (
     <nav className="flex shrink-0 rounded-lg bg-slate-100 p-0.5">
-      <Link href="/" className={tab(active === "videos")} title="Videos">
-        🎬<span className="hidden sm:inline"> Videos</span>
-      </Link>
-      {(Object.keys(SECTIONS) as SectionKind[]).map((k) => (
-        <Link key={k} href={SECTIONS[k].path} className={tab(active === k)} title={SECTIONS[k].name}>
-          {SECTIONS[k].icon}
-          <span className="hidden sm:inline"> {SECTIONS[k].name}</span>
+      {items.map(({ key, href, name, Icon, tone }) => (
+        <Link key={key} href={href} className={tab(active === key)} title={name}>
+          <Ico icon={Icon} tone={tone} />
+          <span className="hidden sm:inline">{name}</span>
         </Link>
       ))}
-      <Link href="/scrapbook" className={tab(active === "scrap")} title="ScrapBook">
-        📒<span className="hidden sm:inline"> ScrapBook</span>
-      </Link>
-      <Link href="/vault" className={tab(active === "vault")} title="Vault">
-        🔐<span className="hidden sm:inline"> Vault</span>
-      </Link>
     </nav>
   );
 }
@@ -822,7 +843,8 @@ function ArticleRow(props: {
         <Link href={`/read/${article.id}`} className={`line-clamp-2 font-medium hover:underline ${article.read_at ? "text-slate-500" : ""}`}>
           {hasNotes && (
             <span className="mr-1.5 inline-block rounded-md bg-amber-400 px-1.5 py-0.5 align-[1px] text-[11px] font-bold text-amber-950 no-underline">
-              📒 Notes
+              <Ico icon={NotebookText} tone="amber" size={12} className="mr-0.5 inline align-[-2px]" />
+              Notes
             </span>
           )}
           {article.title || article.url}
@@ -839,18 +861,22 @@ function ArticleRow(props: {
           onSave={props.onSaveNote}
         />
         {props.aiNoteError && !article.note && (
-          <p className="rounded-md bg-red-50 px-2 py-1 text-xs text-red-700 ring-1 ring-red-200">⚠️ {props.aiNoteError}</p>
+          <p className="flex items-center gap-1 rounded-md bg-red-50 px-2 py-1 text-xs text-red-700 ring-1 ring-red-200">
+            <Ico icon={TriangleAlert} tone="red" size={14} />
+            {props.aiNoteError}
+          </p>
         )}
         <div className="mt-1 flex flex-wrap items-center gap-1">
           <Link
             href={`/read/${article.id}?notes=1`}
             className={
               hasNotes
-                ? "rounded-md border border-amber-300 bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-900 hover:bg-amber-200"
-                : "rounded-md border border-slate-300 px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                ? "inline-flex items-center gap-1 rounded-md border border-amber-300 bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-900 hover:bg-amber-200"
+                : "inline-flex items-center gap-1 rounded-md border border-slate-300 px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100"
             }
           >
-            {hasNotes ? "📒 Open notes" : "✏️ Take notes"}
+            <Ico icon={hasNotes ? NotebookText : Pencil} tone={hasNotes ? "amber" : "yellow"} size={14} />
+            {hasNotes ? "Open notes" : "Take notes"}
           </Link>
           <select
             value={article.category_id ?? ""}
@@ -859,10 +885,10 @@ function ArticleRow(props: {
             aria-label="Category"
             title={props.categoryLabel}
           >
-            <option value="">📥 Uncategorized</option>
+            <option value="">Uncategorized</option>
             {props.categoryOptions.map((c) => (
               <option key={c.id} value={c.id}>
-                🏷️ {c.label}
+                {c.label}
               </option>
             ))}
           </select>
@@ -870,9 +896,10 @@ function ArticleRow(props: {
             href={article.url}
             target="_blank"
             rel="noreferrer"
-            className="rounded-md border border-slate-300 px-2 py-1 text-xs text-slate-700 hover:bg-slate-100"
+            className="inline-flex items-center gap-1 rounded-md border border-slate-300 px-2 py-1 text-xs text-slate-700 hover:bg-slate-100"
           >
-            Original ↗
+            <Ico icon={ExternalLink} tone="sky" size={14} />
+            Original
           </a>
           {props.onShift && (
             <>
@@ -884,7 +911,7 @@ function ArticleRow(props: {
               </SmallButton>
             </>
           )}
-          {!article.note && !editingNote && <SmallButton onClick={() => setEditingNote(true)}>📝 Add summary</SmallButton>}
+          {!article.note && !editingNote && <SmallButton onClick={() => setEditingNote(true)} icon={FilePen} tone="sky">Add summary</SmallButton>}
           {article.note && !editingNote && (
             <SmallButton
               onClick={async () => {
@@ -897,21 +924,23 @@ function ArticleRow(props: {
                 });
                 if (ok) props.onSaveNote("");
               }}
+              icon={Brush}
+              tone="orange"
             >
-              🧹 Clear summary
+              Clear summary
             </SmallButton>
           )}
           {!article.note && !editingNote && props.aiNoteStartedAt === null && (
-            <SmallButton onClick={props.onAiNote} title="Let AI read the page and write the summary">
-              ✨ AI summary
+            <SmallButton onClick={props.onAiNote} title="Let AI read the page and write the summary" icon={Sparkles} tone="yellow">
+              AI summary
             </SmallButton>
           )}
           {!article.note && props.aiNoteStartedAt !== null && <AiNoteWorking startedAt={props.aiNoteStartedAt} />}
           <SmallButton onClick={props.onRename}>Edit title</SmallButton>
           {/* Kept apart from the note buttons so it isn't pressed by mistake. */}
           <span className="ml-auto pl-3">
-            <SmallButton onClick={props.onDelete} danger title="Delete">
-              🗑 Delete
+            <SmallButton onClick={props.onDelete} danger title="Delete" icon={Trash2}>
+              Delete
             </SmallButton>
           </span>
         </div>
@@ -931,7 +960,7 @@ export function ToastBox({ toast, onClose }: { toast: Toast; onClose: () => void
       className={`fixed bottom-4 left-1/2 z-30 flex max-w-[calc(100vw-2rem)] -translate-x-1/2 items-center gap-3 rounded-lg px-4 py-2 text-sm shadow-lg ${color}`}
     >
       <span>
-        {toast.warn && "⚠️ "}
+        {toast.warn && <Ico icon={TriangleAlert} tone="amber" size={15} className="mr-1 inline align-[-2px]" />}
         {toast.text}
       </span>
       {toast.href && (
@@ -948,7 +977,7 @@ export function ToastBox({ toast, onClose }: { toast: Toast; onClose: () => void
   );
 }
 
-// Shown in place of the ✨ AI summary button while the AI writes the note.
+// Shown in place of the AI summary button while the AI writes the note.
 export function AiNoteWorking({ startedAt }: { startedAt: number }) {
   const seconds = useSecondsSince(startedAt);
   return (
@@ -1018,8 +1047,10 @@ export function ArticleNote(props: {
                 props.onSave("");
                 props.setEditing(false);
               }}
+              icon={Brush}
+              tone="orange"
             >
-              🧹 Clear summary
+              Clear summary
             </SmallButton>
           )}
           <SmallButton onClick={() => props.setEditing(false)}>Cancel</SmallButton>
@@ -1041,7 +1072,7 @@ export function ArticleNote(props: {
       title="Tap to edit the summary"
       className="rounded-md bg-amber-50 px-2 py-1 text-left text-sm whitespace-pre-wrap text-slate-700 hover:bg-amber-100"
     >
-      📝 {current}
+      {current}
     </button>
   );
 }
@@ -1078,10 +1109,10 @@ function AddArticleForm(props: {
         className="rounded-md border border-slate-300 bg-white px-2 py-2 text-sm sm:max-w-48"
         aria-label="Save to category"
       >
-        <option value="">📥 Uncategorized</option>
+        <option value="">Uncategorized</option>
         {props.categoryOptions.map((c) => (
           <option key={c.id} value={c.id}>
-            🏷️ {c.label}
+            {c.label}
           </option>
         ))}
       </select>
@@ -1127,8 +1158,11 @@ export function NavItem(props: {
   onDragStart?: () => void;
   onDragEnd?: () => void;
   onContextMenu?: (e: React.MouseEvent) => void;
+  icon?: LucideIcon;
+  tone?: Tone;
 }) {
   const [over, setOver] = useState(false);
+  const Icon = props.icon;
   return (
     <button
       onClick={props.onClick}
@@ -1155,6 +1189,7 @@ export function NavItem(props: {
       className={`flex w-full items-center gap-2 rounded-md py-1.5 pr-2 text-left text-sm ${props.active ? "bg-slate-900 text-white" : "hover:bg-slate-100"} ${over ? "ring-2 ring-blue-500" : ""}`}
       style={{ paddingLeft: 8 + (props.indent ?? 0) * 22 }}
     >
+      {Icon && <Ico icon={Icon} tone={props.tone ?? "slate"} />}
       <span className="truncate">{props.label}</span>
       {props.count !== undefined && (
         <span className={`ml-auto text-xs ${props.active ? "text-slate-300" : "text-slate-400"}`}>{props.count}</span>
@@ -1169,12 +1204,16 @@ export function SmallButton({
   danger,
   disabled,
   title,
+  icon: Icon,
+  tone = "slate",
 }: {
-  children: React.ReactNode;
+  children?: React.ReactNode;
   onClick: () => void;
   danger?: boolean;
   disabled?: boolean;
   title?: string;
+  icon?: LucideIcon;
+  tone?: Tone;
 }) {
   return (
     <button
@@ -1182,8 +1221,9 @@ export function SmallButton({
       disabled={disabled}
       title={title}
       aria-label={title}
-      className={`rounded-md border px-2 py-1 text-xs disabled:opacity-30 ${danger ? "border-red-200 text-red-600 hover:bg-red-50" : "border-slate-300 text-slate-700 hover:bg-slate-100"}`}
+      className={`inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs disabled:opacity-30 ${danger ? "border-red-200 text-red-600 hover:bg-red-50" : "border-slate-300 text-slate-700 hover:bg-slate-100"}`}
     >
+      {Icon && <Ico icon={Icon} tone={danger ? "red" : tone} size={14} />}
       {children}
     </button>
   );
