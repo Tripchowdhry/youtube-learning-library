@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useLayoutEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { onboarding, SAMPLE_VIDEO } from "@/lib/onboarding";
 
 // ---------- Welcome screen for an empty library ----------
@@ -130,113 +130,5 @@ export function GettingStartedChecklist(props: {
         })}
       </ul>
     </section>
-  );
-}
-
-// ---------- Short tour ----------
-
-const TOUR = [
-  {
-    target: "add-video",
-    title: "Save what you're learning",
-    text: "Paste any YouTube link here. BrainShelf fills in the details and sorts it into a folder by channel.",
-  },
-  {
-    target: "sections",
-    title: "Not just videos",
-    text: "Switch here to save articles, posts and tutorials, each with their own categories.",
-  },
-  {
-    target: "search",
-    title: "Find it again",
-    text: "Search everything you've saved, including your notes. Open any video to take notes beside it and Ask AI.",
-  },
-];
-
-type Box = { top: number; left: number; width: number; height: number };
-
-export function Tour({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const [step, setStep] = useState(0);
-  const [box, setBox] = useState<Box | null>(null);
-
-  useEffect(() => {
-    if (open) setStep(0);
-  }, [open]);
-
-  useLayoutEffect(() => {
-    if (!open) return;
-    function measure() {
-      const el = document.querySelector(`[data-tour="${TOUR[step].target}"]`);
-      const r = el?.getBoundingClientRect();
-      setBox(r && r.width > 0 ? { top: r.top, left: r.left, width: r.width, height: r.height } : null);
-    }
-    measure();
-    window.addEventListener("resize", measure);
-    window.addEventListener("scroll", measure, true);
-    return () => {
-      window.removeEventListener("resize", measure);
-      window.removeEventListener("scroll", measure, true);
-    };
-  }, [open, step]);
-
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
-
-  if (!open) return null;
-  const last = step === TOUR.length - 1;
-  const pad = 6;
-  const tipWidth = 320;
-  const tipStyle: React.CSSProperties = box
-    ? {
-        top: box.top + box.height + pad + 10,
-        left: Math.max(16, Math.min(box.left, window.innerWidth - tipWidth - 16)),
-        width: `min(${tipWidth}px, calc(100vw - 32px))`,
-      }
-    : { top: "50%", left: "50%", transform: "translate(-50%, -50%)", width: `min(${tipWidth}px, calc(100vw - 32px))` };
-
-  return (
-    <div className="fixed inset-0 z-50" role="dialog" aria-label="Quick tour">
-      {box ? (
-        <div
-          className="pointer-events-none absolute rounded-lg ring-4 ring-emerald-400 transition-all"
-          style={{
-            top: box.top - pad,
-            left: box.left - pad,
-            width: box.width + pad * 2,
-            height: box.height + pad * 2,
-            boxShadow: "0 0 0 9999px rgba(15, 23, 42, 0.45)",
-          }}
-        />
-      ) : (
-        <div className="absolute inset-0 bg-slate-900/45" />
-      )}
-      <div className="absolute rounded-xl bg-white p-4 shadow-xl" style={tipStyle}>
-        <p className="text-xs font-medium text-slate-500">
-          {step + 1} of {TOUR.length}
-        </p>
-        <p className="mt-1 font-semibold">{TOUR[step].title}</p>
-        <p className="mt-1 text-sm text-slate-600">{TOUR[step].text}</p>
-        <div className="mt-4 flex items-center gap-2">
-          <button onClick={onClose} className="mr-auto text-sm text-slate-500 hover:text-slate-800">
-            Skip tour
-          </button>
-          {step > 0 && (
-            <button onClick={() => setStep(step - 1)} className="rounded-md px-3 py-1.5 text-sm hover:bg-slate-100">
-              Back
-            </button>
-          )}
-          <button
-            onClick={() => (last ? onClose() : setStep(step + 1))}
-            className="rounded-md bg-slate-900 px-3 py-1.5 text-sm font-semibold text-white hover:bg-slate-700"
-          >
-            {last ? "Got it" : "Next"}
-          </button>
-        </div>
-      </div>
-    </div>
   );
 }

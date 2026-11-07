@@ -1,6 +1,7 @@
 "use client";
 
 import { onboarding } from "@/lib/onboarding";
+import { Tour, TourButton, useSectionTour } from "@/components/Tour";
 import Link from "next/link";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import NotePageCanvas, { PAGE_HEIGHT, type Tool } from "@/components/NotePageCanvas";
@@ -90,6 +91,7 @@ export default function StudyPage({ videoId }: { videoId: string }) {
   const [mode, setMode] = useState<Mode>("write");
   const typedBox = useRef<HTMLTextAreaElement>(null);
   const [loaded, setLoaded] = useState(false);
+  const tour = useSectionTour("study", loaded);
   const [saveState, setSaveState] = useState<SaveState>("saved");
 
   const [tool, setTool] = useState<Tool>("pen");
@@ -599,6 +601,7 @@ export default function StudyPage({ videoId }: { videoId: string }) {
         </Link>
         <h1 className="min-w-0 flex-1 truncate font-semibold">{video?.title ?? "Loading…"}</h1>
         <SaveBadge state={saveState} onRetry={save} />
+        <TourButton onClick={tour.start} />
         <button
           onClick={() => setNotesHidden((h) => !h)}
           className="shrink-0 rounded-md px-2.5 py-1 text-sm ring-1 ring-slate-300 hover:bg-slate-100"
@@ -606,6 +609,7 @@ export default function StudyPage({ videoId }: { videoId: string }) {
           {notesHidden ? "Show notes" : "Hide notes"}
         </button>
       </header>
+      <Tour open={tour.open} steps={tour.steps} onClose={tour.close} />
 
       <div className={`gap-5 p-3 md:p-5 ${notesHidden ? "" : "lg:grid lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]"}`}>
         {/* Video: sticky on top in portrait, sticky on the left in landscape. */}
@@ -833,7 +837,7 @@ function AskAi(props: {
   }
 
   return (
-    <div className="rounded-xl bg-white p-3 shadow-sm ring-1 ring-violet-200">
+    <div data-tour="ask-ai" className="rounded-xl bg-white p-3 shadow-sm ring-1 ring-violet-200">
       <button onClick={() => setOpen((o) => !o)} className="flex w-full items-center gap-2 text-left text-sm font-semibold">
         ✨ Ask AI about this video
         {busy && <span className="font-normal text-violet-700">Watching the video… this can take a minute</span>}
@@ -942,7 +946,7 @@ function Toolbar(props: {
   ];
   return (
     <div className="flex flex-wrap items-center gap-2 rounded-xl bg-white p-2 shadow-sm ring-1 ring-slate-200">
-      <div className="flex overflow-hidden rounded-lg bg-slate-100 p-0.5">
+      <div data-tour="note-mode" className="flex overflow-hidden rounded-lg bg-slate-100 p-0.5">
         {(
           [
             ["write", "✍️ Handwriting"],
@@ -1009,6 +1013,7 @@ function Toolbar(props: {
         </>
       )}
       <button
+        data-tour="stamp"
         onClick={props.onStamp}
         className="rounded-lg bg-red-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-red-700"
         title="Pin the video's current time onto your notes"

@@ -1,5 +1,6 @@
 "use client";
 
+import { Tour, TourButton, useSectionTour } from "@/components/Tour";
 import BrandMark from "@/components/BrandMark";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -87,6 +88,7 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
   const [menu, setMenu] = useState<MenuState | null>(null);
   const closeMenu = useCallback(() => setMenu(null), []);
   const [toast, setToast] = useState<Toast | null>(null);
+  const tour = useSectionTour("articles", !loading);
   // The row that was just found as a duplicate, shown with a ring for a few seconds.
   const [flashId, setFlashId] = useState<string | null>(null);
 
@@ -526,6 +528,7 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
           placeholder="Search titles, sites, notes…"
           className="ml-auto w-full max-w-xs rounded-md border border-slate-300 px-3 py-1.5 text-sm"
         />
+        <TourButton onClick={tour.start} />
         <div className="hidden items-center gap-2 text-sm text-slate-500 sm:flex">
           <span className="max-w-40 truncate">{userEmail}</span>
           <button onClick={signOut} className="rounded-md px-2 py-1 hover:bg-slate-100">
@@ -625,7 +628,7 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
                 />
               )}
 
-              <div className="mb-4 flex flex-wrap items-center gap-2 text-sm">
+              <div data-tour="read-filter" className="mb-4 flex flex-wrap items-center gap-2 text-sm">
                 <Pills
                   value={period}
                   onChange={setPeriod}
@@ -700,6 +703,7 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
       {menu && <ContextMenu menu={menu} onClose={closeMenu} />}
 
       {toast && <ToastBox toast={toast} onClose={() => setToast(null)} />}
+      <Tour open={tour.open} steps={tour.steps} onClose={tour.close} />
     </div>
   );
 }
@@ -1047,7 +1051,7 @@ function AddArticleForm(props: {
   }
 
   return (
-    <form onSubmit={submit} className="mb-4 flex flex-col gap-2 sm:flex-row">
+    <form data-tour="add-article" onSubmit={submit} className="mb-4 flex flex-col gap-2 sm:flex-row">
       <input
         value={link}
         onChange={(e) => setLink(e.target.value)}

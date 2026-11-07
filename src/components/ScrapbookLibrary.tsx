@@ -1,5 +1,6 @@
 "use client";
 
+import { Tour, TourButton, useSectionTour } from "@/components/Tour";
 import BrandMark from "@/components/BrandMark";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -66,6 +67,7 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
   const [menu, setMenu] = useState<MenuState | null>(null);
   const closeMenu = useCallback(() => setMenu(null), []);
   const [toast, setToast] = useState<{ text: string; isError?: boolean } | null>(null);
+  const tour = useSectionTour("scrapbook", !loading);
 
   const notify = useCallback((text: string, isError = false) => {
     setToast({ text, isError });
@@ -364,6 +366,7 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
           placeholder="Search titles and text…"
           className="ml-auto w-full max-w-xs rounded-md border border-slate-300 px-3 py-1.5 text-sm"
         />
+        <TourButton onClick={tour.start} />
         <div className="hidden items-center gap-2 text-sm text-slate-500 sm:flex">
           <span className="max-w-40 truncate">{userEmail}</span>
           <button onClick={signOut} className="rounded-md px-2 py-1 hover:bg-slate-100">
@@ -371,6 +374,7 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
           </button>
         </div>
       </header>
+      <Tour open={tour.open} steps={tour.steps} onClose={tour.close} />
 
       <div className="flex flex-1">
         <aside
@@ -645,7 +649,7 @@ function NewScrapForm(props: {
   }
 
   return (
-    <form onSubmit={submit} className="mb-4 flex flex-col gap-2 sm:flex-row">
+    <form data-tour="new-page" onSubmit={submit} className="mb-4 flex flex-col gap-2 sm:flex-row">
       <input
         value={title}
         maxLength={200}

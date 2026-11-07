@@ -1,8 +1,9 @@
 "use client";
 
 import BrandMark from "@/components/BrandMark";
-import { GettingStartedChecklist, Tour, WelcomePanel } from "@/components/GettingStarted";
-import { onboarding, SAMPLE_VIDEO } from "@/lib/onboarding";
+import { GettingStartedChecklist, WelcomePanel } from "@/components/GettingStarted";
+import { Tour, TourButton, useSectionTour } from "@/components/Tour";
+import { SAMPLE_VIDEO } from "@/lib/onboarding";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -68,12 +69,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
   // The video that was just found as a duplicate, shown with a ring for a few seconds.
   const [flashId, setFlashId] = useState<string | null>(null);
   // First-run guide: the short tour, and whether anything is saved in Reading or Tutorials yet.
-  const [tourOpen, setTourOpen] = useState(false);
   const [hasArticle, setHasArticle] = useState(false);
-  const closeTour = useCallback(() => {
-    onboarding.setTourDone(userEmail, true);
-    setTourOpen(false);
-  }, [userEmail]);
 
   const notify = useCallback((text: string, isError = false) => {
     setToast({ text, isError });
@@ -105,9 +101,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
   }, [load]);
 
   // New here: show the short tour once the library has loaded.
-  useEffect(() => {
-    if (!loading && !onboarding.tourDone(userEmail)) setTourOpen(true);
-  }, [loading, userEmail]);
+  const tour = useSectionTour("videos", !loading, userEmail);
 
   // ---------- Folder helpers ----------
 
@@ -536,6 +530,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
           placeholder="Search titles, channels, notes…"
           className="ml-auto w-full max-w-xs rounded-md border border-slate-300 px-3 py-1.5 text-sm"
         />
+        <TourButton onClick={tour.start} />
         <Link
           href="/clips"
           className="shrink-0 rounded-md px-2 py-1 text-sm text-slate-600 hover:bg-slate-100"
@@ -630,7 +625,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
               firstVideoId={videos[0]?.id ?? null}
               hasNote={notedVideoIds.size > 0}
               hasArticle={hasArticle}
-              onShowTour={() => setTourOpen(true)}
+              onShowTour={tour.start}
             />
           )}
 
@@ -731,7 +726,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
       {menu && <ContextMenu menu={menu} onClose={closeMenu} />}
 
       {toast && <ToastBox toast={toast} onClose={() => setToast(null)} />}
-      <Tour open={tourOpen} onClose={closeTour} />
+      <Tour open={tour.open} steps={tour.steps} onClose={tour.close} />
     </div>
   );
 }
