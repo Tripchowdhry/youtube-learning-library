@@ -2,10 +2,11 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import AiJobsBadge from "@/components/AiJobsBadge";
 import { ConfirmHost } from "@/components/ConfirmDialog";
+import { BRAND } from "@/lib/brand";
 
 export const metadata: Metadata = {
-  title: "BrainShelf",
-  description: "Save the videos, articles and tutorials you learn from, with notes and AI help, on every device.",
+  title: `${BRAND.name}: ${BRAND.tagline}`,
+  description: `${BRAND.headline} ${BRAND.description}`,
 };
 
 export const viewport: Viewport = {
