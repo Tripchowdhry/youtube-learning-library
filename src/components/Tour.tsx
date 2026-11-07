@@ -5,19 +5,27 @@ import { onboarding } from "@/lib/onboarding";
 import { TOURS, type TourId, type TourStep } from "@/lib/tours";
 
 // Opens a section's tour the first time it is ready, and lets it be replayed.
+// The section's "Getting started" card shows only alongside the tour: when the tour opens
+// (the first visit, or Quick tour), and until its ✕ is clicked.
 export function useSectionTour(id: TourId, ready: boolean, email = "") {
   const [open, setOpen] = useState(false);
+  const [checklistOpen, setChecklistOpen] = useState(false);
+  const start = useCallback(() => {
+    setOpen(true);
+    setChecklistOpen(true);
+  }, []);
   useEffect(() => {
     if (!ready || onboarding.tourDone(id, email)) return;
     // A moment's wait so the page has laid itself out before we point at things.
-    const timer = setTimeout(() => setOpen(true), 400);
+    const timer = setTimeout(start, 400);
     return () => clearTimeout(timer);
-  }, [id, ready, email]);
+  }, [id, ready, email, start]);
   const close = useCallback(() => {
     onboarding.setTourDone(id, email);
     setOpen(false);
   }, [id, email]);
-  return { open, start: () => setOpen(true), close, steps: TOURS[id] as TourStep[] };
+  const closeChecklist = useCallback(() => setChecklistOpen(false), []);
+  return { open, start, close, steps: TOURS[id] as TourStep[], checklistOpen, closeChecklist };
 }
 
 // The "Quick tour" button in a header that replays the tour.

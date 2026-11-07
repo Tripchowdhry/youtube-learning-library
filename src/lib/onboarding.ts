@@ -26,11 +26,6 @@ export const onboarding = {
   tourDone: (tour: string, email = "") => (tour === "videos" ? read("tour-done", email) : read(`tour:${tour}`, "")),
   setTourDone: (tour: string, email = "") =>
     tour === "videos" ? write("tour-done", email, true) : write(`tour:${tour}`, "", true),
-  // The Videos checklist is per account (its key predates the others); the rest are per device.
-  checklistHidden: (id: string, email = "") =>
-    id === "videos" ? read("checklist-hidden", email) : read(`checklist-hidden:${id}`, ""),
-  hideChecklist: (id: string, email = "") =>
-    id === "videos" ? write("checklist-hidden", email, true) : write(`checklist-hidden:${id}`, "", true),
   // Ask AI runs on the study page, which doesn't know the email, so this one is per device.
   triedAi: () => read("tried-ai", ""),
   markTriedAi: () => write("tried-ai", "", true),
