@@ -79,12 +79,18 @@ export default function Library({ userEmail }: { userEmail: string }) {
   }, []);
 
   const load = useCallback(async () => {
-    const [f, v, n, a] = await Promise.all([
+    const [f, v, n, a, ai] = await Promise.all([
       supabase.from("folders").select("*").order("position").order("name"),
       supabase.from("videos").select("*").order("position"),
       supabase.from("notes").select("video_id"),
       supabase.from("articles").select("id", { count: "exact", head: true }),
+      // AI answers are saved into typed notes starting with ✨, so this finds Ask AI used before.
+      supabase.from("notes").select("video_id", { count: "exact", head: true }).like("text", "%✨%"),
     ]);
+    if (!ai.error && (ai.count ?? 0) > 0) {
+      onboarding.markTriedAi();
+      setTriedAi(true);
+    }
     // Only used by the getting-started checklist, so a missing articles table is fine.
     if (!a.error) setHasArticle((a.count ?? 0) > 0);
     // Notes are optional: ignore errors so the library still loads before the notes table exists.
