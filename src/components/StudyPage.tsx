@@ -1,6 +1,5 @@
 "use client";
 
-import { onboarding } from "@/lib/onboarding";
 import { Tour, TourButton, useSectionTour } from "@/components/Tour";
 import Link from "next/link";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -472,7 +471,6 @@ export default function StudyPage({ videoId }: { videoId: string }) {
   // The AI keeps working if the person leaves this page; the answer is then saved to the notes.
   function askAi(prompt: string) {
     if (!video || aiStartedAt !== null) return;
-    onboarding.markTriedAi();
     const shotAt = screenshotTime(prompt);
     if (shotAt !== null) {
       player.current?.seekTo(shotAt, true);

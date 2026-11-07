@@ -1,6 +1,5 @@
 "use client";
 
-import { ChecklistCard } from "@/components/GettingStarted";
 import { Tour, TourButton, useSectionTour } from "@/components/Tour";
 import BrandMark from "@/components/BrandMark";
 import Link from "next/link";
@@ -458,30 +457,6 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
                 <ItemSortSelect sort={itemSort} onChange={setItemSort} />
               </div>
 
-              {!searching && !loading && (
-                <ChecklistCard
-                  open={tour.checklistOpen}
-                  onClose={tour.closeChecklist}
-                  steps={[
-                    {
-                      done: scraps.length > 0,
-                      label: "Create your first page",
-                      hint: "Give it a title below and tap + New page.",
-                    },
-                    {
-                      done: categories.length > 0,
-                      label: "Make a category",
-                      hint: "Group your pages, like \"Ideas\" or \"Projects\".",
-                      action: { label: "+ New category", onClick: () => createCategory(null) },
-                    },
-                    {
-                      done: scraps.some((p) => p.category_id),
-                      label: "Put a page in a category",
-                      hint: "Drag a page onto a category on the left, or pick one when you create it.",
-                    },
-                  ]}
-                />
-              )}
 
               {!searching && (
                 <NewScrapForm

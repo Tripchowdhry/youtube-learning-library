@@ -1,9 +1,9 @@
 "use client";
 
 import BrandMark from "@/components/BrandMark";
-import { ChecklistCard, WelcomePanel } from "@/components/GettingStarted";
+import { WelcomePanel } from "@/components/GettingStarted";
 import { Tour, TourButton, useSectionTour } from "@/components/Tour";
-import { onboarding, SAMPLE_VIDEO } from "@/lib/onboarding";
+import { SAMPLE_VIDEO } from "@/lib/onboarding";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -68,10 +68,6 @@ export default function Library({ userEmail }: { userEmail: string }) {
   const [toast, setToast] = useState<Toast | null>(null);
   // The video that was just found as a duplicate, shown with a ring for a few seconds.
   const [flashId, setFlashId] = useState<string | null>(null);
-  // First-run guide: the short tour, and whether anything is saved in Reading or Tutorials yet.
-  const [hasArticle, setHasArticle] = useState(false);
-  const [triedAi, setTriedAi] = useState(false);
-  useEffect(() => setTriedAi(onboarding.triedAi()), []);
 
   const notify = useCallback((text: string, isError = false) => {
     setToast({ text, isError });
@@ -79,20 +75,11 @@ export default function Library({ userEmail }: { userEmail: string }) {
   }, []);
 
   const load = useCallback(async () => {
-    const [f, v, n, a, ai] = await Promise.all([
+    const [f, v, n] = await Promise.all([
       supabase.from("folders").select("*").order("position").order("name"),
       supabase.from("videos").select("*").order("position"),
       supabase.from("notes").select("video_id"),
-      supabase.from("articles").select("id", { count: "exact", head: true }),
-      // AI answers are saved into typed notes starting with ✨, so this finds Ask AI used before.
-      supabase.from("notes").select("video_id", { count: "exact", head: true }).like("text", "%✨%"),
     ]);
-    if (!ai.error && (ai.count ?? 0) > 0) {
-      onboarding.markTriedAi();
-      setTriedAi(true);
-    }
-    // Only used by the getting-started checklist, so a missing articles table is fine.
-    if (!a.error) setHasArticle((a.count ?? 0) > 0);
     // Notes are optional: ignore errors so the library still loads before the notes table exists.
     if (!n.error) setNotedVideoIds(new Set(n.data.map((row) => row.video_id as string)));
     if (f.error || v.error) {
@@ -110,7 +97,6 @@ export default function Library({ userEmail }: { userEmail: string }) {
 
   // New here: show the short tour once the library has loaded.
   const tour = useSectionTour("videos", !loading, userEmail);
-  const firstStudy = videos[0] ? `/video/${videos[0].id}` : null;
 
   // ---------- Folder helpers ----------
 
@@ -627,38 +613,6 @@ export default function Library({ userEmail }: { userEmail: string }) {
             <ItemSortSelect sort={itemSort} onChange={setItemSort} />
           </div>
 
-          {!searching && !loading && (
-            <ChecklistCard
-              open={tour.checklistOpen}
-              onClose={tour.closeChecklist}
-              steps={[
-                {
-                  done: videos.length > 0,
-                  label: "Save your first video",
-                  hint: "Paste a YouTube link in the box below.",
-                  action: { label: "Try a sample", onClick: () => addVideo(SAMPLE_VIDEO.link) },
-                },
-                {
-                  done: notedVideoIds.size > 0,
-                  label: "Take a note on a video",
-                  hint: "Open a video and write or draw beside it.",
-                  action: { label: "Open a video →", href: firstStudy },
-                },
-                {
-                  done: triedAi,
-                  label: "Ask AI about a video",
-                  hint: "On a video's page, tap Ask AI for a summary.",
-                  action: { label: "✨ Try Ask AI →", href: firstStudy },
-                },
-                {
-                  done: hasArticle,
-                  label: "Save an article to Reading",
-                  hint: "Switch to Reading and paste any web link.",
-                  action: { label: "Go to Reading →", href: "/reading" },
-                },
-              ]}
-            />
-          )}
 
           {!searching && (
             <AddVideoForm
