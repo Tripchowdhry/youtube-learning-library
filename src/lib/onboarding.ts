@@ -26,9 +26,6 @@ export const onboarding = {
   tourDone: (tour: string, email = "") => (tour === "videos" ? read("tour-done", email) : read(`tour:${tour}`, "")),
   setTourDone: (tour: string, email = "") =>
     tour === "videos" ? write("tour-done", email, true) : write(`tour:${tour}`, "", true),
-  // Ask AI runs on the study page, which doesn't know the email, so this one is per device.
-  triedAi: () => read("tried-ai", ""),
-  markTriedAi: () => write("tried-ai", "", true),
 };
 
 // A short, well-known lesson new users can add with one tap to see how things work.
