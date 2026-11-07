@@ -453,7 +453,6 @@ export default function VaultLibrary({ userEmail }: { userEmail: string }) {
           placeholder="Search names, web addresses, user IDs…"
           className="ml-auto w-full max-w-xs rounded-md border border-slate-300 px-3 py-1.5 text-sm"
         />
-        <TourButton onClick={tour.start} />
         <div className="hidden items-center gap-2 text-sm text-slate-500 sm:flex">
           <span className="max-w-40 truncate">{userEmail}</span>
           <button onClick={signOut} className="rounded-md px-2 py-1 hover:bg-slate-100">
@@ -551,6 +550,7 @@ export default function VaultLibrary({ userEmail }: { userEmail: string }) {
             <>
               <div className="mb-4 flex flex-wrap items-center gap-2">
                 <h1 className="mr-auto text-2xl font-bold">{title}</h1>
+                <TourButton onClick={tour.start} />
                 {currentCategory && !searching && (
                   <>
                     {!currentCategory.parent_id && (

@@ -539,7 +539,6 @@ export default function Library({ userEmail }: { userEmail: string }) {
           placeholder="Search titles, channels, notes…"
           className="ml-auto w-full max-w-xs rounded-md border border-slate-300 px-3 py-1.5 text-sm"
         />
-        <TourButton onClick={tour.start} />
         <Link
           href="/clips"
           className="shrink-0 rounded-md px-2 py-1 text-sm text-slate-600 hover:bg-slate-100"
@@ -609,6 +608,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
         <main className="min-w-0 flex-1 p-4 md:p-6">
           <div className="mb-4 flex flex-wrap items-center gap-2">
             <h1 className="mr-auto text-2xl font-bold">{title}</h1>
+            <TourButton onClick={tour.start} />
             {currentFolder && !searching && (
               <>
                 <SmallButton onClick={() => createFolder(currentFolder.id)}>+ Subfolder</SmallButton>
