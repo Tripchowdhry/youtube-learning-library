@@ -22,8 +22,10 @@ function write(name: string, userEmail: string, on: boolean) {
 }
 
 export const onboarding = {
-  tourDone: (email: string) => read("tour-done", email),
-  setTourDone: (email: string, done: boolean) => write("tour-done", email, done),
+  // The Videos tour is per account (its key predates the others); section tours are per device.
+  tourDone: (tour: string, email = "") => (tour === "videos" ? read("tour-done", email) : read(`tour:${tour}`, "")),
+  setTourDone: (tour: string, email = "") =>
+    tour === "videos" ? write("tour-done", email, true) : write(`tour:${tour}`, "", true),
   checklistHidden: (email: string) => read("checklist-hidden", email),
   hideChecklist: (email: string) => write("checklist-hidden", email, true),
   // Ask AI runs on the study page, which doesn't know the email, so this one is per device.
