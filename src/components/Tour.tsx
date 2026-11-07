@@ -5,14 +5,14 @@ import { onboarding } from "@/lib/onboarding";
 import { TOURS, type TourId, type TourStep } from "@/lib/tours";
 
 // Opens a section's tour the first time it is ready, and lets it be replayed.
-// The section's "Getting started" card shows only alongside the tour: when the tour opens
-// (the first visit, or Quick tour), and until its ✕ is clicked.
+// The section's "Getting started" card shows only after the tour: once the tour is finished
+// or skipped (on the first visit, or after Quick tour), and until its ✕ is clicked.
 export function useSectionTour(id: TourId, ready: boolean, email = "") {
   const [open, setOpen] = useState(false);
   const [checklistOpen, setChecklistOpen] = useState(false);
   const start = useCallback(() => {
     setOpen(true);
-    setChecklistOpen(true);
+    setChecklistOpen(false);
   }, []);
   useEffect(() => {
     if (!ready || onboarding.tourDone(id, email)) return;
@@ -23,6 +23,7 @@ export function useSectionTour(id: TourId, ready: boolean, email = "") {
   const close = useCallback(() => {
     onboarding.setTourDone(id, email);
     setOpen(false);
+    setChecklistOpen(true);
   }, [id, email]);
   const closeChecklist = useCallback(() => setChecklistOpen(false), []);
   return { open, start, close, steps: TOURS[id] as TourStep[], checklistOpen, closeChecklist };
