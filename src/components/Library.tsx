@@ -1,6 +1,8 @@
 "use client";
 
 import BrandMark from "@/components/BrandMark";
+import { GettingStartedChecklist, Tour, WelcomePanel } from "@/components/GettingStarted";
+import { onboarding, SAMPLE_VIDEO } from "@/lib/onboarding";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -65,6 +67,13 @@ export default function Library({ userEmail }: { userEmail: string }) {
   const [toast, setToast] = useState<Toast | null>(null);
   // The video that was just found as a duplicate, shown with a ring for a few seconds.
   const [flashId, setFlashId] = useState<string | null>(null);
+  // First-run guide: the short tour, and whether anything is saved in Reading or Tutorials yet.
+  const [tourOpen, setTourOpen] = useState(false);
+  const [hasArticle, setHasArticle] = useState(false);
+  const closeTour = useCallback(() => {
+    onboarding.setTourDone(userEmail, true);
+    setTourOpen(false);
+  }, [userEmail]);
 
   const notify = useCallback((text: string, isError = false) => {
     setToast({ text, isError });
@@ -72,11 +81,14 @@ export default function Library({ userEmail }: { userEmail: string }) {
   }, []);
 
   const load = useCallback(async () => {
-    const [f, v, n] = await Promise.all([
+    const [f, v, n, a] = await Promise.all([
       supabase.from("folders").select("*").order("position").order("name"),
       supabase.from("videos").select("*").order("position"),
       supabase.from("notes").select("video_id"),
+      supabase.from("articles").select("id", { count: "exact", head: true }),
     ]);
+    // Only used by the getting-started checklist, so a missing articles table is fine.
+    if (!a.error) setHasArticle((a.count ?? 0) > 0);
     // Notes are optional: ignore errors so the library still loads before the notes table exists.
     if (!n.error) setNotedVideoIds(new Set(n.data.map((row) => row.video_id as string)));
     if (f.error || v.error) {
@@ -91,6 +103,11 @@ export default function Library({ userEmail }: { userEmail: string }) {
   useEffect(() => {
     load();
   }, [load]);
+
+  // New here: show the short tour once the library has loaded.
+  useEffect(() => {
+    if (!loading && !onboarding.tourDone(userEmail)) setTourOpen(true);
+  }, [loading, userEmail]);
 
   // ---------- Folder helpers ----------
 
@@ -508,8 +525,11 @@ export default function Library({ userEmail }: { userEmail: string }) {
           {showFolders ? "Close" : "Folders"}
         </button>
         <BrandMark />
-        <SectionSwitch active="videos" />
+        <span data-tour="sections" className="shrink-0">
+          <SectionSwitch active="videos" />
+        </span>
         <input
+          data-tour="search"
           type="search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
@@ -603,6 +623,17 @@ export default function Library({ userEmail }: { userEmail: string }) {
             <ItemSortSelect sort={itemSort} onChange={setItemSort} />
           </div>
 
+          {!searching && !loading && (
+            <GettingStartedChecklist
+              userEmail={userEmail}
+              hasVideo={videos.length > 0}
+              firstVideoId={videos[0]?.id ?? null}
+              hasNote={notedVideoIds.size > 0}
+              hasArticle={hasArticle}
+              onShowTour={() => setTourOpen(true)}
+            />
+          )}
+
           {!searching && (
             <AddVideoForm
               onAdd={addVideo}
@@ -645,6 +676,8 @@ export default function Library({ userEmail }: { userEmail: string }) {
 
           {loading ? (
             <p className="text-slate-500">Loading your library…</p>
+          ) : videos.length === 0 && !searching ? (
+            <WelcomePanel onAddSample={() => addVideo(SAMPLE_VIDEO.link)} />
           ) : visibleVideos.length === 0 ? (
             <EmptyState searching={searching || watchFilter !== "all" || period !== "any"} hasVideos={videos.length > 0} />
           ) : (
@@ -698,6 +731,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
       {menu && <ContextMenu menu={menu} onClose={closeMenu} />}
 
       {toast && <ToastBox toast={toast} onClose={() => setToast(null)} />}
+      <Tour open={tourOpen} onClose={closeTour} />
     </div>
   );
 }
@@ -836,7 +870,7 @@ function AddVideoForm({ onAdd, destination }: { onAdd: (link: string) => Promise
   }
 
   return (
-    <form onSubmit={submit} className="mb-5 flex flex-col gap-2 sm:flex-row">
+    <form data-tour="add-video" onSubmit={submit} className="mb-5 flex flex-col gap-2 sm:flex-row">
       <input
         value={link}
         onChange={(e) => setLink(e.target.value)}
