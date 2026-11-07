@@ -1,6 +1,8 @@
 # BrainShelf
 
-A web app for organizing the YouTube videos you learn from. Anyone can sign in with Google and get their own private library.
+**A home for everything you learn. Stop bookmarking. Start learning.**
+
+A notebook for all learners. Save videos, articles and tutorials, take notes beside them, and ask AI to explain what you don't get. Anyone can sign in with Google and get their own private library.
 
 - Paste a YouTube link and the title, channel and thumbnail fill in automatically
 - Videos added outside a folder are sorted into a folder named after their YouTube channel

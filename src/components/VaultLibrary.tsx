@@ -1,5 +1,6 @@
 "use client";
 
+import BrandMark from "@/components/BrandMark";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import ContextMenu, { type MenuState } from "@/components/ContextMenu";
@@ -440,7 +441,7 @@ export default function VaultLibrary({ userEmail }: { userEmail: string }) {
         >
           {showCategories ? "Close" : "Categories"}
         </button>
-        <span className="hidden text-lg font-bold sm:inline">📚 BrainShelf</span>
+        <BrandMark />
         <SectionSwitch active="vault" />
         <input
           type="search"

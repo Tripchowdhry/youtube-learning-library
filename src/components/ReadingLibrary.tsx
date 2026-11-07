@@ -1,5 +1,6 @@
 "use client";
 
+import BrandMark from "@/components/BrandMark";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -516,7 +517,7 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
         >
           {showCategories ? "Close" : "Categories"}
         </button>
-        <span className="hidden text-lg font-bold sm:inline">📚 BrainShelf</span>
+        <BrandMark />
         <SectionSwitch active={kind} />
         <input
           type="search"

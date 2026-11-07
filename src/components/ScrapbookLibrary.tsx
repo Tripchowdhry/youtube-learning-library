@@ -1,5 +1,6 @@
 "use client";
 
+import BrandMark from "@/components/BrandMark";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -354,7 +355,7 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
         >
           {showCategories ? "Close" : "Categories"}
         </button>
-        <span className="hidden text-lg font-bold sm:inline">📚 BrainShelf</span>
+        <BrandMark />
         <SectionSwitch active="scrap" />
         <input
           type="search"
