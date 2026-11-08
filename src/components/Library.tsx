@@ -4,7 +4,7 @@ import BrandMark from "@/components/BrandMark";
 import { WelcomePanel } from "@/components/GettingStarted";
 import { Tour, TourButton, useSectionTour } from "@/components/Tour";
 import { SAMPLE_VIDEO } from "@/lib/onboarding";
-import { Brush, Clapperboard, ExternalLink, FilePen, Folder as FolderIcon, FolderPlus, Images, Inbox, Link2, NotebookText, Pencil, Sparkles, Trash2, TriangleAlert, type LucideIcon } from "lucide-react";
+import { Brush, Clapperboard, ExternalLink, FilePen, Folder as FolderIcon, Copy, FolderPlus, Images, Inbox, Link2, Link2Off, NotebookText, Pencil, Sparkles, Trash2, TriangleAlert, type LucideIcon } from "lucide-react";
 import { Ico, type Tone } from "@/components/Icon";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -433,6 +433,12 @@ export default function Library({ userEmail }: { userEmail: string }) {
       items: [
         { label: "Rename", icon: Pencil, tone: "yellow", onClick: () => renameFolder(folder) },
         { label: "New subfolder", icon: FolderPlus, tone: "amber", onClick: () => createFolder(folder.id) },
+        ...(folder.share_token
+          ? [
+              { label: "Copy share link", icon: Copy, tone: "sky" as const, onClick: () => copyShareLink(folder.share_token!) },
+              { label: "Stop sharing", icon: Link2Off, tone: "slate" as const, onClick: () => toggleShare(folder) },
+            ]
+          : [{ label: "Share", icon: Link2, tone: "sky" as const, onClick: () => toggleShare(folder) }]),
         { label: "Delete", icon: Trash2, tone: "red", onClick: () => deleteFolder(folder), danger: true },
       ],
     });
@@ -605,11 +611,17 @@ export default function Library({ userEmail }: { userEmail: string }) {
               <>
                 <SmallButton onClick={() => createFolder(currentFolder.id)}>+ Subfolder</SmallButton>
                 <SmallButton onClick={() => renameFolder(currentFolder)}>Rename</SmallButton>
-                <SmallButton onClick={() => toggleShare(currentFolder)}>
+                <SmallButton
+                  onClick={() => toggleShare(currentFolder)}
+                  icon={currentFolder.share_token ? Link2Off : Link2}
+                  tone={currentFolder.share_token ? "slate" : "sky"}
+                >
                   {currentFolder.share_token ? "Stop sharing" : "Share"}
                 </SmallButton>
                 {currentFolder.share_token && (
-                  <SmallButton onClick={() => copyShareLink(currentFolder.share_token!)}>Copy link</SmallButton>
+                  <SmallButton onClick={() => copyShareLink(currentFolder.share_token!)} icon={Copy} tone="sky">
+                    Copy link
+                  </SmallButton>
                 )}
                 <SmallButton onClick={() => deleteFolder(currentFolder)} danger>
                   Delete
