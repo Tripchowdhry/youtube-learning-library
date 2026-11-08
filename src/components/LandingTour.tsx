@@ -178,7 +178,7 @@ export default function LandingTour() {
                   onClick={last ? finish : () => setI(i + 1)}
                   className={`${i > 0 ? "" : "ml-auto"} inline-flex items-center gap-1 rounded-lg bg-slate-900 px-3 py-1.5 text-sm font-semibold text-white hover:bg-slate-700`}
                 >
-                  {last ? "Sign in to start" : "Next"}{" "}
+                  {last ? "Start your shelf today" : "Next"}{" "}
                   {!last && <ArrowRight size={16} />}
                 </button>
               </div>
