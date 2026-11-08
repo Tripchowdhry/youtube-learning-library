@@ -2,13 +2,20 @@ import Link from "next/link";
 import VideoThumb from "@/components/VideoThumb";
 import { createClient } from "@/lib/supabase/server";
 import type { SharedFolder } from "@/lib/types";
-import { Folder as FolderIcon } from "lucide-react";
+import { ArrowLeft, Eye, Folder as FolderIcon } from "lucide-react";
 import { Ico } from "@/components/Icon";
 
 export const dynamic = "force-dynamic";
 
-export default async function SharedFolderPage({ params }: { params: Promise<{ token: string }> }) {
+export default async function SharedFolderPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ token: string }>;
+  searchParams: Promise<{ preview?: string }>;
+}) {
   const { token } = await params;
+  const preview = (await searchParams).preview === "1";
   const supabase = await createClient();
   const isUuid = /^[0-9a-f-]{36}$/i.test(token);
   const { data } = isUuid ? await supabase.rpc("get_shared_folder", { token }) : { data: null };
@@ -25,6 +32,19 @@ export default async function SharedFolderPage({ params }: { params: Promise<{ t
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-8">
+      {preview && (
+        <div className="mb-6 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm text-violet-900">
+          <span className="flex items-center gap-1.5 font-semibold">
+            <Ico icon={Eye} tone="violet" size={16} />
+            Preview: what people with the link see
+          </span>
+          <span className="text-violet-800">Your notes and summaries stay private. Only the videos below are shared.</span>
+          <Link href="/" className="ml-auto flex items-center gap-1 font-medium underline">
+            <ArrowLeft size={14} aria-hidden />
+            Back to my library
+          </Link>
+        </div>
+      )}
       <p className="text-sm text-slate-500">Shared folder</p>
       <h1 className="mb-6 text-3xl font-bold">{shared.folder.name}</h1>
       <Section shared={shared} folderId={shared.folder.id} depth={0} />
