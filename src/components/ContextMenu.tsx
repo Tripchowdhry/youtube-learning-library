@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import type { LucideIcon } from "lucide-react";
+import { Ico, type Tone } from "@/components/Icon";
 
-export type MenuItem = { label: string; onClick: () => void; danger?: boolean };
+export type MenuItem = { label: string; onClick: () => void; danger?: boolean; icon?: LucideIcon; tone?: Tone };
 export type MenuState = { x: number; y: number; items: MenuItem[] };
 
 // A small right-click menu. It closes on a click elsewhere, Escape, or scrolling.
@@ -44,8 +46,9 @@ export default function ContextMenu({ menu, onClose }: { menu: MenuState; onClos
             onClose();
             item.onClick();
           }}
-          className={`block w-full px-3 py-1.5 text-left hover:bg-slate-100 ${item.danger ? "text-red-600" : "text-slate-800"}`}
+          className={`flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-slate-100 ${item.danger ? "text-red-600" : "text-slate-800"}`}
         >
+          {item.icon && <Ico icon={item.icon} tone={item.tone ?? "slate"} />}
           {item.label}
         </button>
       ))}

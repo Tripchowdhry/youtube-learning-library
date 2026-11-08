@@ -6,6 +6,8 @@ import { onAiJobDone, runAiJob, useAiJobs, useSecondsSince } from "@/lib/ai-jobs
 import { createClient } from "@/lib/supabase/client";
 import type { Article } from "@/lib/types";
 import { askArticleAi } from "@/lib/video-ai";
+import { Brush, CircleHelp, FileText, Footprints, Lightbulb, List, NotebookText, Sparkles, TriangleAlert, type LucideIcon } from "lucide-react";
+import { Ico, type Tone } from "@/components/Icon";
 
 type SaveState = "saved" | "saving" | "unsaved" | "error";
 
@@ -18,12 +20,17 @@ function addAnswer(notes: string, answer: string) {
   return `${current ? `${current}\n\n` : ""}${answer}`;
 }
 
-const presets = (word: string) => [
-  { label: "📝 Summary in 100 words", prompt: `Summarize this ${word} in 100 words.` },
-  { label: "💡 Key ideas", prompt: `List the key ideas in this ${word}, one line each.` },
-  { label: "🪜 How to use it in 3 steps", prompt: `Explain in 3 steps how to use what this ${word} teaches.` },
-  { label: "• Report in bullets", prompt: `Write a report on this ${word} in bullet points.` },
-  { label: "❓ Quiz me", prompt: `Write 5 short questions to test what I learned from this ${word}, with the answers at the end.` },
+const presets = (word: string): { label: string; icon: LucideIcon; tone: Tone; prompt: string }[] => [
+  { label: "Summary in 100 words", icon: FileText, tone: "sky", prompt: `Summarize this ${word} in 100 words.` },
+  { label: "Key ideas", icon: Lightbulb, tone: "yellow", prompt: `List the key ideas in this ${word}, one line each.` },
+  { label: "How to use it in 3 steps", icon: Footprints, tone: "green", prompt: `Explain in 3 steps how to use what this ${word} teaches.` },
+  { label: "Report in bullets", icon: List, tone: "slate", prompt: `Write a report on this ${word} in bullet points.` },
+  {
+    label: "Quiz me",
+    icon: CircleHelp,
+    tone: "red",
+    prompt: `Write 5 short questions to test what I learned from this ${word}, with the answers at the end.`,
+  },
 ];
 
 // The notes side of the reading page: Ask AI about the article, and a box for typed notes.
@@ -145,7 +152,10 @@ export default function ArticleNotes(props: {
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center gap-2">
-        <h2 className="font-semibold">📒 My notes</h2>
+        <h2 className="flex items-center gap-1.5 font-semibold">
+          <Ico icon={NotebookText} tone="amber" />
+          My notes
+        </h2>
         {saveState === "error" ? (
           <button onClick={save} className="text-xs text-red-600 underline">
             Not saved. Tap to retry
@@ -166,9 +176,10 @@ export default function ArticleNotes(props: {
                 });
                 if (ok) change("");
               }}
-              className="rounded-md border border-slate-300 bg-white px-2 py-1 text-xs text-slate-700 hover:bg-slate-100"
+              className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-2 py-1 text-xs text-slate-700 hover:bg-slate-100"
             >
-              🧹 Clear my notes
+              <Ico icon={Brush} tone="orange" size={14} />
+              Clear my notes
             </button>
           )}
           <button
@@ -179,7 +190,12 @@ export default function ArticleNotes(props: {
           </button>
         </span>
       </div>
-      {saveError && <p className="rounded-md bg-red-50 px-2 py-1.5 text-sm text-red-700 ring-1 ring-red-200">⚠️ {saveError}</p>}
+      {saveError && (
+        <p className="flex items-center gap-1.5 rounded-md bg-red-50 px-2 py-1.5 text-sm text-red-700 ring-1 ring-red-200">
+          <Ico icon={TriangleAlert} tone="red" size={15} />
+          {saveError}
+        </p>
+      )}
 
       <AskAi word={word} startedAt={aiStartedAt} error={aiError} onAsk={askAi} />
 
@@ -219,7 +235,10 @@ function AskAi(props: { word: string; startedAt: number | null; error: string | 
   }
   return (
     <div className="rounded-xl bg-white p-3 shadow-sm ring-1 ring-violet-200">
-      <p className="text-sm font-semibold">✨ Ask AI about this {props.word}</p>
+      <p className="flex items-center gap-1.5 text-sm font-semibold">
+        <Ico icon={Sparkles} tone="yellow" />
+        Ask AI about this {props.word}
+      </p>
       <div className="mt-2 flex flex-col gap-2">
         <div className="flex flex-wrap gap-1.5">
           {presets(props.word).map((p) => (
@@ -227,8 +246,9 @@ function AskAi(props: { word: string; startedAt: number | null; error: string | 
               key={p.label}
               onClick={() => ask(p.prompt)}
               disabled={busy}
-              className="rounded-full bg-violet-50 px-3 py-1 text-xs text-violet-800 ring-1 ring-violet-200 hover:bg-violet-100 disabled:opacity-50"
+              className="inline-flex items-center gap-1 rounded-full bg-violet-50 px-3 py-1 text-xs text-violet-800 ring-1 ring-violet-200 hover:bg-violet-100 disabled:opacity-50"
             >
+              <Ico icon={p.icon} tone={p.tone} size={14} />
               {p.label}
             </button>
           ))}
@@ -258,7 +278,10 @@ function AskAi(props: { word: string; startedAt: number | null; error: string | 
         </div>
         {props.startedAt !== null && <Working startedAt={props.startedAt} word={props.word} />}
         {props.error && (
-          <p className="rounded-md bg-red-50 px-2 py-1.5 text-sm text-red-700 ring-1 ring-red-200">⚠️ {props.error}</p>
+          <p className="flex items-center gap-1.5 rounded-md bg-red-50 px-2 py-1.5 text-sm text-red-700 ring-1 ring-red-200">
+            <Ico icon={TriangleAlert} tone="red" size={15} />
+            {props.error}
+          </p>
         )}
       </div>
     </div>

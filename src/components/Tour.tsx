@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { Compass } from "lucide-react";
+import { Ico } from "@/components/Icon";
 import { onboarding } from "@/lib/onboarding";
 import { TOURS, type TourId, type TourStep } from "@/lib/tours";
 
@@ -30,7 +32,7 @@ export function TourButton({ onClick }: { onClick: () => void }) {
       aria-label="Show the tour"
       className="flex h-7 shrink-0 items-center gap-1 rounded-full px-2.5 text-sm font-medium text-slate-600 ring-1 ring-slate-300 hover:bg-slate-100 hover:text-slate-900"
     >
-      <span aria-hidden>🧭</span>
+      <Ico icon={Compass} tone="red" size={16} />
       <span>Quick tour</span>
     </button>
   );

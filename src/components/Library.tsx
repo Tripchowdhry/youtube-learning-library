@@ -4,6 +4,8 @@ import BrandMark from "@/components/BrandMark";
 import { WelcomePanel } from "@/components/GettingStarted";
 import { Tour, TourButton, useSectionTour } from "@/components/Tour";
 import { SAMPLE_VIDEO } from "@/lib/onboarding";
+import { Brush, Clapperboard, ExternalLink, FilePen, Folder as FolderIcon, FolderPlus, Images, Inbox, Link2, NotebookText, Pencil, Sparkles, Trash2, TriangleAlert, type LucideIcon } from "lucide-react";
+import { Ico, type Tone } from "@/components/Icon";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -18,6 +20,7 @@ import {
   type Toast,
   ToastBox,
   formatDate,
+  SmallButton,
 } from "@/components/ReadingLibrary";
 import ContextMenu, { type MenuState } from "@/components/ContextMenu";
 import {
@@ -368,7 +371,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
       title: "Delete this whole video?",
       quote: video.title ?? undefined,
       message:
-        "The video, its summary and all its notes will be gone for good.\n\nOnly want to remove the summary? Choose Keep the video, then use 🧹 Clear summary.",
+        "The video, its summary and all its notes will be gone for good.\n\nOnly want to remove the summary? Choose Keep the video, then use Clear summary.",
       confirmLabel: "Yes, delete video",
       cancelLabel: "Keep the video",
       danger: true,
@@ -428,9 +431,9 @@ export default function Library({ userEmail }: { userEmail: string }) {
       x: e.clientX,
       y: e.clientY,
       items: [
-        { label: "✏️ Rename", onClick: () => renameFolder(folder) },
-        { label: "📁 New subfolder", onClick: () => createFolder(folder.id) },
-        { label: "🗑 Delete", onClick: () => deleteFolder(folder), danger: true },
+        { label: "Rename", icon: Pencil, tone: "yellow", onClick: () => renameFolder(folder) },
+        { label: "New subfolder", icon: FolderPlus, tone: "amber", onClick: () => createFolder(folder.id) },
+        { label: "Delete", icon: Trash2, tone: "red", onClick: () => deleteFolder(folder), danger: true },
       ],
     });
   }
@@ -527,10 +530,11 @@ export default function Library({ userEmail }: { userEmail: string }) {
         />
         <Link
           href="/clips"
-          className="shrink-0 rounded-md px-2 py-1 text-sm text-slate-600 hover:bg-slate-100"
+          className="flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1 text-sm text-slate-600 hover:bg-slate-100"
           title="See and delete your clips to free up space"
         >
-          🗂 Clips
+          <Ico icon={Images} tone="sky" />
+          Clips
         </Link>
         <div className="hidden items-center gap-2 text-sm text-slate-500 sm:flex">
           <span className="max-w-40 truncate">{userEmail}</span>
@@ -544,9 +548,11 @@ export default function Library({ userEmail }: { userEmail: string }) {
         <aside
           className={`${showFolders ? "fixed inset-x-0 top-[57px] bottom-0 z-10 block" : "hidden"} w-full overflow-y-auto border-r border-slate-200 bg-white p-3 md:sticky md:top-[57px] md:block md:h-[calc(100vh-57px)] md:w-72`}
         >
-          <NavItem label="🗂️ All videos" count={videos.length} active={view.kind === "all" && !searching} onClick={() => openView({ kind: "all" })} />
+          <NavItem icon={Clapperboard} tone="violet" label="All videos" count={videos.length} active={view.kind === "all" && !searching} onClick={() => openView({ kind: "all" })} />
           <NavItem
-            label="📥 Unsorted"
+            icon={Inbox}
+            tone="blue"
+            label="Unsorted"
             count={videos.filter((v) => !v.folder_id).length}
             active={view.kind === "unsorted" && !searching}
             onClick={() => openView({ kind: "unsorted" })}
@@ -627,9 +633,10 @@ export default function Library({ userEmail }: { userEmail: string }) {
                 <button
                   key={f.id}
                   onClick={() => openView({ kind: "folder", id: f.id })}
-                  className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm hover:bg-slate-50"
+                  className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm hover:bg-slate-50"
                 >
-                  📁 {f.name}
+                  <Ico icon={FolderIcon} tone="amber" />
+                  {f.name}
                 </button>
               ))}
             </div>
@@ -730,6 +737,8 @@ function NavItem(props: {
   onDragStart?: () => void;
   onDragEnd?: () => void;
   onContextMenu?: (e: React.MouseEvent) => void;
+  icon?: LucideIcon;
+  tone?: Tone;
 }) {
   const [over, setOver] = useState(false);
   return (
@@ -759,6 +768,7 @@ function NavItem(props: {
     >
       {props.leading}
       <button onClick={props.onClick} className="flex min-w-0 flex-1 items-center gap-2 px-2 py-1.5 text-left">
+        {props.icon && <Ico icon={props.icon} tone={props.tone ?? "slate"} />}
         <span className="truncate">{props.label}</span>
         {props.count !== undefined && (
           <span className={`ml-auto text-xs ${props.active ? "text-slate-300" : "text-slate-400"}`}>{props.count}</span>
@@ -804,7 +814,9 @@ function FolderTree(props: {
         return (
           <div key={folder.id}>
             <NavItem
-              label={`${folder.share_token ? "🔗" : "📁"} ${folder.name}`}
+              icon={folder.share_token ? Link2 : FolderIcon}
+              tone={folder.share_token ? "sky" : "amber"}
+              label={folder.name}
               // A top-level folder counts the videos in all its subfolders too; a subfolder counts only its own.
               count={props.videos.filter((v) => (props.depth === 0 ? inTree(v.folder_id, folder.id) : v.folder_id === folder.id)).length}
               active={props.activeId === folder.id}
@@ -929,7 +941,8 @@ function VideoCard(props: {
           {/* Videos with notes get a badge, so they stand out in the list. */}
           {props.hasNotes && (
             <span className="pointer-events-none absolute top-1 left-1 rounded-md bg-amber-400 px-1.5 py-0.5 text-[11px] font-bold text-amber-950 shadow">
-              📒 Notes
+              <Ico icon={NotebookText} tone="amber" size={12} className="mr-0.5 inline align-[-2px]" />
+              Notes
             </span>
           )}
         </div>
@@ -948,7 +961,10 @@ function VideoCard(props: {
         </p>
         <ArticleNote note={video.note} editing={editingNote} setEditing={setEditingNote} onSave={props.onSaveNote} />
         {props.aiNoteError && !video.note && (
-          <p className="rounded-md bg-red-50 px-2 py-1 text-xs text-red-700 ring-1 ring-red-200">⚠️ {props.aiNoteError}</p>
+          <p className="flex items-center gap-1 rounded-md bg-red-50 px-2 py-1 text-xs text-red-700 ring-1 ring-red-200">
+            <Ico icon={TriangleAlert} tone="red" size={14} />
+            {props.aiNoteError}
+          </p>
         )}
         {video.tags.length > 0 && (
           <div className="flex flex-wrap gap-1">
@@ -968,21 +984,23 @@ function VideoCard(props: {
             href={`/video/${video.id}`}
             className={
               props.hasNotes
-                ? "rounded-md border border-amber-300 bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-900 hover:bg-amber-200"
-                : "rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100"
+                ? "inline-flex items-center gap-1 rounded-md border border-amber-300 bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-900 hover:bg-amber-200"
+                : "inline-flex items-center gap-1 rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100"
             }
             draggable={false}
           >
-            {props.hasNotes ? "📒 Open notes" : "✏️ Take notes"}
+            <Ico icon={props.hasNotes ? NotebookText : Pencil} tone={props.hasNotes ? "amber" : "yellow"} size={14} />
+            {props.hasNotes ? "Open notes" : "Take notes"}
           </a>
           <a
             href={video.url}
             target="_blank"
             rel="noreferrer"
-            className="rounded-md border border-slate-300 px-2 py-1 text-xs text-slate-700 hover:bg-slate-100"
+            className="inline-flex items-center gap-1 rounded-md border border-slate-300 px-2 py-1 text-xs text-slate-700 hover:bg-slate-100"
             draggable={false}
           >
-            YouTube ↗
+            <Ico icon={ExternalLink} tone="red" size={14} />
+            YouTube
           </a>
           <select
             value={video.folder_id ?? ""}
@@ -990,10 +1008,10 @@ function VideoCard(props: {
             className="max-w-48 min-w-0 rounded-md border border-slate-300 bg-white px-1 py-1 text-xs"
             aria-label="Move to folder"
           >
-            <option value="">📥 Unsorted</option>
+            <option value="">Unsorted</option>
             {props.folderOptions.map((f) => (
               <option key={f.id} value={f.id}>
-                📁 {f.label}
+                {f.label}
               </option>
             ))}
           </select>
@@ -1007,7 +1025,7 @@ function VideoCard(props: {
               </SmallButton>
             </>
           )}
-          {!video.note && !editingNote && <SmallButton onClick={() => setEditingNote(true)}>📝 Add summary</SmallButton>}
+          {!video.note && !editingNote && <SmallButton onClick={() => setEditingNote(true)} icon={FilePen} tone="sky">Add summary</SmallButton>}
           {video.note && !editingNote && (
             <SmallButton
               onClick={async () => {
@@ -1020,13 +1038,15 @@ function VideoCard(props: {
                 });
                 if (ok) props.onSaveNote("");
               }}
+              icon={Brush}
+              tone="orange"
             >
-              🧹 Clear summary
+              Clear summary
             </SmallButton>
           )}
           {!video.note && !editingNote && props.aiNoteStartedAt === null && (
-            <SmallButton onClick={props.onAiNote} title="Let AI watch the video and write the summary">
-              ✨ AI summary
+            <SmallButton onClick={props.onAiNote} title="Let AI watch the video and write the summary" icon={Sparkles} tone="yellow">
+              AI summary
             </SmallButton>
           )}
           {!video.note && props.aiNoteStartedAt !== null && <AiNoteWorking startedAt={props.aiNoteStartedAt} />}
@@ -1034,39 +1054,13 @@ function VideoCard(props: {
           <SmallButton onClick={props.onEditTags}>Tags</SmallButton>
           {/* Kept apart from the note buttons so it isn't pressed by mistake. */}
           <span className="ml-auto pl-3">
-            <SmallButton onClick={props.onDelete} danger>
-              🗑 Delete video
+            <SmallButton onClick={props.onDelete} danger icon={Trash2}>
+              Delete video
             </SmallButton>
           </span>
         </div>
       </div>
     </div>
-  );
-}
-
-function SmallButton({
-  children,
-  onClick,
-  danger,
-  disabled,
-  title,
-}: {
-  children: React.ReactNode;
-  onClick: () => void;
-  danger?: boolean;
-  disabled?: boolean;
-  title?: string;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      title={title}
-      aria-label={title}
-      className={`rounded-md border px-2 py-1 text-xs disabled:opacity-30 ${danger ? "border-red-200 text-red-600 hover:bg-red-50" : "border-slate-300 text-slate-700 hover:bg-slate-100"}`}
-    >
-      {children}
-    </button>
   );
 }
 

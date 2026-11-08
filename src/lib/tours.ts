@@ -30,7 +30,7 @@ export const TOURS = {
     {
       target: "stamp",
       title: "Stamp the moment",
-      text: "Tap ⏱ Stamp time to pin where the video is right now. Tap that time in your notes later to jump straight back.",
+      text: "Tap Stamp time to pin where the video is right now. Tap that time in your notes later to jump straight back.",
     },
     {
       target: "ask-ai",

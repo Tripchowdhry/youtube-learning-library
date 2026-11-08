@@ -2,6 +2,8 @@ import Link from "next/link";
 import VideoThumb from "@/components/VideoThumb";
 import { createClient } from "@/lib/supabase/server";
 import type { SharedFolder } from "@/lib/types";
+import { Folder as FolderIcon } from "lucide-react";
+import { Ico } from "@/components/Icon";
 
 export const dynamic = "force-dynamic";
 
@@ -58,7 +60,10 @@ function Section({ shared, folderId, depth }: { shared: SharedFolder; folderId: 
       )}
       {children.map((child) => (
         <div key={child.id} className="mt-8">
-          <h2 className="mb-3 text-xl font-semibold">📁 {child.name}</h2>
+          <h2 className="mb-3 flex items-center gap-2 text-xl font-semibold">
+            <Ico icon={FolderIcon} tone="amber" size={20} />
+            {child.name}
+          </h2>
           <Section shared={shared} folderId={child.id} depth={depth + 1} />
         </div>
       ))}

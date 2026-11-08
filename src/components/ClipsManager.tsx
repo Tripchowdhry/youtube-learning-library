@@ -1,5 +1,7 @@
 "use client";
 
+import { Camera, Trash2 } from "lucide-react";
+import { Ico } from "@/components/Icon";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { clipUrl, clipVideos, deleteClips, listClips, type StoredClip } from "@/lib/clips";
@@ -138,7 +140,7 @@ export default function ClipsManager() {
             </section>
 
             {clips.length === 0 ? (
-              <p className="text-slate-500">No clips yet. Press 📷 Clip on a video&rsquo;s notes to add one.</p>
+              <p className="text-slate-500">No clips yet. Press <Ico icon={Camera} tone="slate" size={14} className="inline align-[-2px]" /> Clip on a video&rsquo;s notes to add one.</p>
             ) : (
               <>
                 <div className="flex items-center gap-2 text-sm">
@@ -180,9 +182,16 @@ export default function ClipsManager() {
                               remove(`${m.label} ${y.year}`, m.clips);
                             }}
                             disabled={!!busy}
-                            className="ml-auto rounded-md px-2.5 py-1 text-sm text-red-700 ring-1 ring-slate-300 hover:bg-red-50 disabled:opacity-50"
+                            className="ml-auto inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-sm text-red-700 ring-1 ring-slate-300 hover:bg-red-50 disabled:opacity-50"
                           >
-                            {busy === `${m.label} ${y.year}` ? "Deleting…" : "🗑 Delete this month"}
+                            {busy === `${m.label} ${y.year}` ? (
+                              "Deleting…"
+                            ) : (
+                              <>
+                                <Ico icon={Trash2} tone="red" size={14} />
+                                Delete this month
+                              </>
+                            )}
                           </button>
                         </summary>
                         <div className="grid grid-cols-2 gap-2 border-t border-slate-100 p-3 sm:grid-cols-4">

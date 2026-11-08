@@ -25,8 +25,11 @@ import {
   formatDate,
   type Period,
 } from "@/components/ReadingLibrary";
+import { SectionWelcome } from "@/components/GettingStarted";
 import { createClient } from "@/lib/supabase/client";
 import type { ArticleCategory, Scrap } from "@/lib/types";
+import { FileText, Inbox, NotebookPen, Pencil, Tag, Trash2 } from "lucide-react";
+import { Ico } from "@/components/Icon";
 
 type View = { kind: "all" } | { kind: "uncategorized" } | { kind: "category"; id: string };
 
@@ -285,9 +288,11 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
       x: e.clientX,
       y: e.clientY,
       items: [
-        { label: "✏️ Rename", onClick: () => renameCategory(category) },
-        ...(category.parent_id ? [] : [{ label: "🏷️ New subcategory", onClick: () => createCategory(category.id) }]),
-        { label: "🗑 Delete", onClick: () => deleteCategory(category), danger: true },
+        { label: "Rename", icon: Pencil, tone: "yellow" as const, onClick: () => renameCategory(category) },
+        ...(category.parent_id
+          ? []
+          : [{ label: "New subcategory", icon: Tag, tone: "orange" as const, onClick: () => createCategory(category.id) }]),
+        { label: "Delete", icon: Trash2, tone: "red" as const, onClick: () => deleteCategory(category), danger: true },
       ],
     });
   }
@@ -379,9 +384,11 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
         <aside
           className={`${showCategories ? "fixed inset-x-0 top-[57px] bottom-0 z-10 block" : "hidden"} w-full overflow-y-auto border-r border-slate-200 bg-white p-3 md:sticky md:top-[57px] md:block md:h-[calc(100vh-57px)] md:w-72`}
         >
-          <NavItem label="📒 All pages" count={scraps.length} active={view.kind === "all" && !searching} onClick={() => openView({ kind: "all" })} />
+          <NavItem icon={NotebookPen} tone="amber" label="All pages" count={scraps.length} active={view.kind === "all" && !searching} onClick={() => openView({ kind: "all" })} />
           <NavItem
-            label="📥 Uncategorized"
+            icon={Inbox}
+            tone="blue"
+            label="Uncategorized"
             count={scraps.filter((s) => !s.category_id).length}
             active={view.kind === "uncategorized" && !searching}
             onClick={() => openView({ kind: "uncategorized" })}
@@ -401,7 +408,9 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
           {topCategories.map((cat) => (
             <div key={cat.id}>
               <NavItem
-                label={`🏷️ ${cat.name}`}
+                icon={Tag}
+                tone="orange"
+                label={cat.name}
                 count={countIn(cat.id)}
                 active={!searching && view.kind === "category" && view.id === cat.id}
                 onClick={() => openView({ kind: "category", id: cat.id })}
@@ -478,13 +487,22 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
 
               {loading ? (
                 <p className="text-slate-500">Loading your ScrapBook…</p>
+              ) : scraps.length === 0 && !searching && period === "any" ? (
+                <SectionWelcome
+                  title="Start your ScrapBook"
+                  text="Pages of your own for ideas, plans and sketches. Give your first page a title above and tap + New page."
+                  features={[
+                    { title: "Write or draw", text: "Type freely, or draw and handwrite on the page." },
+                    { title: "Sort", text: "Group pages into categories, like \"Ideas\" or \"Projects\"." },
+                    { title: "Find", text: "Search finds any page by its title or text." },
+                  ]}
+                  action={{ label: "Name your first page", target: "new-page" }}
+                />
               ) : visibleScraps.length === 0 ? (
                 <div className="rounded-xl border border-dashed border-slate-300 p-10 text-center text-slate-500">
                   {searching || period !== "any"
                     ? "Nothing matches. Try another search or a longer time range."
-                    : scraps.length
-                      ? "Nothing here yet. Start a new page above, or move pages in from another category."
-                      : "Your ScrapBook is empty. Give your first page a title above and tap + New page."}
+                    : "Nothing here yet. Start a new page above, or move pages in from another category."}
                 </div>
               ) : (
                 <>
@@ -580,9 +598,7 @@ function ScrapRow(props: {
       }}
       className={`flex cursor-grab items-start gap-3 rounded-xl border bg-white p-3 shadow-sm transition ${props.dragging ? "opacity-40" : ""} ${over ? "border-blue-500 ring-2 ring-blue-500" : "border-slate-200"}`}
     >
-      <span className="mt-0.5 text-xl" aria-hidden>
-        📄
-      </span>
+      <Ico icon={FileText} tone="sky" size={22} className="mt-0.5" />
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <Link href={`/scrap/${scrap.id}`} className="line-clamp-2 font-medium hover:underline">
           {scrap.title}
@@ -600,10 +616,10 @@ function ScrapRow(props: {
             aria-label="Category"
             title={props.categoryLabel}
           >
-            <option value="">📥 Uncategorized</option>
+            <option value="">Uncategorized</option>
             {props.categoryOptions.map((c) => (
               <option key={c.id} value={c.id}>
-                🏷️ {c.label}
+                {c.label}
               </option>
             ))}
           </select>
@@ -624,8 +640,8 @@ function ScrapRow(props: {
             </>
           )}
           <SmallButton onClick={props.onRename}>Edit title</SmallButton>
-          <SmallButton onClick={props.onDelete} danger title="Delete">
-            🗑 Delete
+          <SmallButton onClick={props.onDelete} danger title="Delete" icon={Trash2}>
+            Delete
           </SmallButton>
         </div>
       </div>
@@ -664,10 +680,10 @@ function NewScrapForm(props: {
         className="rounded-md border border-slate-300 bg-white px-2 py-2 text-sm sm:max-w-48"
         aria-label="Category for the new page"
       >
-        <option value="">📥 Uncategorized</option>
+        <option value="">Uncategorized</option>
         {props.categoryOptions.map((c) => (
           <option key={c.id} value={c.id}>
-            🏷️ {c.label}
+            {c.label}
           </option>
         ))}
       </select>
