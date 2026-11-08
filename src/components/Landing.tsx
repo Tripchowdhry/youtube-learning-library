@@ -60,6 +60,14 @@ export default function Landing({ error }: { error?: string }) {
         </div>
       </section>
 
+      {/* Closing call to action */}
+      <section className="mx-auto max-w-6xl px-4 py-14 text-center">
+        <h2 className="text-balance text-3xl font-bold">Start your shelf today</h2>
+        <div className="mt-6 flex justify-center">
+          <SignInButton />
+        </div>
+      </section>
+
       <footer className="border-t border-slate-200">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-4 px-4 py-6 text-sm text-slate-500">
           <span className="flex items-center gap-1.5 font-semibold text-slate-700">
