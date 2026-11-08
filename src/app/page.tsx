@@ -1,11 +1,7 @@
-import Link from "next/link";
+import Landing from "@/components/Landing";
 import Library from "@/components/Library";
-import SignInButton from "@/components/SignInButton";
-import { BRAND } from "@/lib/brand";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createClient } from "@/lib/supabase/server";
-import { LibraryBig } from "lucide-react";
-import { Ico } from "@/components/Icon";
 
 export const dynamic = "force-dynamic";
 
@@ -24,21 +20,7 @@ export default async function Home({
   if (user) return <Library userEmail={user.email ?? ""} />;
 
   const { error } = await searchParams;
-  return (
-    <main className="mx-auto flex min-h-screen max-w-2xl flex-col items-center justify-center gap-6 px-4 text-center">
-      <p className="flex flex-wrap items-center justify-center gap-1.5 text-base font-semibold text-slate-700">
-        <Ico icon={LibraryBig} tone="blue" size={20} />
-        {BRAND.name}: <span className="font-normal text-slate-500">{BRAND.tagline}</span>
-      </p>
-      <h1 className="text-balance text-4xl font-bold tracking-tight sm:text-5xl">{BRAND.headline}</h1>
-      <p className="text-lg text-slate-600">{BRAND.description}</p>
-      <SignInButton />
-      {error && <p className="text-sm text-red-600">Sign-in didn&apos;t work. Please try again.</p>}
-      <Link href="/privacy" className="text-sm text-slate-500 underline">
-        Privacy policy
-      </Link>
-    </main>
-  );
+  return <Landing error={error} />;
 }
 
 function SetupNotice() {
