@@ -1,6 +1,8 @@
 import Link from "next/link";
 import {
+  ArrowUp,
   BookOpenCheck,
+  Eye,
   FileText,
   KeyRound,
   LibraryBig,
@@ -54,12 +56,12 @@ export default function Landing({ error }: { error?: string }) {
           </p>
           <h1 className="text-balance text-4xl font-bold tracking-tight sm:text-6xl">{BRAND.headline}</h1>
           <p className="mx-auto mt-4 max-w-2xl text-lg text-slate-600">{BRAND.description}</p>
-          <div id="start" className="mt-8 flex flex-col items-center gap-2">
+          <div id="start" className="mt-8 flex scroll-mt-40 flex-col items-center gap-2">
             <SignInButton />
             <p className="text-sm text-slate-500">Sign in with your Google account. Works on your laptop and phone.</p>
             {error && <p className="text-sm text-red-600">Sign-in didn&apos;t work. Please try again.</p>}
           </div>
-          <Shot src="/landing/videos.webp" alt="Your video library in BrainShelf, with folders, notes and summaries" className="mt-12" />
+          <Shot src="/landing/videos.webp" alt="Your video library in BrainShelf, with folders, notes and summaries" label="your video library" className="mt-12" />
         </div>
       </section>
 
@@ -86,6 +88,7 @@ export default function Landing({ error }: { error?: string }) {
               { icon: Sparkles, tone: "yellow", text: "Ask AI for a summary, the key ideas or a quiz" },
             ]}
             src="/landing/study.webp"
+            label="notes beside a video"
             alt="The notes page: a video on the left, typed notes and Ask AI on the right"
           />
           <Feature
@@ -94,6 +97,7 @@ export default function Landing({ error }: { error?: string }) {
             title="Articles and tutorials too"
             text="Save posts, articles and how-to guides in their own tabs. Add a line on why you saved it, read it in the app, and tick it off when you're done."
             src="/landing/reading.webp"
+            label="your reading list"
             alt="The Reading tab with categories, notes and read ticks"
             flip
           />
@@ -103,6 +107,7 @@ export default function Landing({ error }: { error?: string }) {
             title="A ScrapBook for your own ideas"
             text="Pages of your own for plans, ideas and sketches. Type freely or draw, and sort pages into categories."
             src="/landing/scrapbook.webp"
+            label="your ScrapBook"
             alt="The ScrapBook with pages sorted into categories"
           />
           <Feature
@@ -115,6 +120,7 @@ export default function Landing({ error }: { error?: string }) {
               { icon: LockKeyhole, tone: "slate", text: "Locks itself after 5 idle minutes" },
             ]}
             src="/landing/vault.webp"
+            label="the Vault"
             alt="The Vault, locked, with an API key and a login saved"
             flip
           />
@@ -167,17 +173,32 @@ export default function Landing({ error }: { error?: string }) {
   );
 }
 
-// A screenshot of the app in a simple browser frame.
-function Shot({ src, alt, className = "" }: { src: string; alt: string; className?: string }) {
+// A screenshot of the app in a browser frame, marked as a preview. Clicking it goes to sign-in,
+// since a picture can't be used; hovering says so.
+function Shot({ src, alt, label, className = "" }: { src: string; alt: string; label: string; className?: string }) {
   return (
-    <div className={`overflow-hidden rounded-xl bg-white shadow-xl ring-1 ring-slate-200 ${className}`}>
-      <div className="flex gap-1.5 border-b border-slate-200 bg-slate-50 px-3 py-2">
+    <a
+      href="#start"
+      title="This is a picture of the app. Sign in to try it."
+      className={`group relative block overflow-hidden rounded-xl bg-white shadow-xl ring-1 ring-slate-200 ${className}`}
+    >
+      <div className="flex items-center gap-1.5 border-b border-slate-200 bg-slate-50 px-3 py-2">
         <span className="h-2.5 w-2.5 rounded-full bg-red-300" />
         <span className="h-2.5 w-2.5 rounded-full bg-amber-300" />
         <span className="h-2.5 w-2.5 rounded-full bg-green-300" />
+        <span className="ml-auto flex items-center gap-1 rounded-full bg-white px-2 py-0.5 text-xs font-medium text-slate-500 ring-1 ring-slate-200">
+          <Ico icon={Eye} tone="slate" size={13} />
+          Preview: {label}
+        </span>
       </div>
-      <img src={src} alt={alt} className="block w-full" loading="lazy" />
-    </div>
+      <img src={src} alt={alt} draggable={false} className="block w-full select-none" loading="lazy" />
+      <span className="pointer-events-none absolute inset-0 top-9 flex items-center justify-center bg-slate-900/0 opacity-0 transition group-hover:bg-slate-900/35 group-hover:opacity-100">
+        <span className="flex items-center gap-1.5 rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-900 shadow-lg">
+          This is a preview. Sign in to try it
+          <ArrowUp size={16} aria-hidden />
+        </span>
+      </span>
+    </a>
   );
 }
 
@@ -202,6 +223,7 @@ function Feature(props: {
   points?: { icon: LucideIcon; tone: Tone; text: string }[];
   src: string;
   alt: string;
+  label: string;
   flip?: boolean;
 }) {
   return (
@@ -221,7 +243,7 @@ function Feature(props: {
           </ul>
         )}
       </div>
-      <Shot src={props.src} alt={props.alt} className="md:col-span-3" />
+      <Shot src={props.src} alt={props.alt} label={props.label} className="md:col-span-3" />
     </div>
   );
 }
