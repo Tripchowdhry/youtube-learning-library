@@ -4,7 +4,7 @@ import BrandMark from "@/components/BrandMark";
 import { WelcomePanel } from "@/components/GettingStarted";
 import { Tour, TourButton, useSectionTour } from "@/components/Tour";
 import { SAMPLE_VIDEO } from "@/lib/onboarding";
-import { Brush, Clapperboard, ExternalLink, FilePen, Folder as FolderIcon, Copy, FolderPlus, Images, Inbox, Link2, Link2Off, NotebookText, Pencil, Sparkles, Trash2, TriangleAlert, type LucideIcon } from "lucide-react";
+import { Brush, Clapperboard, ExternalLink, FilePen, Folder as FolderIcon, Copy, Eye, FolderPlus, Images, Inbox, Link2, Link2Off, NotebookText, Pencil, Sparkles, Trash2, TriangleAlert, type LucideIcon } from "lucide-react";
 import { Ico, type Tone } from "@/components/Icon";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -435,6 +435,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
         { label: "New subfolder", icon: FolderPlus, tone: "amber", onClick: () => createFolder(folder.id) },
         ...(folder.share_token
           ? [
+              { label: "Preview what others see", icon: Eye, tone: "violet" as const, onClick: () => previewShare(folder.share_token!) },
               { label: "Copy share link", icon: Copy, tone: "sky" as const, onClick: () => copyShareLink(folder.share_token!) },
               { label: "Stop sharing", icon: Link2Off, tone: "slate" as const, onClick: () => toggleShare(folder) },
             ]
@@ -480,6 +481,11 @@ export default function Library({ userEmail }: { userEmail: string }) {
     if (error) return notify(error.message, true);
     setFolders((prev) => prev.map((f) => (f.id === folder.id ? { ...f, share_token: token } : f)));
     copyShareLink(token);
+  }
+
+  // Opens the shared page in a new tab, marked as a preview, so you see exactly what people with the link see.
+  function previewShare(token: string) {
+    window.open(`/share/${token}?preview=1`, "_blank", "noopener");
   }
 
   async function copyShareLink(token: string) {
@@ -619,9 +625,19 @@ export default function Library({ userEmail }: { userEmail: string }) {
                   {currentFolder.share_token ? "Stop sharing" : "Share"}
                 </SmallButton>
                 {currentFolder.share_token && (
-                  <SmallButton onClick={() => copyShareLink(currentFolder.share_token!)} icon={Copy} tone="sky">
-                    Copy link
-                  </SmallButton>
+                  <>
+                    <SmallButton
+                      onClick={() => previewShare(currentFolder.share_token!)}
+                      icon={Eye}
+                      tone="violet"
+                      title="See this folder the way people with the link see it"
+                    >
+                      Preview
+                    </SmallButton>
+                    <SmallButton onClick={() => copyShareLink(currentFolder.share_token!)} icon={Copy} tone="sky">
+                      Copy link
+                    </SmallButton>
+                  </>
                 )}
                 <SmallButton onClick={() => deleteFolder(currentFolder)} danger>
                   Delete
