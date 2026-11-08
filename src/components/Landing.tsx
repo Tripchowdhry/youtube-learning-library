@@ -5,7 +5,6 @@ import {
   Eye,
   FileText,
   KeyRound,
-  LibraryBig,
   Link2,
   LockKeyhole,
   NotebookPen,
@@ -16,6 +15,7 @@ import {
   Timer,
   type LucideIcon,
 } from "lucide-react";
+import BrandLogo from "@/components/BrandLogo";
 import SignInButton from "@/components/SignInButton";
 import { Ico, type Tone } from "@/components/Icon";
 import { BRAND } from "@/lib/brand";
@@ -27,7 +27,7 @@ export default function Landing({ error }: { error?: string }) {
       <header className="sticky top-0 z-20 border-b border-slate-200/70 bg-white/90 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3">
           <span className="flex items-center gap-1.5 text-lg font-bold">
-            <Ico icon={LibraryBig} tone="blue" size={22} />
+            <BrandLogo size={24} />
             {BRAND.name}
           </span>
           <nav className="ml-auto hidden items-center gap-5 text-sm text-slate-600 sm:flex">
@@ -51,7 +51,7 @@ export default function Landing({ error }: { error?: string }) {
       <section className="bg-gradient-to-b from-blue-50 to-white">
         <div className="mx-auto max-w-6xl px-4 pt-14 pb-10 text-center sm:pt-20">
           <p className="mx-auto mb-4 inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1 text-sm text-slate-600 shadow-sm ring-1 ring-slate-200">
-            <Ico icon={LibraryBig} tone="blue" size={15} />
+            <BrandLogo size={16} />
             {BRAND.name}: {BRAND.tagline}
           </p>
           <h1 className="text-balance text-4xl font-bold tracking-tight sm:text-6xl">{BRAND.headline}</h1>
@@ -160,7 +160,7 @@ export default function Landing({ error }: { error?: string }) {
       <footer className="border-t border-slate-200">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-4 px-4 py-6 text-sm text-slate-500">
           <span className="flex items-center gap-1.5 font-semibold text-slate-700">
-            <Ico icon={LibraryBig} tone="blue" size={16} />
+            <BrandLogo size={18} />
             {BRAND.name}
           </span>
           <span>{BRAND.tagline}</span>
