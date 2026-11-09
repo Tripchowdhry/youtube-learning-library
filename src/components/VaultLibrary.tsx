@@ -20,7 +20,7 @@ import {
   newSalt,
   suggestPassphrase,
 } from "@/lib/vault-crypto";
-import { Inbox, KeyRound, Lock, LockKeyhole, LockKeyholeOpen, Pencil, Tag, Trash2 } from "lucide-react";
+import { ArrowUpToLine, Inbox, KeyRound, Lock, LockKeyhole, LockKeyholeOpen, Pencil, Tag, Trash2 } from "lucide-react";
 import { Ico } from "@/components/Icon";
 
 type View = { kind: "all" } | { kind: "uncategorized" } | { kind: "category"; id: string };
@@ -366,6 +366,19 @@ export default function VaultLibrary({ userEmail }: { userEmail: string }) {
     }
   }
 
+  // Lifts a subcategory out to the top level, at the end of the list.
+  async function moveCategoryToTop(category: { id: string; name: string }) {
+    const position = Math.max(-1, ...topCategories.map((c) => c.position)) + 1;
+    setCategories((prev) => prev.map((c) => (c.id === category.id ? { ...c, parent_id: null, position } : c)));
+    const { error } = await supabase.from("vault_categories").update({ parent_id: null, position }).eq("id", category.id);
+    if (error) {
+      notify(error.message, true);
+      load();
+      return;
+    }
+    notify(`Moved "${category.name}" to the top level`);
+  }
+
   function openCategoryMenu(category: VaultCategory, e: React.MouseEvent) {
     e.preventDefault();
     setMenu({
@@ -376,6 +389,9 @@ export default function VaultLibrary({ userEmail }: { userEmail: string }) {
         ...(category.parent_id
           ? []
           : [{ label: "New subcategory", icon: Tag, tone: "orange" as const, onClick: () => createCategory(category.id) }]),
+        ...(category.parent_id
+          ? [{ label: "Move to top level", icon: ArrowUpToLine, tone: "violet" as const, onClick: () => moveCategoryToTop(category) }]
+          : []),
         { label: "Delete", icon: Trash2, tone: "red" as const, onClick: () => deleteCategory(category), danger: true },
       ],
     });

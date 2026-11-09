@@ -4,7 +4,7 @@ import BrandMark from "@/components/BrandMark";
 import { WelcomePanel } from "@/components/GettingStarted";
 import { Tour, TourButton, useSectionTour } from "@/components/Tour";
 import { SAMPLE_VIDEO } from "@/lib/onboarding";
-import { Brush, Clapperboard, ExternalLink, FilePen, Folder as FolderIcon, Copy, Eye, FolderPlus, Images, Inbox, Link2, Link2Off, NotebookText, Pencil, Sparkles, Trash2, TriangleAlert, type LucideIcon } from "lucide-react";
+import { Brush, Clapperboard, ExternalLink, FilePen, Folder as FolderIcon, ArrowUpToLine, Copy, Eye, FolderPlus, Images, Inbox, Link2, Link2Off, NotebookText, Pencil, Sparkles, Trash2, TriangleAlert, type LucideIcon } from "lucide-react";
 import { Ico, type Tone } from "@/components/Icon";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -425,6 +425,19 @@ export default function Library({ userEmail }: { userEmail: string }) {
     }
   }
 
+  // Lifts a subfolder out to the top level, at the end of the list. Its own subfolders come with it.
+  async function moveFolderToTop(folder: Folder) {
+    const position = Math.max(-1, ...childFolders(null).map((f) => f.position)) + 1;
+    setFolders((prev) => prev.map((f) => (f.id === folder.id ? { ...f, parent_id: null, position } : f)));
+    const { error } = await supabase.from("folders").update({ parent_id: null, position }).eq("id", folder.id);
+    if (error) {
+      notify(error.message, true);
+      load();
+      return;
+    }
+    notify(`Moved "${folder.name}" to the top level`);
+  }
+
   function openFolderMenu(folder: Folder, e: React.MouseEvent) {
     e.preventDefault();
     setMenu({
@@ -433,6 +446,9 @@ export default function Library({ userEmail }: { userEmail: string }) {
       items: [
         { label: "Rename", icon: Pencil, tone: "yellow", onClick: () => renameFolder(folder) },
         { label: "New subfolder", icon: FolderPlus, tone: "amber", onClick: () => createFolder(folder.id) },
+        ...(folder.parent_id
+          ? [{ label: "Move to top level", icon: ArrowUpToLine, tone: "violet" as const, onClick: () => moveFolderToTop(folder) }]
+          : []),
         ...(folder.share_token
           ? [
               { label: "Preview what others see", icon: Eye, tone: "violet" as const, onClick: () => previewShare(folder.share_token!) },
