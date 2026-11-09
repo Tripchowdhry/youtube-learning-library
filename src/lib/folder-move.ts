@@ -48,3 +48,18 @@ export function planFolderMove<T extends Node>(
       return before.position !== c.position || before.parent_id !== c.parent_id;
     });
 }
+
+// Categories only go two levels deep (a category and its subcategories), so a drop is refused when it
+// would put a category inside a subcategory, or put a category that has its own subcategories inside
+// another one.
+export function twoLevelDropAllowed(items: Node[], draggedId: string, targetId: string, where: DropWhere): boolean {
+  const dragged = items.find((n) => n.id === draggedId);
+  const target = items.find((n) => n.id === targetId);
+  if (!dragged || !target || dragged.id === target.id) return false;
+  const newParent = where === "inside" ? target.id : target.parent_id;
+  if (newParent === null) return true;
+  if (newParent === dragged.id) return false;
+  const parent = items.find((n) => n.id === newParent);
+  if (!parent || parent.parent_id !== null) return false;
+  return !items.some((n) => n.parent_id === dragged.id);
+}

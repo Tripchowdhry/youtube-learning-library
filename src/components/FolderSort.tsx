@@ -119,5 +119,7 @@ export function sortHint(sort: FolderSort, things: string) {
       ? "Drag a folder above or below another to reorder, or onto it to put it inside. Drop on FOLDERS to move it to the top. Right-click one to rename or share."
       : 'Pick "My order" to drag folders into place or into each other. Right-click one to rename or share.';
   }
-  return sort === "custom" ? `Drag ${things} to reorder. Right-click one to rename.` : `Pick "My order" to drag ${things} into place. Right-click one to rename.`;
+  return sort === "custom"
+    ? `Drag ${things} above, below or onto each other to move them. Drop on the heading to move one to the top. Right-click one to rename.`
+    : `Pick "My order" to drag ${things} into place. Right-click one to rename.`;
 }
