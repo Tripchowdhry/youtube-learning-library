@@ -17,7 +17,6 @@ import {
 } from "@/components/FolderSort";
 import {
   NavItem,
-  useTopDrop,
   PERIODS,
   Pills,
   SectionSwitch,
@@ -28,7 +27,6 @@ import {
 } from "@/components/ReadingLibrary";
 import { SectionWelcome } from "@/components/GettingStarted";
 import { createClient } from "@/lib/supabase/client";
-import { planFolderMove, twoLevelDropAllowed, type DropWhere } from "@/lib/folder-move";
 import type { ArticleCategory, Scrap } from "@/lib/types";
 import { ArrowUpToLine, FileText, Inbox, NotebookPen, Pencil, Tag, Trash2 } from "lucide-react";
 import { Ico } from "@/components/Icon";
@@ -133,8 +131,8 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
   );
 
   const canDragCategories = folderSort === "custom";
-  const draggingSub = categories.some((c) => c.id === draggingCategoryId && c.parent_id !== null);
-  const topDrop = useTopDrop(draggingSub, () => draggingCategoryId && moveCategoryTo(draggingCategoryId, null, "inside"));
+  const categorySiblings = (category: ArticleCategory) =>
+    category.parent_id ? subcategories(category.parent_id) : topCategories;
 
   const currentCategory = view.kind === "category" ? categories.find((c) => c.id === view.id) ?? null : null;
 
@@ -263,36 +261,39 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
     openView({ kind: "category", id: (data as ArticleCategory).id });
   }
 
-  // Move a category by dragging: above or below another puts it next to that one, onto the middle puts it
-  // inside as a subcategory, and a null target moves it to the top level. Categories stay two levels deep.
-  async function moveCategoryTo(draggedId: string, targetId: string | null, where: DropWhere) {
+  // Drop one category onto another next to it: it takes that one's place, and the rest are renumbered so the order sticks.
+  async function moveCategoryTo(draggedId: string, targetId: string) {
     const dragged = categories.find((c) => c.id === draggedId);
-    if (!dragged) return;
-    if (targetId && !twoLevelDropAllowed(categories, draggedId, targetId, where)) return;
-    const changes = planFolderMove(categories, (p) => (p ? subcategories(p) : topCategories), draggedId, targetId, where);
-    if (!changes || changes.length === 0) return;
-    const newParent = changes[0].parent_id;
-    setCategories((prev) =>
-      prev.map((c) => {
-        const x = changes.find((y) => y.id === c.id);
-        return x ? { ...c, parent_id: x.parent_id, position: x.position } : c;
-      }),
-    );
+    const target = categories.find((c) => c.id === targetId);
+    if (!dragged || !target || dragged.id === target.id || dragged.parent_id !== target.parent_id) return;
+    const all = categorySiblings(dragged);
+    const siblings = all.filter((c) => c.id !== dragged.id);
+    const index = siblings.findIndex((c) => c.id === target.id);
+    siblings.splice(all.indexOf(dragged) <= index ? index + 1 : index, 0, dragged);
+    const changed = siblings.map((c, position) => ({ id: c.id, position })).filter((c, i) => siblings[i].position !== c.position);
+    setCategories((prev) => prev.map((c) => ({ ...c, position: changed.find((x) => x.id === c.id)?.position ?? c.position })));
     const results = await Promise.all(
-      changes.map((c) => supabase.from("article_categories").update({ parent_id: c.parent_id, position: c.position }).eq("id", c.id)),
+      changed.map((c) => supabase.from("article_categories").update({ position: c.position }).eq("id", c.id)),
     );
     const failed = results.find((r) => r.error);
     if (failed) {
       notify(failed.error!.message, true);
       load();
-      return;
-    }
-    if (newParent !== dragged.parent_id) {
-      const into = newParent ? categories.find((c) => c.id === newParent)?.name : null;
-      notify(into ? `Moved "${dragged.name}" into ${into}` : `Moved "${dragged.name}" to the top level`);
     }
   }
 
+  // Lifts a subcategory out to the top level, at the end of the list.
+  async function moveCategoryToTop(category: { id: string; name: string }) {
+    const position = Math.max(-1, ...topCategories.map((c) => c.position)) + 1;
+    setCategories((prev) => prev.map((c) => (c.id === category.id ? { ...c, parent_id: null, position } : c)));
+    const { error } = await supabase.from("article_categories").update({ parent_id: null, position }).eq("id", category.id);
+    if (error) {
+      notify(error.message, true);
+      load();
+      return;
+    }
+    notify(`Moved "${category.name}" to the top level`);
+  }
 
   function openCategoryMenu(category: ArticleCategory, e: React.MouseEvent) {
     e.preventDefault();
@@ -305,7 +306,7 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
           ? []
           : [{ label: "New subcategory", icon: Tag, tone: "orange" as const, onClick: () => createCategory(category.id) }]),
         ...(category.parent_id
-          ? [{ label: "Move to top level", icon: ArrowUpToLine, tone: "violet" as const, onClick: () => moveCategoryTo(category.id, null, "inside") }]
+          ? [{ label: "Move to top level", icon: ArrowUpToLine, tone: "violet" as const, onClick: () => moveCategoryToTop(category) }]
           : []),
         { label: "Delete", icon: Trash2, tone: "red" as const, onClick: () => deleteCategory(category), danger: true },
       ],
@@ -315,16 +316,13 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
   // What happens when something is dropped on a category: a page moves into it,
   // a category next to it takes its place.
   const dropOnCategory = (category: ArticleCategory) => {
-    if (draggingId) return { onDropArticle: () => moveScrap(draggingId, category.id) };
+    if (draggingId) return () => moveScrap(draggingId, category.id);
     const dragged = categories.find((c) => c.id === draggingCategoryId);
-    if (!dragged || dragged.id === category.id) return {};
-    return {
-      edgeDrop: true,
-      allowDrop: (where: DropWhere) => twoLevelDropAllowed(categories, dragged.id, category.id, where),
-      onDropArticle: (where: DropWhere) => moveCategoryTo(dragged.id, category.id, where),
-    };
+    if (dragged && dragged.id !== category.id && dragged.parent_id === category.parent_id) {
+      return () => moveCategoryTo(dragged.id, category.id);
+    }
+    return undefined;
   };
-
 
   async function renameCategory(category: ArticleCategory) {
     const name = window.prompt("Rename:", category.name)?.trim();
@@ -413,10 +411,7 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
             onDropArticle={draggingId ? () => moveScrap(draggingId, null) : undefined}
           />
 
-          <div
-            {...topDrop}
-            className={`mt-4 mb-1 flex items-center justify-between rounded-md px-2 text-xs font-semibold tracking-wide text-slate-500 uppercase ${topDrop.className}`}
-          >
+          <div className="mt-4 mb-1 flex items-center justify-between px-2 text-xs font-semibold tracking-wide text-slate-500 uppercase">
             Categories
             <FolderSortSelect sort={folderSort} onChange={setFolderSort} />
             <button onClick={() => createCategory(null)} className="rounded px-1.5 text-base text-slate-700 hover:bg-slate-100" title="New category">
@@ -435,7 +430,7 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
                 count={countIn(cat.id)}
                 active={!searching && view.kind === "category" && view.id === cat.id}
                 onClick={() => openView({ kind: "category", id: cat.id })}
-                {...dropOnCategory(cat)}
+                onDropArticle={dropOnCategory(cat)}
                 onDragStart={canDragCategories ? () => setDraggingCategoryId(cat.id) : undefined}
                 onDragEnd={() => setDraggingCategoryId(null)}
                 onContextMenu={(e) => openCategoryMenu(cat, e)}
@@ -448,7 +443,7 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
                   indent={1}
                   active={!searching && view.kind === "category" && view.id === sub.id}
                   onClick={() => openView({ kind: "category", id: sub.id })}
-                  {...dropOnCategory(sub)}
+                  onDropArticle={dropOnCategory(sub)}
                   onDragStart={canDragCategories ? () => setDraggingCategoryId(sub.id) : undefined}
                   onDragEnd={() => setDraggingCategoryId(null)}
                   onContextMenu={(e) => openCategoryMenu(sub, e)}
