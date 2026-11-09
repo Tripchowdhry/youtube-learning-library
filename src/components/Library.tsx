@@ -825,7 +825,7 @@ function NavItem(props: {
       }}
       onDragEnd={props.onDragEnd}
       onContextMenu={props.onContextMenu}
-      className={`flex items-center rounded-md text-sm ${props.active ? "bg-slate-900 text-white" : "hover:bg-slate-100"} ${overStyle}`}
+      className={`flex items-center rounded-md text-sm ${props.onDragStart ? "[-webkit-user-drag:element]" : ""} ${props.active ? "bg-slate-900 text-white" : "hover:bg-slate-100"} ${overStyle}`}
       style={{ paddingLeft: (props.indent ?? 0) * 14 }}
       onDragOver={(e) => {
         if (!props.dropTarget) return;
@@ -842,13 +842,25 @@ function NavItem(props: {
       }}
     >
       {props.leading}
-      <button onClick={props.onClick} className="flex min-w-0 flex-1 items-center gap-2 px-2 py-1.5 text-left">
+      {/* A div acting as a button, not a <button>: Safari won't start a drag on a real button. */}
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={props.onClick}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            props.onClick();
+          }
+        }}
+        className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 px-2 py-1.5 text-left"
+      >
         {props.icon && <Ico icon={props.icon} tone={props.tone ?? "slate"} />}
         <span className="truncate">{props.label}</span>
         {props.count !== undefined && (
           <span className={`ml-auto text-xs ${props.active ? "text-slate-300" : "text-slate-400"}`}>{props.count}</span>
         )}
-      </button>
+      </div>
     </div>
   );
 }

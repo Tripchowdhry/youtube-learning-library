@@ -1220,9 +1220,18 @@ export function NavItem(props: {
         : over === "after"
           ? "shadow-[inset_0_-3px_0_0_#3b82f6]"
           : "";
+  // A div acting as a button, not a <button>: Safari won't start a drag on a real button.
   return (
-    <button
+    <div
+      role="button"
+      tabIndex={0}
       onClick={props.onClick}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          props.onClick();
+        }
+      }}
       draggable={Boolean(props.onDragStart)}
       onDragStart={(e) => {
         if (!props.onDragStart) return;
@@ -1247,7 +1256,7 @@ export function NavItem(props: {
         if (props.allowDrop && !props.allowDrop(where)) return;
         props.onDropArticle?.(where);
       }}
-      className={`flex w-full items-center gap-2 rounded-md py-1.5 pr-2 text-left text-sm ${props.active ? "bg-slate-900 text-white" : "hover:bg-slate-100"} ${overStyle}`}
+      className={`flex w-full cursor-pointer items-center gap-2 rounded-md py-1.5 pr-2 text-left text-sm ${props.onDragStart ? "[-webkit-user-drag:element]" : ""} ${props.active ? "bg-slate-900 text-white" : "hover:bg-slate-100"} ${overStyle}`}
       style={{ paddingLeft: 8 + (props.indent ?? 0) * 22 }}
     >
       {Icon && <Ico icon={Icon} tone={props.tone ?? "slate"} />}
@@ -1255,7 +1264,7 @@ export function NavItem(props: {
       {props.count !== undefined && (
         <span className={`ml-auto text-xs ${props.active ? "text-slate-300" : "text-slate-400"}`}>{props.count}</span>
       )}
-    </button>
+    </div>
   );
 }
 
