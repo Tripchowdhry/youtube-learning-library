@@ -4,7 +4,7 @@ import BrandMark from "@/components/BrandMark";
 import { WelcomePanel } from "@/components/GettingStarted";
 import { Tour, TourButton, useSectionTour } from "@/components/Tour";
 import { SAMPLE_VIDEO } from "@/lib/onboarding";
-import { Brush, Clapperboard, ExternalLink, FilePen, Folder as FolderIcon, ArrowUpToLine, Copy, Eye, FolderPlus, Images, Inbox, Link2, Link2Off, NotebookText, Pencil, Sparkles, Trash2, TriangleAlert, type LucideIcon } from "lucide-react";
+import { Brush, Clapperboard, ExternalLink, FilePen, Folder as FolderIcon, Copy, Eye, FolderPlus, Images, Inbox, Link2, Link2Off, NotebookText, Pencil, Sparkles, Trash2, TriangleAlert, type LucideIcon } from "lucide-react";
 import { Ico, type Tone } from "@/components/Icon";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -34,7 +34,6 @@ import {
 } from "@/components/FolderSort";
 import VideoThumb from "@/components/VideoThumb";
 import { findSavedElsewhere } from "@/lib/find-saved";
-import { planFolderMove, isInSubtree, type DropWhere } from "@/lib/folder-move";
 import { createClient } from "@/lib/supabase/client";
 import type { Folder, Video } from "@/lib/types";
 import { onAiJobDone, runAiJob, useAiJobs } from "@/lib/ai-jobs";
@@ -62,7 +61,6 @@ export default function Library({ userEmail }: { userEmail: string }) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [draggingFolderId, setDraggingFolderId] = useState<string | null>(null);
-  const [topDropOver, setTopDropOver] = useState(false);
   const [menu, setMenu] = useState<MenuState | null>(null);
   const closeMenu = useCallback(() => setMenu(null), []);
   const [showFolders, setShowFolders] = useState(false);
@@ -405,33 +403,25 @@ export default function Library({ userEmail }: { userEmail: string }) {
     setView({ kind: "folder", id: (data as Folder).id });
   }
 
-  // Move a folder by dragging: above or below another folder puts it next to that one (at the same level),
-  // onto the middle puts it inside as a subfolder, and a null target moves it to the top level.
-  async function moveFolderTo(draggedId: string, targetId: string | null, where: DropWhere) {
+  // Drop one folder onto another next to it: it takes that folder's place, and the rest are renumbered so the order sticks.
+  async function moveFolderTo(draggedId: string, targetId: string) {
     const dragged = folders.find((f) => f.id === draggedId);
-    const changes = planFolderMove(folders, childFolders, draggedId, targetId, where);
-    if (!dragged || !changes) return;
-    if (changes.length === 0) return;
-    const newParent = changes[0].parent_id;
-    setFolders((prev) =>
-      prev.map((f) => {
-        const c = changes.find((x) => x.id === f.id);
-        return c ? { ...f, parent_id: c.parent_id, position: c.position } : f;
-      }),
-    );
-    if (newParent) setExpanded((prev) => new Set(prev).add(newParent));
+    const target = folders.find((f) => f.id === targetId);
+    if (!dragged || !target || dragged.id === target.id || dragged.parent_id !== target.parent_id) return;
+    const siblings = childFolders(dragged.parent_id).filter((f) => f.id !== dragged.id);
+    const index = siblings.findIndex((f) => f.id === target.id);
+    const draggedIndex = childFolders(dragged.parent_id).findIndex((f) => f.id === dragged.id);
+    // Dragging down puts it after the target; dragging up puts it before.
+    siblings.splice(draggedIndex <= index ? index + 1 : index, 0, dragged);
+    const changed = siblings.map((f, position) => ({ id: f.id, position })).filter((f, i) => siblings[i].position !== f.position);
+    setFolders((prev) => prev.map((f) => ({ ...f, position: changed.find((c) => c.id === f.id)?.position ?? f.position })));
     const results = await Promise.all(
-      changes.map((c) => supabase.from("folders").update({ parent_id: c.parent_id, position: c.position }).eq("id", c.id)),
+      changed.map((c) => supabase.from("folders").update({ position: c.position }).eq("id", c.id)),
     );
     const failed = results.find((r) => r.error);
     if (failed) {
       notify(failed.error!.message, true);
       load();
-      return;
-    }
-    if (newParent !== dragged.parent_id) {
-      const into = newParent ? folders.find((f) => f.id === newParent)?.name : null;
-      notify(into ? `Moved "${dragged.name}" into ${into}` : `Moved "${dragged.name}" to the top level`);
     }
   }
 
@@ -443,9 +433,6 @@ export default function Library({ userEmail }: { userEmail: string }) {
       items: [
         { label: "Rename", icon: Pencil, tone: "yellow", onClick: () => renameFolder(folder) },
         { label: "New subfolder", icon: FolderPlus, tone: "amber", onClick: () => createFolder(folder.id) },
-        ...(folder.parent_id
-          ? [{ label: "Move to top level", icon: ArrowUpToLine, tone: "violet" as const, onClick: () => moveFolderTo(folder.id, null, "inside") }]
-          : []),
         ...(folder.share_token
           ? [
               { label: "Preview what others see", icon: Eye, tone: "violet" as const, onClick: () => previewShare(folder.share_token!) },
@@ -585,22 +572,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
             onDrop={() => draggingId && moveVideo(draggingId, null)}
           />
 
-          <div
-            className={`mt-4 mb-1 flex items-center justify-between rounded-md px-2 text-xs font-semibold tracking-wide text-slate-500 uppercase ${topDropOver ? "ring-2 ring-blue-500" : ""}`}
-            title={draggingFolderId ? "Drop here to move the folder to the top level" : undefined}
-            onDragOver={(e) => {
-              const f = folders.find((x) => x.id === draggingFolderId);
-              if (!f || f.parent_id === null) return;
-              e.preventDefault();
-              setTopDropOver(true);
-            }}
-            onDragLeave={() => setTopDropOver(false)}
-            onDrop={(e) => {
-              e.preventDefault();
-              setTopDropOver(false);
-              if (draggingFolderId) moveFolderTo(draggingFolderId, null, "inside");
-            }}
-          >
+          <div className="mt-4 mb-1 flex items-center justify-between px-2 text-xs font-semibold tracking-wide text-slate-500 uppercase">
             Folders
             <FolderSortSelect sort={folderSort} onChange={setFolderSort} />
             <button onClick={() => createFolder(null)} className="rounded px-1.5 text-base text-slate-700 hover:bg-slate-100" title="New folder">
@@ -624,8 +596,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
             draggingFolder={folders.find((f) => f.id === draggingFolderId) ?? null}
             onFolderDragStart={setDraggingFolderId}
             onFolderDragEnd={() => setDraggingFolderId(null)}
-            onDropFolder={(targetId, where) => draggingFolderId && moveFolderTo(draggingFolderId, targetId, where)}
-            allFolders={folders}
+            onDropFolder={(targetId) => draggingFolderId && moveFolderTo(draggingFolderId, targetId)}
             canDragFolders={folderSort === "custom"}
             onFolderMenu={openFolderMenu}
           />
@@ -788,9 +759,7 @@ function NavItem(props: {
   active: boolean;
   onClick: () => void;
   dropTarget?: boolean;
-  onDrop?: (where: DropWhere) => void;
-  // When true, the top and bottom quarters of the row mean "above" and "below"; the middle means "inside".
-  edgeDrop?: boolean;
+  onDrop?: () => void;
   indent?: number;
   leading?: React.ReactNode;
   onDragStart?: () => void;
@@ -799,21 +768,7 @@ function NavItem(props: {
   icon?: LucideIcon;
   tone?: Tone;
 }) {
-  const [over, setOver] = useState<DropWhere | null>(null);
-  const zone = (e: React.DragEvent): DropWhere => {
-    if (!props.edgeDrop) return "inside";
-    const r = e.currentTarget.getBoundingClientRect();
-    const y = (e.clientY - r.top) / r.height;
-    return y < 0.25 ? "before" : y > 0.75 ? "after" : "inside";
-  };
-  const overStyle =
-    over === "inside"
-      ? "ring-2 ring-blue-500"
-      : over === "before"
-        ? "shadow-[inset_0_3px_0_0_#3b82f6]"
-        : over === "after"
-          ? "shadow-[inset_0_-3px_0_0_#3b82f6]"
-          : "";
+  const [over, setOver] = useState(false);
   return (
     <div
       draggable={Boolean(props.onDragStart)}
@@ -825,42 +780,28 @@ function NavItem(props: {
       }}
       onDragEnd={props.onDragEnd}
       onContextMenu={props.onContextMenu}
-      className={`flex items-center rounded-md text-sm ${props.onDragStart ? "[-webkit-user-drag:element]" : ""} ${props.active ? "bg-slate-900 text-white" : "hover:bg-slate-100"} ${overStyle}`}
+      className={`flex items-center rounded-md text-sm ${props.active ? "bg-slate-900 text-white" : "hover:bg-slate-100"} ${over ? "ring-2 ring-blue-500" : ""}`}
       style={{ paddingLeft: (props.indent ?? 0) * 14 }}
       onDragOver={(e) => {
         if (!props.dropTarget) return;
         e.preventDefault();
-        setOver(zone(e));
+        setOver(true);
       }}
-      onDragLeave={() => setOver(null)}
+      onDragLeave={() => setOver(false)}
       onDrop={(e) => {
         e.preventDefault();
-        if (!props.dropTarget) return;
-        const where = zone(e);
-        setOver(null);
-        props.onDrop?.(where);
+        setOver(false);
+        props.onDrop?.();
       }}
     >
       {props.leading}
-      {/* A div acting as a button, not a <button>: Safari won't start a drag on a real button. */}
-      <div
-        role="button"
-        tabIndex={0}
-        onClick={props.onClick}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            props.onClick();
-          }
-        }}
-        className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 px-2 py-1.5 text-left"
-      >
+      <button onClick={props.onClick} className="flex min-w-0 flex-1 items-center gap-2 px-2 py-1.5 text-left">
         {props.icon && <Ico icon={props.icon} tone={props.tone ?? "slate"} />}
         <span className="truncate">{props.label}</span>
         {props.count !== undefined && (
           <span className={`ml-auto text-xs ${props.active ? "text-slate-300" : "text-slate-400"}`}>{props.count}</span>
         )}
-      </div>
+      </button>
     </div>
   );
 }
@@ -879,8 +820,7 @@ function FolderTree(props: {
   draggingFolder: Folder | null;
   onFolderDragStart: (id: string) => void;
   onFolderDragEnd: () => void;
-  onDropFolder: (targetId: string, where: DropWhere) => void;
-  allFolders: Folder[];
+  onDropFolder: (targetId: string) => void;
   canDragFolders: boolean;
   onFolderMenu: (folder: Folder, e: React.MouseEvent) => void;
 }) {
@@ -910,14 +850,12 @@ function FolderTree(props: {
               active={props.activeId === folder.id}
               onClick={() => props.onOpen(folder.id)}
               indent={props.depth}
-              // A dragged video drops into the folder. A dragged folder goes above, below or inside this one,
-              // but never into itself or one of its own subfolders.
+              // A dragged video drops into the folder; a dragged folder reorders among folders next to it.
               dropTarget={
                 props.draggingId !== null ||
-                (draggingFolder !== null && !isInSubtree(props.allFolders, folder.id, draggingFolder.id))
+                (draggingFolder !== null && draggingFolder.id !== folder.id && draggingFolder.parent_id === folder.parent_id)
               }
-              edgeDrop={draggingFolder !== null}
-              onDrop={(where) => (draggingFolder ? props.onDropFolder(folder.id, where) : props.onDropVideo(folder.id))}
+              onDrop={() => (draggingFolder ? props.onDropFolder(folder.id) : props.onDropVideo(folder.id))}
               onDragStart={props.canDragFolders ? () => props.onFolderDragStart(folder.id) : undefined}
               onDragEnd={props.onFolderDragEnd}
               onContextMenu={(e) => props.onFolderMenu(folder, e)}

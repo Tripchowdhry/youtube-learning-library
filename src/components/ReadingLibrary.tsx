@@ -19,7 +19,6 @@ import { onAiJobDone, runAiJob, useAiJobs, useSecondsSince } from "@/lib/ai-jobs
 import { findSavedElsewhere } from "@/lib/find-saved";
 import { linkKey } from "@/lib/links";
 import { createClient } from "@/lib/supabase/client";
-import { planFolderMove, twoLevelDropAllowed, type DropWhere } from "@/lib/folder-move";
 import type { Article, ArticleCategory, SectionKind } from "@/lib/types";
 import { askArticleAi } from "@/lib/video-ai";
 import { askConfirm } from "./ConfirmDialog";
@@ -41,7 +40,6 @@ import {
   Trash2,
   TriangleAlert,
   type LucideIcon,
-  ArrowUpToLine,
 } from "lucide-react";
 import { SectionWelcome } from "./GettingStarted";
 
@@ -176,8 +174,8 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
   );
 
   const canDragCategories = folderSort === "custom";
-  const draggingSub = categories.some((c) => c.id === draggingCategoryId && c.parent_id !== null);
-  const topDrop = useTopDrop(draggingSub, () => draggingCategoryId && moveCategoryTo(draggingCategoryId, null, "inside"));
+  const categorySiblings = (category: ArticleCategory) =>
+    category.parent_id ? subcategories(category.parent_id) : topCategories;
 
   const currentCategory = view.kind === "category" ? categories.find((c) => c.id === view.id) ?? null : null;
 
@@ -437,36 +435,27 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
     openView({ kind: "category", id: (data as ArticleCategory).id });
   }
 
-  // Move a category by dragging: above or below another puts it next to that one, onto the middle puts it
-  // inside as a subcategory, and a null target moves it to the top level. Categories stay two levels deep.
-  async function moveCategoryTo(draggedId: string, targetId: string | null, where: DropWhere) {
+  // Drop one category onto another next to it: it takes that one's place, and the rest are renumbered so the order sticks.
+  async function moveCategoryTo(draggedId: string, targetId: string) {
     const dragged = categories.find((c) => c.id === draggedId);
-    if (!dragged) return;
-    if (targetId && !twoLevelDropAllowed(categories, draggedId, targetId, where)) return;
-    const changes = planFolderMove(categories, (p) => (p ? subcategories(p) : topCategories), draggedId, targetId, where);
-    if (!changes || changes.length === 0) return;
-    const newParent = changes[0].parent_id;
-    setCategories((prev) =>
-      prev.map((c) => {
-        const x = changes.find((y) => y.id === c.id);
-        return x ? { ...c, parent_id: x.parent_id, position: x.position } : c;
-      }),
-    );
+    const target = categories.find((c) => c.id === targetId);
+    if (!dragged || !target || dragged.id === target.id || dragged.parent_id !== target.parent_id) return;
+    const all = categorySiblings(dragged);
+    const siblings = all.filter((c) => c.id !== dragged.id);
+    const index = siblings.findIndex((c) => c.id === target.id);
+    // Dragging down puts it after the target; dragging up puts it before.
+    siblings.splice(all.indexOf(dragged) <= index ? index + 1 : index, 0, dragged);
+    const changed = siblings.map((c, position) => ({ id: c.id, position })).filter((c, i) => siblings[i].position !== c.position);
+    setCategories((prev) => prev.map((c) => ({ ...c, position: changed.find((x) => x.id === c.id)?.position ?? c.position })));
     const results = await Promise.all(
-      changes.map((c) => supabase.from("article_categories").update({ parent_id: c.parent_id, position: c.position }).eq("id", c.id)),
+      changed.map((c) => supabase.from("article_categories").update({ position: c.position }).eq("id", c.id)),
     );
     const failed = results.find((r) => r.error);
     if (failed) {
       notify(failed.error!.message, true);
       load();
-      return;
-    }
-    if (newParent !== dragged.parent_id) {
-      const into = newParent ? categories.find((c) => c.id === newParent)?.name : null;
-      notify(into ? `Moved "${dragged.name}" into ${into}` : `Moved "${dragged.name}" to the top level`);
     }
   }
-
 
   function openCategoryMenu(category: ArticleCategory, e: React.MouseEvent) {
     e.preventDefault();
@@ -478,9 +467,6 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
         ...(category.parent_id
           ? []
           : [{ label: "New subcategory", icon: Tag, tone: "orange" as const, onClick: () => createCategory(category.id) }]),
-        ...(category.parent_id
-          ? [{ label: "Move to top level", icon: ArrowUpToLine, tone: "violet" as const, onClick: () => moveCategoryTo(category.id, null, "inside") }]
-          : []),
         { label: "Delete", icon: Trash2, tone: "red" as const, onClick: () => deleteCategory(category), danger: true },
       ],
     });
@@ -489,16 +475,13 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
   // What happens when something is dropped on a category: an article moves into it,
   // a category next to it takes its place.
   const dropOnCategory = (category: ArticleCategory) => {
-    if (draggingId) return { onDropArticle: () => moveArticle(draggingId, category.id) };
+    if (draggingId) return () => moveArticle(draggingId, category.id);
     const dragged = categories.find((c) => c.id === draggingCategoryId);
-    if (!dragged || dragged.id === category.id) return {};
-    return {
-      edgeDrop: true,
-      allowDrop: (where: DropWhere) => twoLevelDropAllowed(categories, dragged.id, category.id, where),
-      onDropArticle: (where: DropWhere) => moveCategoryTo(dragged.id, category.id, where),
-    };
+    if (dragged && dragged.id !== category.id && dragged.parent_id === category.parent_id) {
+      return () => moveCategoryTo(dragged.id, category.id);
+    }
+    return undefined;
   };
-
 
   async function renameCategory(category: ArticleCategory) {
     const name = window.prompt("Rename:", category.name)?.trim();
@@ -588,10 +571,7 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
             onDropArticle={draggingId ? () => moveArticle(draggingId, null) : undefined}
           />
 
-          <div
-            {...topDrop}
-            className={`mt-4 mb-1 flex items-center justify-between rounded-md px-2 text-xs font-semibold tracking-wide text-slate-500 uppercase ${topDrop.className}`}
-          >
+          <div className="mt-4 mb-1 flex items-center justify-between px-2 text-xs font-semibold tracking-wide text-slate-500 uppercase">
             Categories
             <FolderSortSelect sort={folderSort} onChange={setFolderSort} />
             <button onClick={() => createCategory(null)} className="rounded px-1.5 text-base text-slate-700 hover:bg-slate-100" title="New category">
@@ -610,7 +590,7 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
                 count={countIn(cat.id)}
                 active={!searching && view.kind === "category" && view.id === cat.id}
                 onClick={() => openView({ kind: "category", id: cat.id })}
-                {...dropOnCategory(cat)}
+                onDropArticle={dropOnCategory(cat)}
                 onDragStart={canDragCategories ? () => setDraggingCategoryId(cat.id) : undefined}
                 onDragEnd={() => setDraggingCategoryId(null)}
                 onContextMenu={(e) => openCategoryMenu(cat, e)}
@@ -623,7 +603,7 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
                   indent={1}
                   active={!searching && view.kind === "category" && view.id === sub.id}
                   onClick={() => openView({ kind: "category", id: sub.id })}
-                  {...dropOnCategory(sub)}
+                  onDropArticle={dropOnCategory(sub)}
                   onDragStart={canDragCategories ? () => setDraggingCategoryId(sub.id) : undefined}
                   onDragEnd={() => setDraggingCategoryId(null)}
                   onContextMenu={(e) => openCategoryMenu(sub, e)}
@@ -1168,70 +1148,24 @@ export function Pills<T extends string>(props: {
   );
 }
 
-// Lets a list heading take a dragged subcategory and move it to the top level.
-export function useTopDrop(enabled: boolean, onDrop: () => void) {
-  const [over, setOver] = useState(false);
-  return {
-    className: over ? "ring-2 ring-blue-500" : "",
-    title: enabled ? "Drop here to move it to the top level" : undefined,
-    onDragOver: (e: React.DragEvent) => {
-      if (!enabled) return;
-      e.preventDefault();
-      setOver(true);
-    },
-    onDragLeave: () => setOver(false),
-    onDrop: (e: React.DragEvent) => {
-      e.preventDefault();
-      setOver(false);
-      if (enabled) onDrop();
-    },
-  };
-}
-
 export function NavItem(props: {
   label: string;
   count?: number;
   active: boolean;
   onClick: () => void;
   indent?: number;
-  onDropArticle?: (where: DropWhere) => void;
-  // When true, the top and bottom quarters of the row mean "above" and "below"; the middle means "inside".
-  edgeDrop?: boolean;
-  allowDrop?: (where: DropWhere) => boolean;
+  onDropArticle?: () => void;
   onDragStart?: () => void;
   onDragEnd?: () => void;
   onContextMenu?: (e: React.MouseEvent) => void;
   icon?: LucideIcon;
   tone?: Tone;
 }) {
-  const [over, setOver] = useState<DropWhere | null>(null);
+  const [over, setOver] = useState(false);
   const Icon = props.icon;
-  const zone = (e: React.DragEvent): DropWhere => {
-    if (!props.edgeDrop) return "inside";
-    const r = e.currentTarget.getBoundingClientRect();
-    const y = (e.clientY - r.top) / r.height;
-    return y < 0.25 ? "before" : y > 0.75 ? "after" : "inside";
-  };
-  const overStyle =
-    over === "inside"
-      ? "ring-2 ring-blue-500"
-      : over === "before"
-        ? "shadow-[inset_0_3px_0_0_#3b82f6]"
-        : over === "after"
-          ? "shadow-[inset_0_-3px_0_0_#3b82f6]"
-          : "";
-  // A div acting as a button, not a <button>: Safari won't start a drag on a real button.
   return (
-    <div
-      role="button"
-      tabIndex={0}
+    <button
       onClick={props.onClick}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          props.onClick();
-        }
-      }}
       draggable={Boolean(props.onDragStart)}
       onDragStart={(e) => {
         if (!props.onDragStart) return;
@@ -1243,20 +1177,16 @@ export function NavItem(props: {
       onContextMenu={props.onContextMenu}
       onDragOver={(e) => {
         if (!props.onDropArticle) return;
-        const where = zone(e);
-        if (props.allowDrop && !props.allowDrop(where)) return setOver(null);
         e.preventDefault();
-        setOver(where);
+        setOver(true);
       }}
-      onDragLeave={() => setOver(null)}
+      onDragLeave={() => setOver(false)}
       onDrop={(e) => {
         e.preventDefault();
-        const where = zone(e);
-        setOver(null);
-        if (props.allowDrop && !props.allowDrop(where)) return;
-        props.onDropArticle?.(where);
+        setOver(false);
+        props.onDropArticle?.();
       }}
-      className={`flex w-full cursor-pointer items-center gap-2 rounded-md py-1.5 pr-2 text-left text-sm ${props.onDragStart ? "[-webkit-user-drag:element]" : ""} ${props.active ? "bg-slate-900 text-white" : "hover:bg-slate-100"} ${overStyle}`}
+      className={`flex w-full items-center gap-2 rounded-md py-1.5 pr-2 text-left text-sm ${props.active ? "bg-slate-900 text-white" : "hover:bg-slate-100"} ${over ? "ring-2 ring-blue-500" : ""}`}
       style={{ paddingLeft: 8 + (props.indent ?? 0) * 22 }}
     >
       {Icon && <Ico icon={Icon} tone={props.tone ?? "slate"} />}
@@ -1264,7 +1194,7 @@ export function NavItem(props: {
       {props.count !== undefined && (
         <span className={`ml-auto text-xs ${props.active ? "text-slate-300" : "text-slate-400"}`}>{props.count}</span>
       )}
-    </div>
+    </button>
   );
 }
 
