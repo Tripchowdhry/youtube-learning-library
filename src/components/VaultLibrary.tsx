@@ -704,7 +704,9 @@ function EntryRow(props: {
       onDragStart={(e) => {
         e.dataTransfer.effectAllowed = "move";
         e.dataTransfer.setData("text/plain", entry.name);
-        props.onDragStart();
+        // Re-render after the drag has started; Safari can cancel a drag whose row changes during dragstart.
+        const start = props.onDragStart;
+        setTimeout(() => start?.(), 0);
       }}
       onDragEnd={props.onDragEnd}
       className={`flex cursor-grab items-start gap-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm transition ${props.dragging ? "opacity-40" : ""}`}
