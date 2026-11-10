@@ -1,25 +1,27 @@
 -- BrainShelf database setup.
 -- Paste this whole file into Supabase > SQL Editor > New query, then click Run.
 -- It is safe to run more than once.
+-- Set up before the Videos "folders" became "categories"? Run rename-folders-to-categories.sql instead
+-- of re-running this file.
 
 create extension if not exists pgcrypto;
 
--- Folders form a tree: a folder with parent_id = null is a top-level folder.
-create table if not exists public.folders (
+-- Video categories form a tree: a category with parent_id = null is a top-level one.
+create table if not exists public.video_categories (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null default auth.uid() references auth.users (id) on delete cascade,
-  parent_id uuid references public.folders (id) on delete cascade,
+  parent_id uuid references public.video_categories (id) on delete cascade,
   name text not null check (char_length(name) between 1 and 100),
   position double precision not null default 0,
   share_token uuid unique,
   created_at timestamptz not null default now()
 );
 
--- A video with folder_id = null shows up under "Unsorted".
+-- A video with category_id = null shows up under "Uncategorized".
 create table if not exists public.videos (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null default auth.uid() references auth.users (id) on delete cascade,
-  folder_id uuid references public.folders (id) on delete set null,
+  category_id uuid references public.video_categories (id) on delete set null,
   youtube_id text not null,
   url text not null,
   title text,
@@ -36,17 +38,17 @@ alter table public.videos add column if not exists note text not null default ''
 -- When the video was ticked as watched (added later; see video-watched.sql).
 alter table public.videos add column if not exists watched_at timestamptz;
 
-create index if not exists folders_user_idx on public.folders (user_id);
-create index if not exists folders_parent_idx on public.folders (parent_id);
+create index if not exists video_categories_user_idx on public.video_categories (user_id);
+create index if not exists video_categories_parent_idx on public.video_categories (parent_id);
 create index if not exists videos_user_idx on public.videos (user_id);
-create index if not exists videos_folder_idx on public.videos (folder_id);
+create index if not exists videos_category_idx on public.videos (category_id);
 
 -- Row level security: every person can only see and change their own rows.
-alter table public.folders enable row level security;
+alter table public.video_categories enable row level security;
 alter table public.videos enable row level security;
 
-drop policy if exists "Own folders" on public.folders;
-create policy "Own folders" on public.folders
+drop policy if exists "Own video categories" on public.video_categories;
+create policy "Own video categories" on public.video_categories
   for all to authenticated
   using (user_id = auth.uid())
   with check (user_id = auth.uid());
@@ -84,8 +86,8 @@ create policy "Own notes" on public.notes
     and exists (select 1 from public.videos v where v.id = video_id and v.user_id = auth.uid())
   );
 
--- Read-only view of a shared folder (and its subfolders) for anyone with the link.
-create or replace function public.get_shared_folder(token uuid)
+-- Read-only view of a shared category (and its subcategories) for anyone with the link.
+create or replace function public.get_shared_video_category(token uuid)
 returns json
 language sql
 stable
@@ -93,31 +95,31 @@ security definer
 set search_path = public
 as $$
   with recursive tree as (
-    select f.id, f.name, f.parent_id, f.position
-    from folders f
-    where f.share_token = token
+    select c.id, c.name, c.parent_id, c.position
+    from video_categories c
+    where c.share_token = token
     union all
     select c.id, c.name, c.parent_id, c.position
-    from folders c
+    from video_categories c
     join tree t on c.parent_id = t.id
   )
   select case
-    when not exists (select 1 from folders where share_token = token) then null
+    when not exists (select 1 from video_categories where share_token = token) then null
     else json_build_object(
-      'folder', (select json_build_object('id', id, 'name', name) from folders where share_token = token),
-      'folders', (select coalesce(json_agg(tree order by tree.position, tree.name), '[]'::json) from tree),
+      'category', (select json_build_object('id', id, 'name', name) from video_categories where share_token = token),
+      'categories', (select coalesce(json_agg(tree order by tree.position, tree.name), '[]'::json) from tree),
       'videos', (
         select coalesce(json_agg(json_build_object(
-          'id', v.id, 'folder_id', v.folder_id, 'youtube_id', v.youtube_id, 'url', v.url,
+          'id', v.id, 'category_id', v.category_id, 'youtube_id', v.youtube_id, 'url', v.url,
           'title', v.title, 'channel', v.channel, 'thumbnail_url', v.thumbnail_url,
           'tags', v.tags, 'position', v.position
         ) order by v.position), '[]'::json)
         from videos v
-        where v.folder_id in (select id from tree)
+        where v.category_id in (select id from tree)
       )
     )
   end;
 $$;
 
-revoke all on function public.get_shared_folder(uuid) from public;
-grant execute on function public.get_shared_folder(uuid) to anon, authenticated;
+revoke all on function public.get_shared_video_category(uuid) from public;
+grant execute on function public.get_shared_video_category(uuid) to anon, authenticated;

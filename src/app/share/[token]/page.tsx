@@ -1,7 +1,7 @@
 import Link from "next/link";
 import VideoThumb from "@/components/VideoThumb";
 import { createClient } from "@/lib/supabase/server";
-import type { SharedCategory, SharedFolder } from "@/lib/types";
+import type { SharedCategory, SharedVideoCategory } from "@/lib/types";
 import { ArrowLeft, ExternalLink, Eye, FileText, Folder as FolderIcon, Tag } from "lucide-react";
 import { Ico } from "@/components/Icon";
 
@@ -18,8 +18,8 @@ export default async function SharedFolderPage({
   const preview = (await searchParams).preview === "1";
   const supabase = await createClient();
   const isUuid = /^[0-9a-f-]{36}$/i.test(token);
-  const { data } = isUuid ? await supabase.rpc("get_shared_folder", { token }) : { data: null };
-  const shared = data as SharedFolder | null;
+  const { data } = isUuid ? await supabase.rpc("get_shared_video_category", { token }) : { data: null };
+  const shared = data as SharedVideoCategory | null;
   // Not a Videos folder: it may be a shared Reading, Tutorials or ScrapBook category.
   const sharedCategory =
     !shared && isUuid ? ((await supabase.rpc("get_shared_category", { token })).data as SharedCategory | null) : null;
@@ -41,8 +41,8 @@ export default async function SharedFolderPage({
         <PreviewBanner text="Your notes and summaries stay private. Only the videos below are shared." back="/" />
       )}
       <p className="text-sm text-slate-500">Shared category</p>
-      <h1 className="mb-6 text-3xl font-bold">{shared.folder.name}</h1>
-      <Section shared={shared} folderId={shared.folder.id} depth={0} />
+      <h1 className="mb-6 text-3xl font-bold">{shared.category.name}</h1>
+      <Section shared={shared} folderId={shared.category.id} depth={0} />
       <p className="mt-12 text-center text-sm text-slate-500">
         <Link href="/" className="underline">
           Make your own learning library
@@ -52,9 +52,9 @@ export default async function SharedFolderPage({
   );
 }
 
-function Section({ shared, folderId, depth }: { shared: SharedFolder; folderId: string; depth: number }) {
-  const videos = shared.videos.filter((v) => v.folder_id === folderId);
-  const children = shared.folders.filter((f) => f.parent_id === folderId);
+function Section({ shared, folderId, depth }: { shared: SharedVideoCategory; folderId: string; depth: number }) {
+  const videos = shared.videos.filter((v) => v.category_id === folderId);
+  const children = shared.categories.filter((f) => f.parent_id === folderId);
 
   return (
     <div className={depth > 0 ? "mt-8" : ""}>

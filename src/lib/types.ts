@@ -1,4 +1,5 @@
-export type Folder = {
+// A Videos category (the video_categories table). Categories form a tree through parent_id.
+export type VideoCategory = {
   id: string;
   user_id: string;
   parent_id: string | null;
@@ -11,7 +12,7 @@ export type Folder = {
 export type Video = {
   id: string;
   user_id: string;
-  folder_id: string | null;
+  category_id: string | null;
   youtube_id: string;
   url: string;
   title: string | null;
@@ -25,12 +26,13 @@ export type Video = {
   created_at: string;
 };
 
-export type SharedFolder = {
-  folder: { id: string; name: string };
-  folders: Pick<Folder, "id" | "name" | "parent_id" | "position">[];
+// What get_shared_video_category returns for a shared link.
+export type SharedVideoCategory = {
+  category: { id: string; name: string };
+  categories: Pick<VideoCategory, "id" | "name" | "parent_id" | "position">[];
   videos: Pick<
     Video,
-    "id" | "folder_id" | "youtube_id" | "url" | "title" | "channel" | "thumbnail_url" | "tags" | "position"
+    "id" | "category_id" | "youtube_id" | "url" | "title" | "channel" | "thumbnail_url" | "tags" | "position"
   >[];
 };
 

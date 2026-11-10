@@ -37,13 +37,13 @@ export async function findSavedElsewhere(
   if (skip !== "videos" && youtubeIds.size) {
     const { data } = await supabase
       .from("videos")
-      .select("id, folder_id")
+      .select("id, category_id")
       .in("youtube_id", [...youtubeIds])
       .limit(1);
     const video = data?.[0];
     if (video) {
-      const { data: folders } = await supabase.from("folders").select("id, name, parent_id");
-      return { where: `Videos › ${pathOf(folders, video.folder_id, "Unsorted")}`, href: `/?show=${video.id}` };
+      const { data: categories } = await supabase.from("video_categories").select("id, name, parent_id");
+      return { where: `Videos › ${pathOf(categories, video.category_id, "Uncategorized")}`, href: `/?show=${video.id}` };
     }
   }
 
