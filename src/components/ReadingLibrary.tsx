@@ -41,7 +41,7 @@ import {
   Trash2,
   TriangleAlert,
   type LucideIcon,
-  ArrowUpToLine,
+  ArrowUp,
 } from "lucide-react";
 import { SectionWelcome } from "./GettingStarted";
 
@@ -469,7 +469,7 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
       load();
       return;
     }
-    notify(`Moved "${category.name}" to the top level`);
+    notify(`Moved "${category.name}" up a level`);
   }
 
   function openCategoryMenu(category: ArticleCategory, e: React.MouseEvent) {
@@ -483,7 +483,7 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
           ? []
           : [{ label: "New subcategory", icon: Tag, tone: "orange" as const, onClick: () => createCategory(category.id) }]),
         ...(category.parent_id
-          ? [{ label: "Move to top level", icon: ArrowUpToLine, tone: "violet" as const, onClick: () => moveCategoryToTop(category) }]
+          ? [{ label: "Move up a level", icon: ArrowUp, tone: "violet" as const, onClick: () => moveCategoryToTop(category) }]
           : []),
         { label: "Delete", icon: Trash2, tone: "red" as const, onClick: () => deleteCategory(category), danger: true },
       ],

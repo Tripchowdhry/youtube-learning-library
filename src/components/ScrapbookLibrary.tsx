@@ -29,7 +29,7 @@ import {
 import { SectionWelcome } from "@/components/GettingStarted";
 import { createClient } from "@/lib/supabase/client";
 import type { ArticleCategory, Scrap } from "@/lib/types";
-import { ArrowUpToLine, FileText, Inbox, NotebookPen, Pencil, Tag, Trash2 } from "lucide-react";
+import { ArrowUp, FileText, Inbox, NotebookPen, Pencil, Tag, Trash2 } from "lucide-react";
 import { Ico } from "@/components/Icon";
 
 type View = { kind: "all" } | { kind: "uncategorized" } | { kind: "category"; id: string };
@@ -293,7 +293,7 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
       load();
       return;
     }
-    notify(`Moved "${category.name}" to the top level`);
+    notify(`Moved "${category.name}" up a level`);
   }
 
   function openCategoryMenu(category: ArticleCategory, e: React.MouseEvent) {
@@ -307,7 +307,7 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
           ? []
           : [{ label: "New subcategory", icon: Tag, tone: "orange" as const, onClick: () => createCategory(category.id) }]),
         ...(category.parent_id
-          ? [{ label: "Move to top level", icon: ArrowUpToLine, tone: "violet" as const, onClick: () => moveCategoryToTop(category) }]
+          ? [{ label: "Move up a level", icon: ArrowUp, tone: "violet" as const, onClick: () => moveCategoryToTop(category) }]
           : []),
         { label: "Delete", icon: Trash2, tone: "red" as const, onClick: () => deleteCategory(category), danger: true },
       ],

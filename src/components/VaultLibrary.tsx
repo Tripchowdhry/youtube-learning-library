@@ -21,7 +21,7 @@ import {
   newSalt,
   suggestPassphrase,
 } from "@/lib/vault-crypto";
-import { ArrowUpToLine, Inbox, KeyRound, Lock, LockKeyhole, LockKeyholeOpen, Pencil, Tag, Trash2 } from "lucide-react";
+import { ArrowUp, Inbox, KeyRound, Lock, LockKeyhole, LockKeyholeOpen, Pencil, Tag, Trash2 } from "lucide-react";
 import { Ico } from "@/components/Icon";
 
 type View = { kind: "all" } | { kind: "uncategorized" } | { kind: "category"; id: string };
@@ -377,7 +377,7 @@ export default function VaultLibrary({ userEmail }: { userEmail: string }) {
       load();
       return;
     }
-    notify(`Moved "${category.name}" to the top level`);
+    notify(`Moved "${category.name}" up a level`);
   }
 
   function openCategoryMenu(category: VaultCategory, e: React.MouseEvent) {
@@ -391,7 +391,7 @@ export default function VaultLibrary({ userEmail }: { userEmail: string }) {
           ? []
           : [{ label: "New subcategory", icon: Tag, tone: "orange" as const, onClick: () => createCategory(category.id) }]),
         ...(category.parent_id
-          ? [{ label: "Move to top level", icon: ArrowUpToLine, tone: "violet" as const, onClick: () => moveCategoryToTop(category) }]
+          ? [{ label: "Move up a level", icon: ArrowUp, tone: "violet" as const, onClick: () => moveCategoryToTop(category) }]
           : []),
         { label: "Delete", icon: Trash2, tone: "red" as const, onClick: () => deleteCategory(category), danger: true },
       ],
