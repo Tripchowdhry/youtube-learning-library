@@ -12,7 +12,7 @@ export function WelcomePanel({ onAddSample }: { onAddSample: () => Promise<unkno
       <h2 className="text-2xl font-bold">Welcome to your shelf</h2>
       <p className="mx-auto mt-2 max-w-md text-slate-600">
         Paste a YouTube link in the box above to save your first video. BrainShelf fills in the title and puts it in a
-        folder named after the channel.
+        category named after the channel.
       </p>
       <div className="mx-auto mt-6 grid max-w-2xl gap-3 text-left sm:grid-cols-3">
         <Feature title="Save" text="Videos here, articles and tutorials in the other tabs." />

@@ -175,7 +175,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
 
   // Points at a saved video: opens its folder and rings it in green for a few seconds.
   function showSaved(video: Video) {
-    const where = video.folder_id ? folderPath(video.folder_id) : "Unsorted";
+    const where = video.folder_id ? folderPath(video.folder_id) : "Uncategorized";
     openView(video.folder_id ? { kind: "folder", id: video.folder_id } : { kind: "unsorted" });
     setPeriod("any");
     setWatchFilter("all");
@@ -327,7 +327,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
     const video = videos.find((v) => v.id === id);
     if (!video || video.folder_id === folderId) return;
     updateVideo(id, { folder_id: folderId, position: topPosition(folderId) });
-    notify(`Moved to ${folderId ? folderPath(folderId) : "Unsorted"}`);
+    notify(`Moved to ${folderId ? folderPath(folderId) : "Uncategorized"}`);
   }
 
   // Drop one video onto another: it takes the target's place in the list.
@@ -406,7 +406,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
   // ---------- Folder actions ----------
 
   async function createFolder(parentId: string | null) {
-    const name = window.prompt(parentId ? `New folder inside "${folderPath(parentId)}":` : "New folder name:");
+    const name = window.prompt(parentId ? `New subcategory inside "${folderPath(parentId)}":` : "New category name:");
     if (!name?.trim()) return;
     const siblings = folders.filter((f) => f.parent_id === parentId);
     const position = siblings.length ? Math.max(...siblings.map((f) => f.position)) + 1 : 0;
@@ -467,7 +467,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
       y: e.clientY,
       items: [
         { label: "Rename", icon: Pencil, tone: "yellow", onClick: () => renameFolder(folder) },
-        { label: "New subfolder", icon: FolderPlus, tone: "amber", onClick: () => createFolder(folder.id) },
+        { label: "New subcategory", icon: FolderPlus, tone: "amber", onClick: () => createFolder(folder.id) },
         ...(folder.parent_id
           ? [{ label: "Move up a level", icon: ArrowUp, tone: "violet" as const, onClick: () => moveFolderUp(folder) }]
           : []),
@@ -484,7 +484,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
   }
 
   async function renameFolder(folder: Folder) {
-    const name = window.prompt("Rename folder:", folder.name);
+    const name = window.prompt("Rename category:", folder.name);
     if (!name?.trim() || name.trim() === folder.name) return;
     setFolders((prev) => prev.map((f) => (f.id === folder.id ? { ...f, name: name.trim() } : f)));
     const { error } = await supabase.from("folders").update({ name: name.trim() }).eq("id", folder.id);
@@ -496,7 +496,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
 
   async function deleteFolder(folder: Folder) {
     const ok = window.confirm(
-      `Delete "${folder.name}" and any folders inside it?\nThe videos inside will move to Unsorted, not be deleted.`,
+      `Delete "${folder.name}" and any categories inside it?\nThe videos inside will move to Uncategorized, not be deleted.`,
     );
     if (!ok) return;
     const { error } = await supabase.from("folders").delete().eq("id", folder.id);
@@ -530,7 +530,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
     const link = `${window.location.origin}/share/${token}`;
     try {
       await navigator.clipboard.writeText(link);
-      notify("Share link copied. Anyone with it can view this folder.");
+      notify("Share link copied. Anyone with it can view this category.");
     } catch {
       window.prompt("Copy this share link:", link);
     }
@@ -554,7 +554,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
     : view.kind === "all"
       ? "All videos"
       : view.kind === "unsorted"
-        ? "Unsorted"
+        ? "Uncategorized"
         : folderPath(view.id);
 
   return (
@@ -564,7 +564,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
           className="rounded-md border border-slate-300 px-2 py-1 text-sm md:hidden"
           onClick={() => setShowFolders((s) => !s)}
         >
-          {showFolders ? "Close" : "Folders"}
+          {showFolders ? "Close" : "Categories"}
         </button>
         <BrandMark />
         <span data-tour="sections" className="shrink-0">
@@ -601,14 +601,14 @@ export default function Library({ userEmail }: { userEmail: string }) {
           onContextMenu={(e) => {
             if (e.defaultPrevented) return;
             e.preventDefault();
-            setMenu({ x: e.clientX, y: e.clientY, items: [{ label: "New folder", icon: FolderPlus, tone: "amber" as const, onClick: () => createFolder(null) }] });
+            setMenu({ x: e.clientX, y: e.clientY, items: [{ label: "New category", icon: FolderPlus, tone: "amber" as const, onClick: () => createFolder(null) }] });
           }}
         >
           <NavItem icon={Clapperboard} tone="violet" label="All videos" count={videos.length} active={view.kind === "all" && !searching} onClick={() => openView({ kind: "all" })} />
           <NavItem
             icon={Inbox}
             tone="blue"
-            label="Unsorted"
+            label="Uncategorized"
             count={videos.filter((v) => !v.folder_id).length}
             active={view.kind === "unsorted" && !searching}
             onClick={() => openView({ kind: "unsorted" })}
@@ -616,14 +616,14 @@ export default function Library({ userEmail }: { userEmail: string }) {
             onDrop={() => draggingId && moveVideo(draggingId, null)}
           />
 
-          <SidebarHeading label="Folders">
+          <SidebarHeading label="Categories">
             <FolderSortSelect sort={folderSort} onChange={setFolderSort} />
-            <button onClick={() => createFolder(null)} className="rounded px-1.5 text-base text-slate-700 hover:bg-slate-100" title="New folder">
+            <button onClick={() => createFolder(null)} className="rounded px-1.5 text-base text-slate-700 hover:bg-slate-100" title="New category">
               +
             </button>
           </SidebarHeading>
           {childFolders(null).length === 0 && (
-            <p className="px-2 text-sm text-slate-500">No folders yet. Click + to make one, like &quot;LLMs&quot; or &quot;Agents&quot;.</p>
+            <p className="px-2 text-sm text-slate-500">No categories yet. Click + to make one, like &quot;LLMs&quot; or &quot;Agents&quot;.</p>
           )}
           <FolderTree
             parentId={null}
@@ -649,7 +649,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
             onFolderMenu={openFolderMenu}
           />
           {childFolders(null).length > 1 && (
-            <p className="mt-3 px-2 text-xs text-slate-400">{sortHint(folderSort, "folders")}</p>
+            <p className="mt-3 px-2 text-xs text-slate-400">{sortHint(folderSort, "categories")}</p>
           )}
 
           <button onClick={signOut} className="mt-6 px-2 text-sm text-slate-500 underline sm:hidden">
@@ -663,7 +663,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
             <TourButton onClick={tour.start} />
             {currentFolder && !searching && (
               <>
-                <SmallButton onClick={() => createFolder(currentFolder.id)}>+ Subfolder</SmallButton>
+                <SmallButton onClick={() => createFolder(currentFolder.id)}>+ Subcategory</SmallButton>
                 <SmallButton onClick={() => renameFolder(currentFolder)}>Rename</SmallButton>
                 <SmallButton
                   onClick={() => toggleShare(currentFolder)}
@@ -678,7 +678,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
                       onClick={() => previewShare(currentFolder.share_token!)}
                       icon={Eye}
                       tone="violet"
-                      title="See this folder the way people with the link see it"
+                      title="See this category the way people with the link see it"
                     >
                       Preview
                     </SmallButton>
@@ -752,7 +752,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
               )}
               {!canReorder && visibleVideos.length > 1 && (
                 <p className="mb-3 text-xs text-slate-500">
-                  {`${searching ? "Search results" : "All videos"} show the newest first. To change the order, open a folder on the left.`}
+                  {`${searching ? "Search results" : "All videos"} show the newest first. To change the order, open a category on the left.`}
                 </p>
               )}
               <div className="flex flex-col gap-2">
@@ -1059,9 +1059,9 @@ function VideoCard(props: {
             value={video.folder_id ?? ""}
             onChange={(e) => props.onMove(e.target.value || null)}
             className="max-w-48 min-w-0 rounded-md border border-slate-300 bg-white px-1 py-1 text-xs"
-            aria-label="Move to folder"
+            aria-label="Move to category"
           >
-            <option value="">Unsorted</option>
+            <option value="">Uncategorized</option>
             {props.folderOptions.map((f) => (
               <option key={f.id} value={f.id}>
                 {f.label}
@@ -1123,7 +1123,7 @@ function EmptyState({ searching, hasVideos }: { searching: boolean; hasVideos: b
       {searching
         ? "No videos match. Try another search, or pick Any time and All above."
         : hasVideos
-          ? "No videos here yet. Paste a link above, or move videos in from another folder."
+          ? "No videos here yet. Paste a link above, or move videos in from another category."
           : "Your library is empty. Paste a YouTube link above to save your first video."}
     </div>
   );

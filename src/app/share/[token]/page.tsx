@@ -29,7 +29,7 @@ export default async function SharedFolderPage({
   if (!shared) {
     return (
       <main className="mx-auto max-w-xl px-4 py-16 text-center">
-        <h1 className="mb-2 text-2xl font-bold">Folder not found</h1>
+        <h1 className="mb-2 text-2xl font-bold">Category not found</h1>
         <p className="text-slate-600">This link may have been turned off by its owner.</p>
       </main>
     );
@@ -40,7 +40,7 @@ export default async function SharedFolderPage({
       {preview && (
         <PreviewBanner text="Your notes and summaries stay private. Only the videos below are shared." back="/" />
       )}
-      <p className="text-sm text-slate-500">Shared folder</p>
+      <p className="text-sm text-slate-500">Shared category</p>
       <h1 className="mb-6 text-3xl font-bold">{shared.folder.name}</h1>
       <Section shared={shared} folderId={shared.folder.id} depth={0} />
       <p className="mt-12 text-center text-sm text-slate-500">

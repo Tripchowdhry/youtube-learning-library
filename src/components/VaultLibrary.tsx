@@ -523,7 +523,7 @@ export default function VaultLibrary({ userEmail }: { userEmail: string }) {
             onMenu={openCategoryMenu}
           />
           {topCategories.length > 1 && (
-            <p className="mt-3 px-2 text-xs text-slate-400">{sortHint(folderSort, "categories")}</p>
+            <p className="mt-3 px-2 text-xs text-slate-400">{sortHint(folderSort, "categories", false)}</p>
           )}
 
           {vaultKey && (

@@ -39,7 +39,7 @@ export default function Landing({ error }: { error?: string }) {
             <p className="text-sm text-slate-500">Uses your Google account, so there&apos;s no new password to make.</p>
             {error && <p className="text-sm text-red-600">Sign-in didn&apos;t work. Please try again.</p>}
           </div>
-          <Shot src="/landing/videos.webp" alt="Your video library in BrainShelf, with folders, notes and summaries" label="your video library" className="mt-12" />
+          <Shot src="/landing/videos.webp" alt="Your video library in BrainShelf, with categories, notes and summaries" label="your video library" className="mt-12" />
         </div>
       </section>
 
@@ -52,7 +52,7 @@ export default function Landing({ error }: { error?: string }) {
             <Faq q="What do I sign in with?" a="Your Google account. There's no new password to remember." />
             <Faq q="What can I save?" a="YouTube videos, articles, X posts, tutorials and course pages, plus your own ScrapBook pages and Vault entries." />
             <Faq q="Does it work on my phone?" a="Yes. It runs in your phone's browser, and you can draw notes with your finger or a pen." />
-            <Faq q="Who can see my notes?" a="Only you. If you share a folder, people with the link see the videos in it, not your notes." />
+            <Faq q="Who can see my notes?" a="Only you. If you share a category, people with the link see the videos in it, not your notes." />
             <Faq q="Can BrainShelf read my Vault?" a="No. Passwords and API keys are encrypted with your passphrase before they leave your browser." />
           </div>
         </div>
