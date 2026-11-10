@@ -142,7 +142,9 @@ export default function Library({ userEmail }: { userEmail: string }) {
   // ---------- Which videos to show ----------
 
   const searching = query.trim().length > 0;
-  const canReorder = !searching && view.kind !== "all" && itemSort === "custom";
+  // Dragging to reorder works inside a folder whatever the sort; ▲ ▼ only in your own order.
+  const canReorder = !searching && view.kind !== "all";
+  const canShift = canReorder && itemSort === "custom";
 
   const visibleVideos = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -330,6 +332,20 @@ export default function Library({ userEmail }: { userEmail: string }) {
   // Drop one video onto another: it takes the target's place in the list.
   function reorderVideo(draggedId: string, targetId: string) {
     if (draggedId === targetId) return;
+    if (itemSort !== "custom") {
+      // Sorted by date or name: keep the order you see, put the dragged one before the target,
+      // save that as your own order and switch Sort to "My order".
+      const dragged = visibleVideos.find((v) => v.id === draggedId);
+      const rest = visibleVideos.filter((v) => v.id !== draggedId);
+      const at = rest.findIndex((v) => v.id === targetId);
+      if (!dragged || at === -1) return;
+      rest.splice(at, 0, dragged);
+      rest.forEach((v, position) => {
+        if (v.position !== position) updateVideo(v.id, { position });
+      });
+      setItemSort("custom");
+      return;
+    }
     const list = visibleVideos.filter((v) => v.id !== draggedId);
     const index = list.findIndex((v) => v.id === targetId);
     if (index === -1) return;
@@ -617,8 +633,13 @@ export default function Library({ userEmail }: { userEmail: string }) {
             draggingFolder={folders.find((f) => f.id === draggingFolderId) ?? null}
             onFolderDragStart={setDraggingFolderId}
             onFolderDragEnd={() => setDraggingFolderId(null)}
-            onDropFolder={(targetId) => draggingFolderId && moveFolderTo(draggingFolderId, targetId)}
-            canDragFolders={folderSort === "custom"}
+            onDropFolder={(targetId) => {
+              if (!draggingFolderId) return;
+              moveFolderTo(draggingFolderId, targetId);
+              // Dragging sets your own order, so the list switches to "My order" and keeps it.
+              if (folderSort !== "custom") setFolderSort("custom");
+            }}
+            canDragFolders
             onFolderMenu={openFolderMenu}
           />
           {childFolders(null).length > 1 && (
@@ -725,9 +746,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
               )}
               {!canReorder && visibleVideos.length > 1 && (
                 <p className="mb-3 text-xs text-slate-500">
-                  {itemSort === "custom"
-                    ? `${searching ? "Search results" : "All videos"} show the newest first. To change the order, open a folder on the left.`
-                    : 'To arrange videos yourself, pick "My order" in Sort.'}
+                  {`${searching ? "Search results" : "All videos"} show the newest first. To change the order, open a folder on the left.`}
                 </p>
               )}
               <div className="flex flex-col gap-2">
@@ -743,7 +762,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
                     onDragStart={() => setDraggingId(video.id)}
                     onDragEnd={() => setDraggingId(null)}
                     onDropOnto={() => draggingId && reorderVideo(draggingId, video.id)}
-                    onShift={canReorder ? (step) => shiftVideo(video.id, step) : null}
+                    onShift={canShift ? (step) => shiftVideo(video.id, step) : null}
                     isFirst={index === 0}
                     isLast={index === visibleVideos.length - 1}
                     onMove={(folderId) => moveVideo(video.id, folderId)}

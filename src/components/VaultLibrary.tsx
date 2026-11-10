@@ -230,7 +230,7 @@ export default function VaultLibrary({ userEmail }: { userEmail: string }) {
   // Every category in tree order, for the "Category" menus.
   const categoryOptions = useMemo(() => treeOptions(childCategories), [childCategories]);
 
-  const canDragCategories = folderSort === "custom";
+  const canDragCategories = true;
   const categorySiblings = (category: VaultCategory) =>
     childCategories(category.parent_id);
 
@@ -398,7 +398,11 @@ export default function VaultLibrary({ userEmail }: { userEmail: string }) {
     if (draggingId) return () => moveEntry(draggingId, category.id);
     const dragged = categories.find((c) => c.id === draggingCategoryId);
     if (dragged && dragged.id !== category.id && dragged.parent_id === category.parent_id) {
-      return () => moveCategoryTo(dragged.id, category.id);
+      return () => {
+        moveCategoryTo(dragged.id, category.id);
+        // Dragging sets your own order, so the list switches to "My order" and keeps it.
+        if (folderSort !== "custom") setFolderSort("custom");
+      };
     }
     return undefined;
   };
