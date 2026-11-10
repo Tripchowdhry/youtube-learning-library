@@ -8,6 +8,7 @@ import { Brush, Clapperboard, ExternalLink, FilePen, Folder as FolderIcon, Arrow
 import { Ico, type Tone } from "@/components/Icon";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { usePointerDrag } from "@/lib/pointer-drag";
 import { useRouter } from "next/navigation";
 import {
   AiNoteWorking,
@@ -784,40 +785,19 @@ function NavItem(props: {
   icon?: LucideIcon;
   tone?: Tone;
 }) {
-  const [over, setOver] = useState(false);
+  const { ref, over, handlers } = usePointerDrag<HTMLDivElement>({
+    onDragStart: props.onDragStart,
+    onDragEnd: props.onDragEnd,
+    canDrop: props.dropTarget,
+    onDrop: props.onDrop,
+  });
   return (
     <div
-      draggable={Boolean(props.onDragStart)}
-      onDragStart={(e) => {
-        if (!props.onDragStart) return;
-        e.dataTransfer.effectAllowed = "move";
-        e.dataTransfer.setData("text/plain", props.label);
-        // Re-render after the drag has started; Safari can cancel a drag whose row changes during dragstart.
-        const start = props.onDragStart;
-        setTimeout(() => start?.(), 0);
-      }}
-      onDragEnd={props.onDragEnd}
+      ref={ref}
+      {...handlers}
       onContextMenu={props.onContextMenu}
       className={`flex items-center rounded-md text-sm ${props.active ? "bg-slate-900 text-white" : "hover:bg-slate-100"} ${over ? "ring-2 ring-blue-500" : ""}`}
       style={{ paddingLeft: (props.indent ?? 0) * 14 }}
-      // Safari only drops where both dragenter and dragover are cancelled and the drop effect says "move".
-      onDragEnter={(e) => {
-        if (!props.dropTarget) return;
-        e.preventDefault();
-        e.dataTransfer.dropEffect = "move";
-      }}
-      onDragOver={(e) => {
-        if (!props.dropTarget) return;
-        e.preventDefault();
-        e.dataTransfer.dropEffect = "move";
-        setOver(true);
-      }}
-      onDragLeave={() => setOver(false)}
-      onDrop={(e) => {
-        e.preventDefault();
-        setOver(false);
-        props.onDrop?.();
-      }}
     >
       {props.leading}
       <button onClick={props.onClick} className="flex min-w-0 flex-1 items-center gap-2 px-2 py-1.5 text-left">
@@ -961,39 +941,21 @@ function VideoCard(props: {
   useEffect(() => {
     if (props.flash) cardRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
   }, [props.flash]);
-  const [over, setOver] = useState(false);
   const [editingNote, setEditingNote] = useState(false);
+  const { over, handlers } = usePointerDrag(
+    {
+      onDragStart: editingNote ? undefined : props.onDragStart,
+      onDragEnd: props.onDragEnd,
+      canDrop: props.canReorder && !props.dragging,
+      onDrop: props.onDropOnto,
+    },
+    cardRef,
+  );
 
   return (
     <div
       ref={cardRef}
-      draggable={!editingNote}
-      onDragStart={(e) => {
-        e.dataTransfer.effectAllowed = "move";
-        e.dataTransfer.setData("text/plain", video.id);
-        // Re-render after the drag has started; Safari can cancel a drag whose row changes during dragstart.
-        const start = props.onDragStart;
-        setTimeout(() => start?.(), 0);
-      }}
-      onDragEnd={props.onDragEnd}
-      // Safari only drops where both dragenter and dragover are cancelled and the drop effect says "move".
-      onDragEnter={(e) => {
-        if (!props.canReorder) return;
-        e.preventDefault();
-        e.dataTransfer.dropEffect = "move";
-      }}
-      onDragOver={(e) => {
-        if (!props.canReorder) return;
-        e.preventDefault();
-        e.dataTransfer.dropEffect = "move";
-        setOver(true);
-      }}
-      onDragLeave={() => setOver(false)}
-      onDrop={(e) => {
-        e.preventDefault();
-        setOver(false);
-        props.onDropOnto();
-      }}
+      {...handlers}
       className={`flex gap-3 rounded-xl border bg-white p-3 shadow-sm transition ${props.dragging ? "opacity-40" : ""} ${over ? "border-blue-500 ring-2 ring-blue-500" : props.flash ? "border-green-500 ring-4 ring-green-400" : "border-slate-200"}`}
     >
       <ReadCheck read={Boolean(video.watched_at)} onClick={props.onToggleWatched} word="watched" />

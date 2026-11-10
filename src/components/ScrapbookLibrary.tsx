@@ -4,6 +4,7 @@ import { Tour, TourButton, useSectionTour } from "@/components/Tour";
 import BrandMark from "@/components/BrandMark";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { usePointerDrag } from "@/lib/pointer-drag";
 import { useRouter } from "next/navigation";
 import ContextMenu, { type MenuState } from "@/components/ContextMenu";
 import {
@@ -589,38 +590,18 @@ function ScrapRow(props: {
   onDelete: () => void;
 }) {
   const { scrap } = props;
-  const [over, setOver] = useState(false);
+  const { ref, over, handlers } = usePointerDrag<HTMLLIElement>({
+    onDragStart: props.onDragStart,
+    onDragEnd: props.onDragEnd,
+    canDrop: props.canReorder && !props.dragging,
+    onDrop: props.onDropOnto,
+  });
   const preview = plainText(scrap.body);
   const edited = formatDate(scrap.updated_at);
   return (
     <li
-      draggable
-      onDragStart={(e) => {
-        e.dataTransfer.effectAllowed = "move";
-        e.dataTransfer.setData("text/plain", scrap.id);
-        // Re-render after the drag has started; Safari can cancel a drag whose row changes during dragstart.
-        const start = props.onDragStart;
-        setTimeout(() => start?.(), 0);
-      }}
-      onDragEnd={props.onDragEnd}
-      // Safari only drops where both dragenter and dragover are cancelled and the drop effect says "move".
-      onDragEnter={(e) => {
-        if (!props.canReorder) return;
-        e.preventDefault();
-        e.dataTransfer.dropEffect = "move";
-      }}
-      onDragOver={(e) => {
-        if (!props.canReorder) return;
-        e.preventDefault();
-        e.dataTransfer.dropEffect = "move";
-        setOver(true);
-      }}
-      onDragLeave={() => setOver(false)}
-      onDrop={(e) => {
-        e.preventDefault();
-        setOver(false);
-        props.onDropOnto();
-      }}
+      ref={ref}
+      {...handlers}
       className={`flex cursor-grab items-start gap-3 rounded-xl border bg-white p-3 shadow-sm transition ${props.dragging ? "opacity-40" : ""} ${over ? "border-blue-500 ring-2 ring-blue-500" : "border-slate-200"}`}
     >
       <Ico icon={FileText} tone="sky" size={22} className="mt-0.5" />

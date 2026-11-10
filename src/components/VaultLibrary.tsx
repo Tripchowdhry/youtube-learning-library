@@ -3,6 +3,7 @@
 import { Tour, TourButton, useSectionTour } from "@/components/Tour";
 import BrandMark from "@/components/BrandMark";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { usePointerDrag } from "@/lib/pointer-drag";
 import { useRouter } from "next/navigation";
 import ContextMenu, { type MenuState } from "@/components/ContextMenu";
 import { FolderSortSelect, compareFolders, sortHint, useFolderSort } from "@/components/FolderSort";
@@ -698,17 +699,11 @@ function EntryRow(props: {
 }) {
   const { entry } = props;
   const href = /^https?:\/\//i.test(entry.url) ? entry.url : entry.url ? `https://${entry.url}` : "";
+  const { ref, handlers } = usePointerDrag<HTMLLIElement>({ onDragStart: props.onDragStart, onDragEnd: props.onDragEnd });
   return (
     <li
-      draggable
-      onDragStart={(e) => {
-        e.dataTransfer.effectAllowed = "move";
-        e.dataTransfer.setData("text/plain", entry.name);
-        // Re-render after the drag has started; Safari can cancel a drag whose row changes during dragstart.
-        const start = props.onDragStart;
-        setTimeout(() => start?.(), 0);
-      }}
-      onDragEnd={props.onDragEnd}
+      ref={ref}
+      {...handlers}
       className={`flex cursor-grab items-start gap-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm transition ${props.dragging ? "opacity-40" : ""}`}
     >
       <Ico icon={KeyRound} tone="yellow" size={22} className="mt-0.5" />

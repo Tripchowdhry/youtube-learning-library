@@ -5,6 +5,7 @@ import BrandMark from "@/components/BrandMark";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { usePointerDrag } from "@/lib/pointer-drag";
 import ContextMenu, { type MenuState } from "@/components/ContextMenu";
 import {
   FolderSortSelect,
@@ -830,38 +831,20 @@ function ArticleRow(props: {
     if (props.flash) rowRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
   }, [props.flash]);
   const [editingNote, setEditingNote] = useState(false);
-  const [over, setOver] = useState(false);
+  const { over, handlers } = usePointerDrag(
+    {
+      onDragStart: editingNote ? undefined : props.onDragStart,
+      onDragEnd: props.onDragEnd,
+      canDrop: props.canReorder && !props.dragging,
+      onDrop: props.onDropOnto,
+    },
+    rowRef,
+  );
   const hasNotes = Boolean(article.notes?.trim());
   return (
     <li
       ref={rowRef}
-      draggable={!editingNote}
-      onDragStart={(e) => {
-        e.dataTransfer.effectAllowed = "move";
-        e.dataTransfer.setData("text/plain", article.id);
-        // Re-render after the drag has started; Safari can cancel a drag whose row changes during dragstart.
-        const start = props.onDragStart;
-        setTimeout(() => start?.(), 0);
-      }}
-      onDragEnd={props.onDragEnd}
-      // Safari only drops where both dragenter and dragover are cancelled and the drop effect says "move".
-      onDragEnter={(e) => {
-        if (!props.canReorder) return;
-        e.preventDefault();
-        e.dataTransfer.dropEffect = "move";
-      }}
-      onDragOver={(e) => {
-        if (!props.canReorder) return;
-        e.preventDefault();
-        e.dataTransfer.dropEffect = "move";
-        setOver(true);
-      }}
-      onDragLeave={() => setOver(false)}
-      onDrop={(e) => {
-        e.preventDefault();
-        setOver(false);
-        props.onDropOnto();
-      }}
+      {...handlers}
       className={`flex cursor-grab items-start gap-3 rounded-xl border bg-white p-3 shadow-sm transition ${props.dragging ? "opacity-40" : ""} ${over ? "border-blue-500 ring-2 ring-blue-500" : props.flash ? "border-green-500 ring-4 ring-green-400" : "border-slate-200"}`}
     >
       <ReadCheck read={Boolean(article.read_at)} onClick={props.onToggleRead} />
@@ -1187,40 +1170,19 @@ export function NavItem(props: {
   icon?: LucideIcon;
   tone?: Tone;
 }) {
-  const [over, setOver] = useState(false);
+  const { ref, over, handlers } = usePointerDrag<HTMLButtonElement>({
+    onDragStart: props.onDragStart,
+    onDragEnd: props.onDragEnd,
+    canDrop: Boolean(props.onDropArticle),
+    onDrop: props.onDropArticle,
+  });
   const Icon = props.icon;
   return (
     <button
+      ref={ref}
+      {...handlers}
       onClick={props.onClick}
-      draggable={Boolean(props.onDragStart)}
-      onDragStart={(e) => {
-        if (!props.onDragStart) return;
-        e.dataTransfer.effectAllowed = "move";
-        e.dataTransfer.setData("text/plain", props.label);
-        // Re-render after the drag has started; Safari can cancel a drag whose row changes during dragstart.
-        const start = props.onDragStart;
-        setTimeout(() => start?.(), 0);
-      }}
-      onDragEnd={props.onDragEnd}
       onContextMenu={props.onContextMenu}
-      // Safari only drops where both dragenter and dragover are cancelled and the drop effect says "move".
-      onDragEnter={(e) => {
-        if (!props.onDropArticle) return;
-        e.preventDefault();
-        e.dataTransfer.dropEffect = "move";
-      }}
-      onDragOver={(e) => {
-        if (!props.onDropArticle) return;
-        e.preventDefault();
-        e.dataTransfer.dropEffect = "move";
-        setOver(true);
-      }}
-      onDragLeave={() => setOver(false)}
-      onDrop={(e) => {
-        e.preventDefault();
-        setOver(false);
-        props.onDropArticle?.();
-      }}
       className={`flex w-full items-center gap-2 rounded-md py-1.5 pr-2 text-left text-sm ${props.active ? "bg-slate-900 text-white" : "hover:bg-slate-100"} ${over ? "ring-2 ring-blue-500" : ""}`}
       style={{ paddingLeft: 8 + (props.indent ?? 0) * 22 }}
     >
