@@ -456,6 +456,12 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
       <div className="flex flex-1">
         <aside
           className={`${showCategories ? "fixed inset-x-0 top-[57px] bottom-0 z-10 block" : "hidden"} w-full overflow-y-auto border-r border-slate-200 bg-white p-3 md:sticky md:top-[57px] md:block md:h-[calc(100vh-57px)] md:w-72`}
+          // Right-click anywhere in the sidebar that isn't a categorie to make a new top-level one.
+          onContextMenu={(e) => {
+            if (e.defaultPrevented) return;
+            e.preventDefault();
+            setMenu({ x: e.clientX, y: e.clientY, items: [{ label: "New category", icon: Tag, tone: "orange" as const, onClick: () => createCategory(null) }] });
+          }}
         >
           <NavItem icon={NotebookPen} tone="amber" label="All pages" count={scraps.length} active={view.kind === "all" && !searching} onClick={() => openView({ kind: "all" })} />
           <NavItem
@@ -491,6 +497,13 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
             onDragEnd={() => setDraggingCategoryId(null)}
             onMenu={openCategoryMenu}
           />
+          <button
+            onClick={() => createCategory(null)}
+            className="mt-2 flex w-full items-center gap-2 rounded-md border border-dashed border-slate-300 px-2 py-1.5 text-sm text-slate-600 hover:border-slate-400 hover:bg-slate-50"
+          >
+            <Ico icon={Tag} tone="orange" />
+            New category
+          </button>
           {topCategories.length > 1 && (
             <p className="mt-3 px-2 text-xs text-slate-400">{sortHint(folderSort, "categories")}</p>
           )}
