@@ -45,6 +45,9 @@ function startDrag(e: React.PointerEvent<HTMLElement>, onStart: () => void, onEn
   if (e.pointerType !== "mouse" || e.button !== 0) return;
   // Typing and choosing in a field never starts a drag.
   if ((e.target as Element).closest("input, textarea, select, [contenteditable=true]")) return;
+  // Safari starts its own drag of a link or picture under the pointer unless the mouse-down is cancelled.
+  // Buttons and links still get their click, because a click comes from mouse-up, not mouse-down.
+  e.preventDefault();
 
   const source = e.currentTarget;
   const startX = e.clientX;
@@ -183,6 +186,8 @@ export function usePointerDrag<T extends HTMLElement>(
 
   const draggable = Boolean(opts.onDragStart);
   const handlers = {
+    // Marks the row for the CSS in globals.css that stops Safari dragging a link or picture inside it.
+    "data-drag-source": draggable ? "" : undefined,
     onPointerDown: draggable
       ? (e: React.PointerEvent<T>) =>
           startDrag(

@@ -70,3 +70,10 @@ body {
     padding-right: calc(1rem + 3px);
   }
 }
+
+/* Rows and cards you can drag (src/lib/pointer-drag.ts): stop Safari dragging the links and
+   pictures inside them on its own, which would take the drag away from the app. */
+[data-drag-source],
+[data-drag-source] * {
+  -webkit-user-drag: none;
+}
