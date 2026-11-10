@@ -8,7 +8,7 @@ import { isWithin, treeOptions, treePath } from "@/lib/category-tree";
 import CategoryTree from "@/components/CategoryTree";
 import { useRouter } from "next/navigation";
 import ContextMenu, { type MenuState } from "@/components/ContextMenu";
-import { FolderSortSelect, compareFolders, sortHint, useFolderSort } from "@/components/FolderSort";
+import { FolderSortSelect, SidebarHeading, compareFolders, sortHint, useFolderSort } from "@/components/FolderSort";
 import { NavItem, SectionSwitch, SetupNotice, SmallButton, formatDate } from "@/components/ReadingLibrary";
 import { createClient } from "@/lib/supabase/client";
 import type { VaultCategory, VaultEntry, VaultKey } from "@/lib/types";
@@ -500,13 +500,12 @@ export default function VaultLibrary({ userEmail }: { userEmail: string }) {
             onDropArticle={draggingId ? () => moveEntry(draggingId, null) : undefined}
           />
 
-          <div className="mt-4 mb-1 flex items-center justify-between px-2 text-xs font-semibold tracking-wide text-slate-500 uppercase">
-            Categories
+          <SidebarHeading label="Categories">
             <FolderSortSelect sort={folderSort} onChange={setFolderSort} />
             <button onClick={() => createCategory(null)} className="rounded px-1.5 text-base text-slate-700 hover:bg-slate-100" title="New category">
               +
             </button>
-          </div>
+          </SidebarHeading>
           {topCategories.length === 0 && (
             <p className="px-2 text-sm text-slate-500">No categories yet. Click + to make one, like &quot;API keys&quot;.</p>
           )}

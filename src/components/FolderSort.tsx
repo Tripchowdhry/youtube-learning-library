@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import { FolderPlus } from "lucide-react";
 
 // How folders and categories are listed. "custom" is the order you set by dragging.
 export type FolderSort = "custom" | "name" | "newest" | "oldest";
@@ -118,4 +119,25 @@ export function sortHint(sort: FolderSort, things: string) {
   // Dragging works in any sort; it switches the list to "My order".
   const heading = things === "folders" ? "Folders" : "Categories";
   return `Drag ${things} to reorder. ${menu} Right-click "${heading}" to add a new one.`;
+}
+
+// The "Folders" / "Categories" heading in the sidebar. Hovering it lights it up and shows a + icon,
+// so you can see it's the place to right-click for a new one.
+export function SidebarHeading({ label, children }: { label: string; children?: ReactNode }) {
+  const thing = label === "Folders" ? "folder" : "category";
+  return (
+    <div className="mt-4 mb-1 flex items-center justify-between px-2 text-xs font-semibold tracking-wide text-slate-500 uppercase">
+      <span
+        className="group -ml-1 flex cursor-context-menu whitespace-nowrap items-center gap-1 rounded px-1 py-0.5 transition-colors hover:bg-amber-100 hover:text-amber-800"
+        title={`Right-click to add a new ${thing}`}
+      >
+        {label}
+        <FolderPlus size={13} className="opacity-0 transition-opacity group-hover:opacity-100" aria-hidden />
+        <span className="text-[10px] font-normal tracking-normal normal-case opacity-0 transition-opacity group-hover:opacity-100">
+          right-click for new
+        </span>
+      </span>
+      {children}
+    </div>
+  );
 }
