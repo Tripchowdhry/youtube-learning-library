@@ -596,6 +596,12 @@ export default function Library({ userEmail }: { userEmail: string }) {
       <div className="flex flex-1">
         <aside
           className={`${showFolders ? "fixed inset-x-0 top-[57px] bottom-0 z-10 block" : "hidden"} w-full overflow-y-auto border-r border-slate-200 bg-white p-3 md:sticky md:top-[57px] md:block md:h-[calc(100vh-57px)] md:w-72`}
+          // Right-click anywhere in the sidebar that isn't a folder to make a new top-level one.
+          onContextMenu={(e) => {
+            if (e.defaultPrevented) return;
+            e.preventDefault();
+            setMenu({ x: e.clientX, y: e.clientY, items: [{ label: "New folder", icon: FolderPlus, tone: "amber" as const, onClick: () => createFolder(null) }] });
+          }}
         >
           <NavItem icon={Clapperboard} tone="violet" label="All videos" count={videos.length} active={view.kind === "all" && !searching} onClick={() => openView({ kind: "all" })} />
           <NavItem
@@ -642,6 +648,13 @@ export default function Library({ userEmail }: { userEmail: string }) {
             canDragFolders
             onFolderMenu={openFolderMenu}
           />
+          <button
+            onClick={() => createFolder(null)}
+            className="mt-2 flex w-full items-center gap-2 rounded-md border border-dashed border-slate-300 px-2 py-1.5 text-sm text-slate-600 hover:border-slate-400 hover:bg-slate-50"
+          >
+            <Ico icon={FolderPlus} tone="amber" />
+            New folder
+          </button>
           {childFolders(null).length > 1 && (
             <p className="mt-3 px-2 text-xs text-slate-400">{sortHint(folderSort, "folders")}</p>
           )}
