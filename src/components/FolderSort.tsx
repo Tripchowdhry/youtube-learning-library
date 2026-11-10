@@ -128,7 +128,7 @@ export function SidebarHeading({ label, children }: { label: string; children?: 
   return (
     <div className="mt-4 mb-1 flex items-center justify-between px-2 text-xs font-semibold tracking-wide text-slate-500 uppercase">
       <span
-        className="group -ml-1 flex cursor-context-menu whitespace-nowrap items-center gap-1 rounded px-1 py-0.5 transition-colors hover:bg-amber-100 hover:text-amber-800"
+        className="group -ml-1 flex cursor-default whitespace-nowrap items-center gap-1 rounded px-1 py-0.5 transition-colors hover:bg-amber-100 hover:text-amber-800"
         title={`Right-click to add a new ${thing}`}
       >
         {label}
