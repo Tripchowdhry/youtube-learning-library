@@ -21,9 +21,7 @@ export default function Landing({ error }: { error?: string }) {
               Tour and FAQ
             </a>
           </nav>
-          <a href="#start" className="ml-auto rounded-lg bg-slate-900 px-3 py-1.5 text-sm font-semibold text-white hover:bg-slate-700 sm:ml-0">
-            Sign in
-          </a>
+          <SignInButton variant="header" />
         </div>
       </header>
 
@@ -38,7 +36,7 @@ export default function Landing({ error }: { error?: string }) {
           <p className="mx-auto mt-4 max-w-2xl text-lg text-slate-600">{BRAND.description}</p>
           <div id="start" className="mt-8 flex scroll-mt-40 flex-col items-center gap-2">
             <SignInButton />
-            <p className="text-sm text-slate-500">Sign in with your Google account. Works on your laptop and phone.</p>
+            <p className="text-sm text-slate-500">Uses your Google account, so there&apos;s no new password to make.</p>
             {error && <p className="text-sm text-red-600">Sign-in didn&apos;t work. Please try again.</p>}
           </div>
           <Shot src="/landing/videos.webp" alt="Your video library in BrainShelf, with folders, notes and summaries" label="your video library" className="mt-12" />
