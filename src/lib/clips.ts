@@ -106,21 +106,46 @@ export async function listClips(supabase: SupabaseClient): Promise<StoredClip[]>
 }
 
 type NoteRow = { video_id: string; pages: NotePage[] | null; text: string | null };
+// Reading and ScrapBook keep clips too: typed article notes, and a ScrapBook page's text and sheets.
+export type ArticleRow = { id: string; title: string | null; notes: string | null };
+export type ScrapRow = { id: string; title: string; body: string | null; pages: NotePage[] | null };
+export type ClipHomes = { notes: NoteRow[]; articles: ArticleRow[]; scraps: ScrapRow[] };
 
-// Which video's notes each clip is in.
-export function clipVideos(notes: NoteRow[]) {
-  const where = new Map<string, string>();
-  for (const note of notes) {
-    for (const page of note.pages ?? []) for (const im of page.images ?? []) where.set(im.path, note.video_id);
-    for (const c of splitTypedClips(note.text ?? "").clips) where.set(c.path, note.video_id);
+// A ScrapBook page's typed text holds clips as <img src=".../clips/<path>">.
+const BODY_CLIP = /<img\b[^>]*?src="[^"]*\/object\/public\/clips\/([^"?]+)[^"]*"[^>]*>/g;
+
+export function bodyClipPaths(body: string) {
+  return Array.from(body.matchAll(BODY_CLIP), (m) => decodeURIComponent(m[1]));
+}
+
+export type ClipOwner = { kind: "video" | "article" | "scrap"; id: string };
+
+// Which notes each clip is in.
+export function clipOwners(homes: ClipHomes) {
+  const where = new Map<string, ClipOwner>();
+  for (const note of homes.notes) {
+    const owner = { kind: "video" as const, id: note.video_id };
+    for (const page of note.pages ?? []) for (const im of page.images ?? []) where.set(im.path, owner);
+    for (const c of splitTypedClips(note.text ?? "").clips) where.set(c.path, owner);
+  }
+  for (const a of homes.articles) {
+    for (const c of splitTypedClips(a.notes ?? "").clips) where.set(c.path, { kind: "article", id: a.id });
+  }
+  for (const sc of homes.scraps) {
+    const owner = { kind: "scrap" as const, id: sc.id };
+    for (const page of sc.pages ?? []) for (const im of page.images ?? []) where.set(im.path, owner);
+    for (const path of bodyClipPaths(sc.body ?? "")) where.set(path, owner);
   }
   return where;
 }
 
+const withoutImages = (pages: NotePage[], gone: Set<string>) =>
+  pages.map((p) => ({ ...p, images: (p.images ?? []).filter((im) => !gone.has(im.path)) }));
+
 // Takes the clips out of every note that shows them, then deletes the pictures to free the space.
-export async function deleteClips(supabase: SupabaseClient, notes: NoteRow[], paths: string[]) {
+export async function deleteClips(supabase: SupabaseClient, homes: ClipHomes, paths: string[]) {
   const gone = new Set(paths);
-  for (const note of notes) {
+  for (const note of homes.notes) {
     const pages = note.pages ?? [];
     const typed = splitTypedClips(note.text ?? "");
     const usesGone =
@@ -129,7 +154,7 @@ export async function deleteClips(supabase: SupabaseClient, notes: NoteRow[], pa
     const { error } = await supabase
       .from("notes")
       .update({
-        pages: pages.map((p) => ({ ...p, images: (p.images ?? []).filter((im) => !gone.has(im.path)) })),
+        pages: withoutImages(pages, gone),
         text: joinTypedClips(
           typed.text,
           typed.clips.filter((c) => !gone.has(c.path)),
@@ -137,6 +162,30 @@ export async function deleteClips(supabase: SupabaseClient, notes: NoteRow[], pa
         updated_at: new Date().toISOString(),
       })
       .eq("video_id", note.video_id);
+    if (error) throw new Error(error.message);
+  }
+  for (const a of homes.articles) {
+    const typed = splitTypedClips(a.notes ?? "");
+    if (!typed.clips.some((c) => gone.has(c.path))) continue;
+    const { error } = await supabase
+      .from("articles")
+      .update({ notes: joinTypedClips(typed.text, typed.clips.filter((c) => !gone.has(c.path))) })
+      .eq("id", a.id);
+    if (error) throw new Error(error.message);
+  }
+  for (const sc of homes.scraps) {
+    const pages = sc.pages ?? [];
+    const body = sc.body ?? "";
+    const usesGone =
+      pages.some((p) => (p.images ?? []).some((im) => gone.has(im.path))) || bodyClipPaths(body).some((p) => gone.has(p));
+    if (!usesGone) continue;
+    const { error } = await supabase
+      .from("scraps")
+      .update({
+        pages: withoutImages(pages, gone),
+        body: body.replace(BODY_CLIP, (tag, path: string) => (gone.has(decodeURIComponent(path)) ? "" : tag)),
+      })
+      .eq("id", sc.id);
     if (error) throw new Error(error.message);
   }
   for (let i = 0; i < paths.length; i += 100) {

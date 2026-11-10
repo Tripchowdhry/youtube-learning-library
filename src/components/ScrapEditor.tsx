@@ -4,10 +4,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { compareFolders, useFolderSort } from "@/components/FolderSort";
-import NotePageCanvas, { type Tool } from "@/components/NotePageCanvas";
+import NotePageCanvas, { PAGE_HEIGHT, type Tool } from "@/components/NotePageCanvas";
+import { ClipButton } from "@/components/ClipButtons";
+import { clipUrl, type ClipImage } from "@/lib/clips";
 import { formatDate } from "@/components/ReadingLibrary";
 import { createClient } from "@/lib/supabase/client";
-import type { ArticleCategory, NotePage, NoteStroke, Scrap } from "@/lib/types";
+import type { ArticleCategory, NoteImage, NotePage, NoteStroke, Scrap } from "@/lib/types";
 import { Keyboard, PenLine, Trash2 } from "lucide-react";
 import { Ico } from "@/components/Icon";
 
@@ -28,11 +30,18 @@ const MODE_KEY = "scrap-mode";
 // Formatting the typed text may keep; anything else (scripts, pasted styles) is dropped.
 const ALLOWED_TAGS = new Set(["P", "DIV", "BR", "B", "STRONG", "I", "EM", "U", "H1", "H2", "H3", "UL", "OL", "LI", "MARK", "SPAN"]);
 
-function cleanHtml(html: string) {
+// Clips (screenshots) in the text are kept only when they come from your own clips storage.
+function cleanHtml(html: string, clipPrefix: string) {
   const doc = new DOMParser().parseFromString(`<div>${html}</div>`, "text/html");
   const walk = (el: Element) => {
     for (const child of Array.from(el.children)) {
       walk(child);
+      if (child.tagName === "IMG") {
+        const src = child.getAttribute("src") ?? "";
+        if (!clipPrefix || !src.startsWith(clipPrefix)) child.remove();
+        else for (const attr of Array.from(child.attributes)) if (attr.name !== "src") child.removeAttribute(attr.name);
+        continue;
+      }
       if (!ALLOWED_TAGS.has(child.tagName)) {
         // Keep the words of an unknown tag but not the tag itself; drop scripts and styles entirely.
         if (["SCRIPT", "STYLE", "IFRAME", "OBJECT", "EMBED"].includes(child.tagName)) child.remove();
@@ -62,6 +71,7 @@ function preferredMode(): Mode {
 
 export default function ScrapEditor({ scrapId }: { scrapId: string }) {
   const supabase = useMemo(() => createClient(), []);
+  const clipPrefix = useMemo(() => clipUrl(supabase, ""), [supabase]);
   const router = useRouter();
   const [scrap, setScrap] = useState<Scrap | null>(null);
   const [missing, setMissing] = useState(false);
@@ -98,7 +108,7 @@ export default function ScrapEditor({ scrapId }: { scrapId: string }) {
       ]);
       if (!s.data) return setMissing(true);
       const loaded = s.data as Scrap;
-      bodyRef.current = cleanHtml(loaded.body);
+      bodyRef.current = cleanHtml(loaded.body, clipPrefix);
       setScrap(loaded);
       setTitle(loaded.title);
       setCategoryId(loaded.category_id);
@@ -109,13 +119,13 @@ export default function ScrapEditor({ scrapId }: { scrapId: string }) {
       const hasInk = (loaded.pages ?? []).some((p) => p.strokes.length);
       setMode(hasInk && !hasText ? "write" : hasText && !hasInk ? "type" : preferredMode());
     })();
-  }, [supabase, scrapId]);
+  }, [supabase, scrapId, clipPrefix]);
 
   // Put the typed text into the editor box when it appears; after that the box owns it.
   useEffect(() => {
     if (!scrap || mode !== "type" || !editor.current) return;
     editor.current.innerHTML = bodyRef.current;
-    setIsEmpty(!editor.current.textContent?.trim());
+    setIsEmpty(!editor.current.textContent?.trim() && !editor.current.querySelector("img"));
   }, [scrap, mode]);
 
   // ---------- Saving ----------
@@ -132,14 +142,14 @@ export default function ScrapEditor({ scrapId }: { scrapId: string }) {
       .from("scraps")
       .update({
         title: titleRef.current.trim().slice(0, 200) || "Untitled",
-        body: cleanHtml(bodyRef.current),
+        body: cleanHtml(bodyRef.current, clipPrefix),
         pages: pagesRef.current,
         category_id: categoryRef.current,
         updated_at: new Date().toISOString(),
       })
       .eq("id", scrapId);
     setSaveState(error ? "error" : "saved");
-  }, [supabase, scrapId]);
+  }, [supabase, scrapId, clipPrefix]);
 
   useEffect(() => {
     if (saveState !== "unsaved") return;
@@ -159,7 +169,7 @@ export default function ScrapEditor({ scrapId }: { scrapId: string }) {
   function onTyped() {
     if (!editor.current) return;
     bodyRef.current = editor.current.innerHTML;
-    setIsEmpty(!editor.current.textContent?.trim());
+    setIsEmpty(!editor.current.textContent?.trim() && !editor.current.querySelector("img"));
     setSaveState("unsaved");
     setBodyTick((t) => t + 1);
   }
@@ -174,9 +184,81 @@ export default function ScrapEditor({ scrapId }: { scrapId: string }) {
   }
 
   // Pasted text comes in plain, so other sites' fonts and colors don't follow it in.
+  // A pasted picture is left to the Clip button, which saves it and puts it in.
   function pastePlain(e: React.ClipboardEvent) {
+    if (Array.from(e.clipboardData.files).some((f) => f.type.startsWith("image/"))) return;
     e.preventDefault();
     document.execCommand("insertText", false, e.clipboardData.getData("text/plain"));
+  }
+
+  // ---------- Clips ----------
+
+  // Where the typing spot was last, so a clip lands there even after the screenshot took the focus away.
+  const lastRange = useRef<Range | null>(null);
+  useEffect(() => {
+    const remember = () => {
+      const sel = window.getSelection();
+      if (sel?.rangeCount && editor.current?.contains(sel.anchorNode)) lastRange.current = sel.getRangeAt(0).cloneRange();
+    };
+    document.addEventListener("selectionchange", remember);
+    return () => document.removeEventListener("selectionchange", remember);
+  }, []);
+
+  const modeRef = useRef(mode);
+  modeRef.current = mode;
+
+  const addClip = useCallback(
+    (image: ClipImage, path: string) => {
+      if (modeRef.current === "type") insertTypedClip(path);
+      else placeImage(image, path);
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+
+  function insertTypedClip(path: string) {
+    const box = editor.current;
+    if (!box) return;
+    const img = document.createElement("img");
+    img.src = clipUrl(supabase, path);
+    const range = lastRange.current && box.contains(lastRange.current.startContainer) ? lastRange.current : null;
+    if (range) {
+      range.collapse(false);
+      range.insertNode(img);
+      range.setStartAfter(img);
+      range.collapse(true);
+      lastRange.current = range;
+    } else {
+      const line = document.createElement("p");
+      line.appendChild(img);
+      box.appendChild(line);
+    }
+    onTyped();
+  }
+
+  // On a handwriting sheet the picture goes under the last one, or onto a new sheet when there's no room.
+  function placeImage(image: ClipImage, path: string) {
+    const current = pagesRef.current;
+    const w = 640;
+    const h = Math.round((w * image.height) / image.width);
+    let page = current.length - 1;
+    const bottom = Math.max(60, ...(current[page].images ?? []).map((im) => im.y + im.h + 30));
+    let y = bottom;
+    let next = current;
+    if (y + h > PAGE_HEIGHT - 20) {
+      page += 1;
+      y = 60;
+      next = [...current, emptyPage()];
+    }
+    const im: NoteImage = { id: crypto.randomUUID(), path, x: 100, y, w, h, t: 0 };
+    change(next.map((p, i) => (i === page ? { ...p, images: [...(p.images ?? []), im] } : p)));
+  }
+
+  function deleteImage(pageIndex: number, imageId: string) {
+    if (!window.confirm("Delete this picture from the page?")) return;
+    change(
+      pagesRef.current.map((p, i) => (i === pageIndex ? { ...p, images: (p.images ?? []).filter((im) => im.id !== imageId) } : p)),
+    );
   }
 
   // ---------- Handwriting ----------
@@ -335,6 +417,7 @@ export default function ScrapEditor({ scrapId }: { scrapId: string }) {
                   </button>
                 ))}
               </div>
+              <ClipButton what="screen" onPicture={addClip} />
               {mode === "type" ? (
                 <TypingTools onFormat={format} />
               ) : (
@@ -376,7 +459,7 @@ export default function ScrapEditor({ scrapId }: { scrapId: string }) {
                     }
                   }}
                   aria-label="Page text"
-                  className="min-h-[65vh] rounded-xl bg-white px-5 py-4 text-[17px] leading-relaxed shadow-sm ring-1 ring-slate-200 outline-none focus:ring-2 focus:ring-slate-400 [&_h1]:my-2 [&_h1]:text-2xl [&_h1]:font-bold [&_h2]:my-2 [&_h2]:text-xl [&_h2]:font-semibold [&_ol]:list-decimal [&_ol]:pl-7 [&_ul]:list-disc [&_ul]:pl-7"
+                  className="min-h-[65vh] rounded-xl bg-white px-5 py-4 text-[17px] leading-relaxed shadow-sm ring-1 ring-slate-200 outline-none focus:ring-2 focus:ring-slate-400 [&_h1]:my-2 [&_h1]:text-2xl [&_h1]:font-bold [&_h2]:my-2 [&_h2]:text-xl [&_h2]:font-semibold [&_ol]:list-decimal [&_ol]:pl-7 [&_ul]:list-disc [&_ul]:pl-7 [&_img]:my-2 [&_img]:inline-block [&_img]:max-h-[480px] [&_img]:max-w-full [&_img]:rounded-md [&_img]:ring-1 [&_img]:ring-slate-200"
                 />
               </div>
             ) : (
@@ -398,8 +481,8 @@ export default function ScrapEditor({ scrapId }: { scrapId: string }) {
                       onAddStroke={(stroke) => addStroke(i, stroke)}
                       onEraseStrokes={(indexes) => eraseStrokes(i, indexes)}
                       onStampTap={() => {}}
-                      imageUrl={() => ""}
-                      onDeleteImage={() => {}}
+                      imageUrl={(path) => clipUrl(supabase, path)}
+                      onDeleteImage={(id) => deleteImage(i, id)}
                     />
                   </div>
                 ))}

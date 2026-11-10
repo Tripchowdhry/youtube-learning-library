@@ -4,7 +4,7 @@ import { Camera, Trash2 } from "lucide-react";
 import { Ico } from "@/components/Icon";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { clipUrl, clipVideos, deleteClips, listClips, type StoredClip } from "@/lib/clips";
+import { clipOwners, clipUrl, deleteClips, listClips, type ArticleRow, type ClipHomes, type ClipOwner, type ScrapRow, type StoredClip } from "@/lib/clips";
 import { createClient } from "@/lib/supabase/client";
 import type { NotePage } from "@/lib/types";
 
@@ -41,10 +41,16 @@ function groupByMonth(clips: StoredClip[], newestFirst: boolean): Year[] {
   return years;
 }
 
+function ownerHref(owner: ClipOwner) {
+  if (owner.kind === "video") return `/video/${owner.id}`;
+  if (owner.kind === "article") return `/read/${owner.id}?notes=1`;
+  return `/scrap/${owner.id}`;
+}
+
 export default function ClipsManager() {
   const supabase = useMemo(() => createClient(), []);
   const [clips, setClips] = useState<StoredClip[] | null>(null);
-  const [notes, setNotes] = useState<NoteRow[]>([]);
+  const [homes, setHomes] = useState<ClipHomes>({ notes: [], articles: [], scraps: [] });
   const [titles, setTitles] = useState<Map<string, string>>(new Map());
   const [newestFirst, setNewestFirst] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
@@ -52,14 +58,25 @@ export default function ClipsManager() {
 
   const load = useCallback(async () => {
     try {
-      const [stored, n, v] = await Promise.all([
+      const [stored, n, v, a, sc] = await Promise.all([
         listClips(supabase),
         supabase.from("notes").select("video_id, pages, text"),
         supabase.from("videos").select("id, title"),
+        supabase.from("articles").select("id, title, notes"),
+        supabase.from("scraps").select("id, title, body, pages"),
       ]);
       if (n.error) throw new Error(n.error.message);
-      setNotes((n.data ?? []) as NoteRow[]);
-      setTitles(new Map((v.data ?? []).map((x) => [x.id as string, (x.title as string) || "Untitled video"])));
+      // Reading notes or the ScrapBook may not be set up yet (their SQL not run); then they hold no clips.
+      const articles = (a.error ? [] : (a.data ?? [])) as ArticleRow[];
+      const scraps = (sc.error ? [] : (sc.data ?? [])) as ScrapRow[];
+      setHomes({ notes: (n.data ?? []) as NoteRow[], articles, scraps });
+      setTitles(
+        new Map([
+          ...(v.data ?? []).map((x) => [`video:${x.id}`, (x.title as string) || "Untitled video"] as const),
+          ...articles.map((x) => [`article:${x.id}`, x.title || "Untitled article"] as const),
+          ...scraps.map((x) => [`scrap:${x.id}`, x.title || "Untitled"] as const),
+        ]),
+      );
       setClips(stored);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't load your clips.");
@@ -70,7 +87,7 @@ export default function ClipsManager() {
     load();
   }, [load]);
 
-  const where = useMemo(() => clipVideos(notes), [notes]);
+  const where = useMemo(() => clipOwners(homes), [homes]);
   const years = useMemo(() => groupByMonth(clips ?? [], newestFirst), [clips, newestFirst]);
   const used = (clips ?? []).reduce((total, c) => total + c.size, 0);
   const unused = (clips ?? []).filter((c) => !where.has(c.path));
@@ -83,7 +100,7 @@ export default function ClipsManager() {
     try {
       await deleteClips(
         supabase,
-        notes,
+        homes,
         list.map((c) => c.path),
       );
       await load();
@@ -140,7 +157,7 @@ export default function ClipsManager() {
             </section>
 
             {clips.length === 0 ? (
-              <p className="text-slate-500">No clips yet. Press <Ico icon={Camera} tone="slate" size={14} className="inline align-[-2px]" /> Clip on a video&rsquo;s notes to add one.</p>
+              <p className="text-slate-500">No clips yet. Press <Ico icon={Camera} tone="slate" size={14} className="inline align-[-2px]" /> Clip in the notes of a video, an article or a ScrapBook page to add one.</p>
             ) : (
               <>
                 <div className="flex items-center gap-2 text-sm">
@@ -196,11 +213,11 @@ export default function ClipsManager() {
                         </summary>
                         <div className="grid grid-cols-2 gap-2 border-t border-slate-100 p-3 sm:grid-cols-4">
                           {m.clips.map((c) => {
-                            const videoId = where.get(c.path);
+                            const owner = where.get(c.path);
                             return (
                               <Link
                                 key={c.path}
-                                href={videoId ? `/video/${videoId}` : clipUrl(supabase, c.path)}
+                                href={owner ? ownerHref(owner) : clipUrl(supabase, c.path)}
                                 className="group block overflow-hidden rounded-md ring-1 ring-slate-200"
                               >
                                 <img
@@ -210,7 +227,7 @@ export default function ClipsManager() {
                                   className="block aspect-video w-full bg-slate-100 object-cover"
                                 />
                                 <span className="block truncate px-2 py-1 text-xs text-slate-600 group-hover:underline">
-                                  {videoId ? (titles.get(videoId) ?? "Video") : "Not in any notes"}
+                                  {owner ? (titles.get(`${owner.kind}:${owner.id}`) ?? "Notes") : "Not in any notes"}
                                 </span>
                               </Link>
                             );

@@ -27,29 +27,7 @@ import type { Article, ArticleCategory, SectionKind } from "@/lib/types";
 import { askArticleAi } from "@/lib/video-ai";
 import { askConfirm } from "./ConfirmDialog";
 import { Ico, type Tone } from "./Icon";
-import {
-  Brush,
-  FilePen,
-  ExternalLink,
-  FileText,
-  GraduationCap,
-  Inbox,
-  LockKeyhole,
-  NotebookPen,
-  NotebookText,
-  Pencil,
-  Clapperboard,
-  Sparkles,
-  Tag,
-  Trash2,
-  TriangleAlert,
-  type LucideIcon,
-  ArrowUp,
-  Copy,
-  Eye,
-  Link2,
-  Link2Off,
-} from "lucide-react";
+import { Images, Brush, FilePen, ExternalLink, FileText, GraduationCap, Inbox, LockKeyhole, NotebookPen, NotebookText, Pencil, Clapperboard, Sparkles, Tag, Trash2, TriangleAlert, type LucideIcon, ArrowUp, Copy, Eye, Link2, Link2Off } from "lucide-react";
 import { SectionWelcome } from "./GettingStarted";
 
 type AiNote = { articleId: string; note: string; model?: string };
@@ -626,6 +604,14 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
           placeholder="Search titles, sites, notes…"
           className="ml-auto w-full max-w-xs rounded-md border border-slate-300 px-3 py-1.5 text-sm"
         />
+        <Link
+          href="/clips"
+          className="flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1 text-sm text-slate-600 hover:bg-slate-100"
+          title="See and delete your clips to free up space"
+        >
+          <Ico icon={Images} tone="sky" />
+          Clips
+        </Link>
         <div className="hidden items-center gap-2 text-sm text-slate-500 sm:flex">
           <span className="max-w-40 truncate">{userEmail}</span>
           <button onClick={signOut} className="rounded-md px-2 py-1 hover:bg-slate-100">
