@@ -4,10 +4,11 @@ import BrandMark from "@/components/BrandMark";
 import { WelcomePanel } from "@/components/GettingStarted";
 import { Tour, TourButton, useSectionTour } from "@/components/Tour";
 import { SAMPLE_VIDEO } from "@/lib/onboarding";
-import { Brush, Clapperboard, ExternalLink, FilePen, Folder as FolderIcon, ArrowUpToLine, Copy, Eye, FolderPlus, Images, Inbox, Link2, Link2Off, NotebookText, Pencil, Sparkles, Trash2, TriangleAlert, type LucideIcon } from "lucide-react";
+import { Brush, Clapperboard, ExternalLink, FilePen, Folder as FolderIcon, ArrowUp, Copy, Eye, FolderPlus, Images, Inbox, Link2, Link2Off, NotebookText, Pencil, Sparkles, Trash2, TriangleAlert, type LucideIcon } from "lucide-react";
 import { Ico, type Tone } from "@/components/Icon";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { usePointerDrag } from "@/lib/pointer-drag";
 import { useRouter } from "next/navigation";
 import {
   AiNoteWorking,
@@ -426,16 +427,20 @@ export default function Library({ userEmail }: { userEmail: string }) {
   }
 
   // Lifts a subfolder out to the top level, at the end of the list. Its own subfolders come with it.
-  async function moveFolderToTop(folder: Folder) {
-    const position = Math.max(-1, ...childFolders(null).map((f) => f.position)) + 1;
-    setFolders((prev) => prev.map((f) => (f.id === folder.id ? { ...f, parent_id: null, position } : f)));
-    const { error } = await supabase.from("folders").update({ parent_id: null, position }).eq("id", folder.id);
+  // Moves a subfolder out of its folder, into the folder one level above (or the top level).
+  async function moveFolderUp(folder: Folder) {
+    const parent = folders.find((f) => f.id === folder.parent_id);
+    const parent_id = parent?.parent_id ?? null;
+    const position = Math.max(-1, ...childFolders(parent_id).map((f) => f.position)) + 1;
+    setFolders((prev) => prev.map((f) => (f.id === folder.id ? { ...f, parent_id, position } : f)));
+    const { error } = await supabase.from("folders").update({ parent_id, position }).eq("id", folder.id);
     if (error) {
       notify(error.message, true);
       load();
       return;
     }
-    notify(`Moved "${folder.name}" to the top level`);
+    const into = folders.find((f) => f.id === parent_id);
+    notify(into ? `Moved "${folder.name}" up into "${into.name}"` : `Moved "${folder.name}" up to the top level`);
   }
 
   function openFolderMenu(folder: Folder, e: React.MouseEvent) {
@@ -447,7 +452,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
         { label: "Rename", icon: Pencil, tone: "yellow", onClick: () => renameFolder(folder) },
         { label: "New subfolder", icon: FolderPlus, tone: "amber", onClick: () => createFolder(folder.id) },
         ...(folder.parent_id
-          ? [{ label: "Move to top level", icon: ArrowUpToLine, tone: "violet" as const, onClick: () => moveFolderToTop(folder) }]
+          ? [{ label: "Move up a level", icon: ArrowUp, tone: "violet" as const, onClick: () => moveFolderUp(folder) }]
           : []),
         ...(folder.share_token
           ? [
@@ -784,40 +789,19 @@ function NavItem(props: {
   icon?: LucideIcon;
   tone?: Tone;
 }) {
-  const [over, setOver] = useState(false);
+  const { ref, over, handlers } = usePointerDrag<HTMLDivElement>({
+    onDragStart: props.onDragStart,
+    onDragEnd: props.onDragEnd,
+    canDrop: props.dropTarget,
+    onDrop: props.onDrop,
+  });
   return (
     <div
-      draggable={Boolean(props.onDragStart)}
-      onDragStart={(e) => {
-        if (!props.onDragStart) return;
-        e.dataTransfer.effectAllowed = "move";
-        e.dataTransfer.setData("text/plain", props.label);
-        // Re-render after the drag has started; Safari can cancel a drag whose row changes during dragstart.
-        const start = props.onDragStart;
-        setTimeout(() => start?.(), 0);
-      }}
-      onDragEnd={props.onDragEnd}
+      ref={ref}
+      {...handlers}
       onContextMenu={props.onContextMenu}
       className={`flex items-center rounded-md text-sm ${props.active ? "bg-slate-900 text-white" : "hover:bg-slate-100"} ${over ? "ring-2 ring-blue-500" : ""}`}
       style={{ paddingLeft: (props.indent ?? 0) * 14 }}
-      // Safari only drops where both dragenter and dragover are cancelled and the drop effect says "move".
-      onDragEnter={(e) => {
-        if (!props.dropTarget) return;
-        e.preventDefault();
-        e.dataTransfer.dropEffect = "move";
-      }}
-      onDragOver={(e) => {
-        if (!props.dropTarget) return;
-        e.preventDefault();
-        e.dataTransfer.dropEffect = "move";
-        setOver(true);
-      }}
-      onDragLeave={() => setOver(false)}
-      onDrop={(e) => {
-        e.preventDefault();
-        setOver(false);
-        props.onDrop?.();
-      }}
     >
       {props.leading}
       <button onClick={props.onClick} className="flex min-w-0 flex-1 items-center gap-2 px-2 py-1.5 text-left">
@@ -961,39 +945,21 @@ function VideoCard(props: {
   useEffect(() => {
     if (props.flash) cardRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
   }, [props.flash]);
-  const [over, setOver] = useState(false);
   const [editingNote, setEditingNote] = useState(false);
+  const { over, handlers } = usePointerDrag(
+    {
+      onDragStart: editingNote ? undefined : props.onDragStart,
+      onDragEnd: props.onDragEnd,
+      canDrop: props.canReorder && !props.dragging,
+      onDrop: props.onDropOnto,
+    },
+    cardRef,
+  );
 
   return (
     <div
       ref={cardRef}
-      draggable={!editingNote}
-      onDragStart={(e) => {
-        e.dataTransfer.effectAllowed = "move";
-        e.dataTransfer.setData("text/plain", video.id);
-        // Re-render after the drag has started; Safari can cancel a drag whose row changes during dragstart.
-        const start = props.onDragStart;
-        setTimeout(() => start?.(), 0);
-      }}
-      onDragEnd={props.onDragEnd}
-      // Safari only drops where both dragenter and dragover are cancelled and the drop effect says "move".
-      onDragEnter={(e) => {
-        if (!props.canReorder) return;
-        e.preventDefault();
-        e.dataTransfer.dropEffect = "move";
-      }}
-      onDragOver={(e) => {
-        if (!props.canReorder) return;
-        e.preventDefault();
-        e.dataTransfer.dropEffect = "move";
-        setOver(true);
-      }}
-      onDragLeave={() => setOver(false)}
-      onDrop={(e) => {
-        e.preventDefault();
-        setOver(false);
-        props.onDropOnto();
-      }}
+      {...handlers}
       className={`flex gap-3 rounded-xl border bg-white p-3 shadow-sm transition ${props.dragging ? "opacity-40" : ""} ${over ? "border-blue-500 ring-2 ring-blue-500" : props.flash ? "border-green-500 ring-4 ring-green-400" : "border-slate-200"}`}
     >
       <ReadCheck read={Boolean(video.watched_at)} onClick={props.onToggleWatched} word="watched" />

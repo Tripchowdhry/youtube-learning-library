@@ -2,7 +2,7 @@
 -- Paste this into Supabase > SQL Editor > New query, then click Run.
 -- It is safe to run more than once.
 
--- Categories are two levels deep: a category (parent_id = null) and its subcategories.
+-- Categories can sit inside each other, any number of levels deep (parent_id = null is the top level).
 create table if not exists public.article_categories (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null default auth.uid() references auth.users (id) on delete cascade,

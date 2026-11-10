@@ -5,6 +5,9 @@ import BrandMark from "@/components/BrandMark";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { usePointerDrag } from "@/lib/pointer-drag";
+import { isWithin, treeOptions, treePath } from "@/lib/category-tree";
+import CategoryTree from "@/components/CategoryTree";
 import ContextMenu, { type MenuState } from "@/components/ContextMenu";
 import {
   FolderSortSelect,
@@ -40,7 +43,11 @@ import {
   Trash2,
   TriangleAlert,
   type LucideIcon,
-  ArrowUpToLine,
+  ArrowUp,
+  Copy,
+  Eye,
+  Link2,
+  Link2Off,
 } from "lucide-react";
 import { SectionWelcome } from "./GettingStarted";
 
@@ -145,45 +152,35 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
 
   const [folderSort, setFolderSort] = useFolderSort();
   const [itemSort, setItemSort] = useItemSort();
-  const topCategories = useMemo(
-    () => categories.filter((c) => !c.parent_id).sort(compareFolders(folderSort)),
+  // Categories sit inside each other, any number of levels deep, like the Videos folders.
+  const childCategories = useCallback(
+    (parentId: string | null) => categories.filter((c) => c.parent_id === parentId).sort(compareFolders(folderSort)),
     [categories, folderSort],
   );
-  const subcategories = useCallback(
-    (parentId: string) => categories.filter((c) => c.parent_id === parentId).sort(compareFolders(folderSort)),
-    [categories, folderSort],
-  );
+  const topCategories = useMemo(() => childCategories(null), [childCategories]);
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const toggleCategory = (id: string) =>
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
 
-  const categoryPath = useCallback(
-    (id: string | null) => {
-      const cat = categories.find((c) => c.id === id);
-      if (!cat) return "";
-      const parent = categories.find((c) => c.id === cat.parent_id);
-      return parent ? `${parent.name} › ${cat.name}` : cat.name;
-    },
-    [categories],
-  );
+  const categoryPath = useCallback((id: string | null) => treePath(categories, id), [categories]);
 
-  // Every category in order, for the "Category" menus.
-  const categoryOptions = useMemo(
-    () =>
-      topCategories.flatMap((c) => [
-        { id: c.id, label: c.name },
-        ...subcategories(c.id).map((s) => ({ id: s.id, label: `  ${s.name}` })),
-      ]),
-    [topCategories, subcategories],
-  );
+  // Every category in tree order, for the "Category" menus.
+  const categoryOptions = useMemo(() => treeOptions(childCategories), [childCategories]);
 
   const canDragCategories = folderSort === "custom";
   const categorySiblings = (category: ArticleCategory) =>
-    category.parent_id ? subcategories(category.parent_id) : topCategories;
+    childCategories(category.parent_id);
 
   const currentCategory = view.kind === "category" ? categories.find((c) => c.id === view.id) ?? null : null;
 
-  // A category shows its own articles plus those in its subcategories.
+  // A category shows its own articles plus those in every category inside it.
   const inCategory = useCallback(
-    (article: Article, id: string) =>
-      article.category_id === id || categories.some((c) => c.id === article.category_id && c.parent_id === id),
+    (article: Article, id: string) => isWithin(categories, article.category_id, id),
     [categories],
   );
 
@@ -458,17 +455,20 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
     }
   }
 
-  // Lifts a subcategory out to the top level, at the end of the list.
-  async function moveCategoryToTop(category: { id: string; name: string }) {
-    const position = Math.max(-1, ...topCategories.map((c) => c.position)) + 1;
-    setCategories((prev) => prev.map((c) => (c.id === category.id ? { ...c, parent_id: null, position } : c)));
-    const { error } = await supabase.from("article_categories").update({ parent_id: null, position }).eq("id", category.id);
+  // Moves a category out of the one it sits in, into the category one level above (or the top level).
+  async function moveCategoryUp(category: { id: string; name: string; parent_id: string | null }) {
+    const parent = categories.find((c) => c.id === category.parent_id);
+    const parent_id = parent?.parent_id ?? null;
+    const position = Math.max(-1, ...childCategories(parent_id).map((c) => c.position)) + 1;
+    setCategories((prev) => prev.map((c) => (c.id === category.id ? { ...c, parent_id, position } : c)));
+    const { error } = await supabase.from("article_categories").update({ parent_id, position }).eq("id", category.id);
     if (error) {
       notify(error.message, true);
       load();
       return;
     }
-    notify(`Moved "${category.name}" to the top level`);
+    const into = categories.find((c) => c.id === parent_id);
+    notify(into ? `Moved "${category.name}" up into "${into.name}"` : `Moved "${category.name}" up to the top level`);
   }
 
   function openCategoryMenu(category: ArticleCategory, e: React.MouseEvent) {
@@ -478,12 +478,17 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
       y: e.clientY,
       items: [
         { label: "Rename", icon: Pencil, tone: "yellow" as const, onClick: () => renameCategory(category) },
+        { label: "New subcategory", icon: Tag, tone: "orange" as const, onClick: () => createCategory(category.id) },
         ...(category.parent_id
-          ? []
-          : [{ label: "New subcategory", icon: Tag, tone: "orange" as const, onClick: () => createCategory(category.id) }]),
-        ...(category.parent_id
-          ? [{ label: "Move to top level", icon: ArrowUpToLine, tone: "violet" as const, onClick: () => moveCategoryToTop(category) }]
+          ? [{ label: "Move up a level", icon: ArrowUp, tone: "violet" as const, onClick: () => moveCategoryUp(category) }]
           : []),
+        ...(category.share_token
+          ? [
+              { label: "Preview what others see", icon: Eye, tone: "violet" as const, onClick: () => previewShare(category.share_token!) },
+              { label: "Copy share link", icon: Copy, tone: "sky" as const, onClick: () => copyShareLink(category.share_token!) },
+              { label: "Stop sharing", icon: Link2Off, tone: "slate" as const, onClick: () => toggleShare(category) },
+            ]
+          : [{ label: "Share", icon: Link2, tone: "sky" as const, onClick: () => toggleShare(category) }]),
         { label: "Delete", icon: Trash2, tone: "red" as const, onClick: () => deleteCategory(category), danger: true },
       ],
     });
@@ -512,15 +517,50 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
   }
 
   async function deleteCategory(category: ArticleCategory) {
-    const subs = category.parent_id ? "" : " and its subcategories";
     const ok = window.confirm(
-      `Delete "${category.name}"${subs}?\nThe articles inside will move to Uncategorized, not be deleted.`,
+      `Delete "${category.name}" and any categories inside it?\nThe articles inside will move to Uncategorized, not be deleted.`,
     );
     if (!ok) return;
     const { error } = await supabase.from("article_categories").delete().eq("id", category.id);
     if (error) return notify(error.message, true);
     setView({ kind: "all" });
     load();
+  }
+
+  // ---------- Sharing a category with a link ----------
+
+  const shareError = (message: string) =>
+    /share_token/.test(message) ? "To share categories, run supabase/share-categories.sql in Supabase first." : message;
+
+  async function toggleShare(category: ArticleCategory) {
+    if (category.share_token) {
+      if (!window.confirm("Turn off the share link? People with the old link won't be able to see it anymore.")) return;
+      const { error } = await supabase.from("article_categories").update({ share_token: null }).eq("id", category.id);
+      if (error) return notify(shareError(error.message), true);
+      setCategories((prev) => prev.map((c) => (c.id === category.id ? { ...c, share_token: null } : c)));
+      notify("Sharing turned off");
+      return;
+    }
+    const token = crypto.randomUUID();
+    const { error } = await supabase.from("article_categories").update({ share_token: token }).eq("id", category.id);
+    if (error) return notify(shareError(error.message), true);
+    setCategories((prev) => prev.map((c) => (c.id === category.id ? { ...c, share_token: token } : c)));
+    copyShareLink(token);
+  }
+
+  // Opens the shared page in a new tab, marked as a preview, so you see exactly what people with the link see.
+  function previewShare(token: string) {
+    window.open(`/share/${token}?preview=1`, "_blank", "noopener");
+  }
+
+  async function copyShareLink(token: string) {
+    const link = `${window.location.origin}/share/${token}`;
+    try {
+      await navigator.clipboard.writeText(link);
+      notify("Share link copied. Anyone with it can view this category.");
+    } catch {
+      window.prompt("Copy this share link:", link);
+    }
   }
 
   async function signOut() {
@@ -598,36 +638,19 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
           {topCategories.length === 0 && (
             <p className="px-2 text-sm text-slate-500">No categories yet. Click + to make one, like &quot;AI news&quot;.</p>
           )}
-          {topCategories.map((cat) => (
-            <div key={cat.id}>
-              <NavItem
-                icon={Tag}
-                tone="orange"
-                label={cat.name}
-                count={countIn(cat.id)}
-                active={!searching && view.kind === "category" && view.id === cat.id}
-                onClick={() => openView({ kind: "category", id: cat.id })}
-                onDropArticle={dropOnCategory(cat)}
-                onDragStart={canDragCategories ? () => setDraggingCategoryId(cat.id) : undefined}
-                onDragEnd={() => setDraggingCategoryId(null)}
-                onContextMenu={(e) => openCategoryMenu(cat, e)}
-              />
-              {subcategories(cat.id).map((sub) => (
-                <NavItem
-                  key={sub.id}
-                  label={sub.name}
-                  count={countIn(sub.id)}
-                  indent={1}
-                  active={!searching && view.kind === "category" && view.id === sub.id}
-                  onClick={() => openView({ kind: "category", id: sub.id })}
-                  onDropArticle={dropOnCategory(sub)}
-                  onDragStart={canDragCategories ? () => setDraggingCategoryId(sub.id) : undefined}
-                  onDragEnd={() => setDraggingCategoryId(null)}
-                  onContextMenu={(e) => openCategoryMenu(sub, e)}
-                />
-              ))}
-            </div>
-          ))}
+          <CategoryTree
+            parentId={null}
+            childrenOf={childCategories}
+            collapsed={collapsed}
+            onToggle={toggleCategory}
+            activeId={!searching && view.kind === "category" ? view.id : null}
+            count={countIn}
+            onOpen={(id) => openView({ kind: "category", id })}
+            dropOn={dropOnCategory}
+            onDragStart={canDragCategories ? setDraggingCategoryId : undefined}
+            onDragEnd={() => setDraggingCategoryId(null)}
+            onMenu={openCategoryMenu}
+          />
           {topCategories.length > 1 && (
             <p className="mt-3 px-2 text-xs text-slate-400">{sortHint(folderSort, "categories")}</p>
           )}
@@ -647,10 +670,30 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
                 <TourButton onClick={tour.start} />
                 {currentCategory && !searching && (
                   <>
-                    {!currentCategory.parent_id && (
-                      <SmallButton onClick={() => createCategory(currentCategory.id)}>+ Subcategory</SmallButton>
-                    )}
+                    <SmallButton onClick={() => createCategory(currentCategory.id)}>+ Subcategory</SmallButton>
                     <SmallButton onClick={() => renameCategory(currentCategory)}>Rename</SmallButton>
+                    <SmallButton
+                      onClick={() => toggleShare(currentCategory)}
+                      icon={currentCategory.share_token ? Link2Off : Link2}
+                      tone={currentCategory.share_token ? "slate" : "sky"}
+                    >
+                      {currentCategory.share_token ? "Stop sharing" : "Share"}
+                    </SmallButton>
+                    {currentCategory.share_token && (
+                      <>
+                        <SmallButton
+                          onClick={() => previewShare(currentCategory.share_token!)}
+                          icon={Eye}
+                          tone="violet"
+                          title="See this category the way people with the link see it"
+                        >
+                          Preview
+                        </SmallButton>
+                        <SmallButton onClick={() => copyShareLink(currentCategory.share_token!)} icon={Copy} tone="sky">
+                          Copy link
+                        </SmallButton>
+                      </>
+                    )}
                     <SmallButton onClick={() => deleteCategory(currentCategory)} danger>
                       Delete
                     </SmallButton>
@@ -830,38 +873,20 @@ function ArticleRow(props: {
     if (props.flash) rowRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
   }, [props.flash]);
   const [editingNote, setEditingNote] = useState(false);
-  const [over, setOver] = useState(false);
+  const { over, handlers } = usePointerDrag(
+    {
+      onDragStart: editingNote ? undefined : props.onDragStart,
+      onDragEnd: props.onDragEnd,
+      canDrop: props.canReorder && !props.dragging,
+      onDrop: props.onDropOnto,
+    },
+    rowRef,
+  );
   const hasNotes = Boolean(article.notes?.trim());
   return (
     <li
       ref={rowRef}
-      draggable={!editingNote}
-      onDragStart={(e) => {
-        e.dataTransfer.effectAllowed = "move";
-        e.dataTransfer.setData("text/plain", article.id);
-        // Re-render after the drag has started; Safari can cancel a drag whose row changes during dragstart.
-        const start = props.onDragStart;
-        setTimeout(() => start?.(), 0);
-      }}
-      onDragEnd={props.onDragEnd}
-      // Safari only drops where both dragenter and dragover are cancelled and the drop effect says "move".
-      onDragEnter={(e) => {
-        if (!props.canReorder) return;
-        e.preventDefault();
-        e.dataTransfer.dropEffect = "move";
-      }}
-      onDragOver={(e) => {
-        if (!props.canReorder) return;
-        e.preventDefault();
-        e.dataTransfer.dropEffect = "move";
-        setOver(true);
-      }}
-      onDragLeave={() => setOver(false)}
-      onDrop={(e) => {
-        e.preventDefault();
-        setOver(false);
-        props.onDropOnto();
-      }}
+      {...handlers}
       className={`flex cursor-grab items-start gap-3 rounded-xl border bg-white p-3 shadow-sm transition ${props.dragging ? "opacity-40" : ""} ${over ? "border-blue-500 ring-2 ring-blue-500" : props.flash ? "border-green-500 ring-4 ring-green-400" : "border-slate-200"}`}
     >
       <ReadCheck read={Boolean(article.read_at)} onClick={props.onToggleRead} />
@@ -1187,40 +1212,19 @@ export function NavItem(props: {
   icon?: LucideIcon;
   tone?: Tone;
 }) {
-  const [over, setOver] = useState(false);
+  const { ref, over, handlers } = usePointerDrag<HTMLButtonElement>({
+    onDragStart: props.onDragStart,
+    onDragEnd: props.onDragEnd,
+    canDrop: Boolean(props.onDropArticle),
+    onDrop: props.onDropArticle,
+  });
   const Icon = props.icon;
   return (
     <button
+      ref={ref}
+      {...handlers}
       onClick={props.onClick}
-      draggable={Boolean(props.onDragStart)}
-      onDragStart={(e) => {
-        if (!props.onDragStart) return;
-        e.dataTransfer.effectAllowed = "move";
-        e.dataTransfer.setData("text/plain", props.label);
-        // Re-render after the drag has started; Safari can cancel a drag whose row changes during dragstart.
-        const start = props.onDragStart;
-        setTimeout(() => start?.(), 0);
-      }}
-      onDragEnd={props.onDragEnd}
       onContextMenu={props.onContextMenu}
-      // Safari only drops where both dragenter and dragover are cancelled and the drop effect says "move".
-      onDragEnter={(e) => {
-        if (!props.onDropArticle) return;
-        e.preventDefault();
-        e.dataTransfer.dropEffect = "move";
-      }}
-      onDragOver={(e) => {
-        if (!props.onDropArticle) return;
-        e.preventDefault();
-        e.dataTransfer.dropEffect = "move";
-        setOver(true);
-      }}
-      onDragLeave={() => setOver(false)}
-      onDrop={(e) => {
-        e.preventDefault();
-        setOver(false);
-        props.onDropArticle?.();
-      }}
       className={`flex w-full items-center gap-2 rounded-md py-1.5 pr-2 text-left text-sm ${props.active ? "bg-slate-900 text-white" : "hover:bg-slate-100"} ${over ? "ring-2 ring-blue-500" : ""}`}
       style={{ paddingLeft: 8 + (props.indent ?? 0) * 22 }}
     >

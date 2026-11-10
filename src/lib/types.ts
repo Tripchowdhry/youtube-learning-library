@@ -80,6 +80,16 @@ export type ArticleCategory = {
   position: number;
   kind: CategoryKind;
   created_at: string;
+  // Set while the category is shared with a link. Missing until supabase/share-categories.sql is run.
+  share_token?: string | null;
+};
+
+// What people with a category's share link see: titles and links only (and a page's typed text).
+export type SharedCategory = {
+  category: { id: string; name: string; kind: CategoryKind };
+  categories: { id: string; name: string; parent_id: string | null; position: number }[];
+  articles: { id: string; category_id: string; url: string; title: string | null; site: string | null; author: string | null; position: number }[];
+  scraps: { id: string; category_id: string; title: string; body: string; position: number }[];
 };
 
 export type Article = {
