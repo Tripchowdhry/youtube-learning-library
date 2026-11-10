@@ -4,6 +4,8 @@ import { Tour, TourButton, useSectionTour } from "@/components/Tour";
 import BrandMark from "@/components/BrandMark";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { usePointerDrag } from "@/lib/pointer-drag";
+import { isWithin, treeOptions, treePath } from "@/lib/category-tree";
+import CategoryTree from "@/components/CategoryTree";
 import { useRouter } from "next/navigation";
 import ContextMenu, { type MenuState } from "@/components/ContextMenu";
 import { FolderSortSelect, compareFolders, sortHint, useFolderSort } from "@/components/FolderSort";
@@ -208,44 +210,35 @@ export default function VaultLibrary({ userEmail }: { userEmail: string }) {
   // ---------- Category helpers ----------
 
   const [folderSort, setFolderSort] = useFolderSort();
-  const topCategories = useMemo(
-    () => categories.filter((c) => !c.parent_id).sort(compareFolders(folderSort)),
+  // Categories sit inside each other, any number of levels deep, like the Videos folders.
+  const childCategories = useCallback(
+    (parentId: string | null) => categories.filter((c) => c.parent_id === parentId).sort(compareFolders(folderSort)),
     [categories, folderSort],
   );
-  const subcategories = useCallback(
-    (parentId: string) => categories.filter((c) => c.parent_id === parentId).sort(compareFolders(folderSort)),
-    [categories, folderSort],
-  );
+  const topCategories = useMemo(() => childCategories(null), [childCategories]);
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const toggleCategory = (id: string) =>
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
 
-  const categoryPath = useCallback(
-    (id: string | null) => {
-      const cat = categories.find((c) => c.id === id);
-      if (!cat) return "";
-      const parent = categories.find((c) => c.id === cat.parent_id);
-      return parent ? `${parent.name} › ${cat.name}` : cat.name;
-    },
-    [categories],
-  );
+  const categoryPath = useCallback((id: string | null) => treePath(categories, id), [categories]);
 
-  const categoryOptions = useMemo(
-    () =>
-      topCategories.flatMap((c) => [
-        { id: c.id, label: c.name },
-        ...subcategories(c.id).map((s) => ({ id: s.id, label: `  ${s.name}` })),
-      ]),
-    [topCategories, subcategories],
-  );
+  // Every category in tree order, for the "Category" menus.
+  const categoryOptions = useMemo(() => treeOptions(childCategories), [childCategories]);
 
   const canDragCategories = folderSort === "custom";
   const categorySiblings = (category: VaultCategory) =>
-    category.parent_id ? subcategories(category.parent_id) : topCategories;
+    childCategories(category.parent_id);
 
   const currentCategory = view.kind === "category" ? categories.find((c) => c.id === view.id) ?? null : null;
 
-  // A category shows its own entries plus those in its subcategories.
+  // A category shows its own entries plus those in every category inside it.
   const inCategory = useCallback(
-    (entry: VaultEntry, id: string) =>
-      entry.category_id === id || categories.some((c) => c.id === entry.category_id && c.parent_id === id),
+    (entry: VaultEntry, id: string) => isWithin(categories, entry.category_id, id),
     [categories],
   );
 
@@ -367,17 +360,20 @@ export default function VaultLibrary({ userEmail }: { userEmail: string }) {
     }
   }
 
-  // Lifts a subcategory out to the top level, at the end of the list.
-  async function moveCategoryToTop(category: { id: string; name: string }) {
-    const position = Math.max(-1, ...topCategories.map((c) => c.position)) + 1;
-    setCategories((prev) => prev.map((c) => (c.id === category.id ? { ...c, parent_id: null, position } : c)));
-    const { error } = await supabase.from("vault_categories").update({ parent_id: null, position }).eq("id", category.id);
+  // Moves a category out of the one it sits in, into the category one level above (or the top level).
+  async function moveCategoryUp(category: { id: string; name: string; parent_id: string | null }) {
+    const parent = categories.find((c) => c.id === category.parent_id);
+    const parent_id = parent?.parent_id ?? null;
+    const position = Math.max(-1, ...childCategories(parent_id).map((c) => c.position)) + 1;
+    setCategories((prev) => prev.map((c) => (c.id === category.id ? { ...c, parent_id, position } : c)));
+    const { error } = await supabase.from("vault_categories").update({ parent_id, position }).eq("id", category.id);
     if (error) {
       notify(error.message, true);
       load();
       return;
     }
-    notify(`Moved "${category.name}" up a level`);
+    const into = categories.find((c) => c.id === parent_id);
+    notify(into ? `Moved "${category.name}" up into "${into.name}"` : `Moved "${category.name}" up to the top level`);
   }
 
   function openCategoryMenu(category: VaultCategory, e: React.MouseEvent) {
@@ -387,11 +383,9 @@ export default function VaultLibrary({ userEmail }: { userEmail: string }) {
       y: e.clientY,
       items: [
         { label: "Rename", icon: Pencil, tone: "yellow" as const, onClick: () => renameCategory(category) },
+        { label: "New subcategory", icon: Tag, tone: "orange" as const, onClick: () => createCategory(category.id) },
         ...(category.parent_id
-          ? []
-          : [{ label: "New subcategory", icon: Tag, tone: "orange" as const, onClick: () => createCategory(category.id) }]),
-        ...(category.parent_id
-          ? [{ label: "Move up a level", icon: ArrowUp, tone: "violet" as const, onClick: () => moveCategoryToTop(category) }]
+          ? [{ label: "Move up a level", icon: ArrowUp, tone: "violet" as const, onClick: () => moveCategoryUp(category) }]
           : []),
         { label: "Delete", icon: Trash2, tone: "red" as const, onClick: () => deleteCategory(category), danger: true },
       ],
@@ -421,9 +415,8 @@ export default function VaultLibrary({ userEmail }: { userEmail: string }) {
   }
 
   async function deleteCategory(category: VaultCategory) {
-    const subs = category.parent_id ? "" : " and its subcategories";
     const ok = window.confirm(
-      `Delete "${category.name}"${subs}?\nThe entries inside will move to Uncategorized, not be deleted.`,
+      `Delete "${category.name}" and any categories inside it?\nThe entries inside will move to Uncategorized, not be deleted.`,
     );
     if (!ok) return;
     const { error } = await supabase.from("vault_categories").delete().eq("id", category.id);
@@ -507,36 +500,19 @@ export default function VaultLibrary({ userEmail }: { userEmail: string }) {
           {topCategories.length === 0 && (
             <p className="px-2 text-sm text-slate-500">No categories yet. Click + to make one, like &quot;API keys&quot;.</p>
           )}
-          {topCategories.map((cat) => (
-            <div key={cat.id}>
-              <NavItem
-                icon={Tag}
-                tone="orange"
-                label={cat.name}
-                count={countIn(cat.id)}
-                active={!searching && view.kind === "category" && view.id === cat.id}
-                onClick={() => openView({ kind: "category", id: cat.id })}
-                onDropArticle={dropOnCategory(cat)}
-                onDragStart={canDragCategories ? () => setDraggingCategoryId(cat.id) : undefined}
-                onDragEnd={() => setDraggingCategoryId(null)}
-                onContextMenu={(e) => openCategoryMenu(cat, e)}
-              />
-              {subcategories(cat.id).map((sub) => (
-                <NavItem
-                  key={sub.id}
-                  label={sub.name}
-                  count={countIn(sub.id)}
-                  indent={1}
-                  active={!searching && view.kind === "category" && view.id === sub.id}
-                  onClick={() => openView({ kind: "category", id: sub.id })}
-                  onDropArticle={dropOnCategory(sub)}
-                  onDragStart={canDragCategories ? () => setDraggingCategoryId(sub.id) : undefined}
-                  onDragEnd={() => setDraggingCategoryId(null)}
-                  onContextMenu={(e) => openCategoryMenu(sub, e)}
-                />
-              ))}
-            </div>
-          ))}
+          <CategoryTree
+            parentId={null}
+            childrenOf={childCategories}
+            collapsed={collapsed}
+            onToggle={toggleCategory}
+            activeId={!searching && view.kind === "category" ? view.id : null}
+            count={countIn}
+            onOpen={(id) => openView({ kind: "category", id })}
+            dropOn={dropOnCategory}
+            onDragStart={canDragCategories ? setDraggingCategoryId : undefined}
+            onDragEnd={() => setDraggingCategoryId(null)}
+            onMenu={openCategoryMenu}
+          />
           {topCategories.length > 1 && (
             <p className="mt-3 px-2 text-xs text-slate-400">{sortHint(folderSort, "categories")}</p>
           )}
@@ -580,9 +556,7 @@ export default function VaultLibrary({ userEmail }: { userEmail: string }) {
                 <TourButton onClick={tour.start} />
                 {currentCategory && !searching && (
                   <>
-                    {!currentCategory.parent_id && (
-                      <SmallButton onClick={() => createCategory(currentCategory.id)}>+ Subcategory</SmallButton>
-                    )}
+                    <SmallButton onClick={() => createCategory(currentCategory.id)}>+ Subcategory</SmallButton>
                     <SmallButton onClick={() => renameCategory(currentCategory)}>Rename</SmallButton>
                     <SmallButton onClick={() => deleteCategory(currentCategory)} danger>
                       Delete
