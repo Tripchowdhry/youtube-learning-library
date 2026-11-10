@@ -115,5 +115,6 @@ export function ItemSortSelect({ sort, onChange }: { sort: FolderSort; onChange:
 // The hint under the list: dragging only makes sense in your own order.
 export function sortHint(sort: FolderSort, things: string) {
   const menu = things === "folders" ? "Right-click one to rename or share." : "Right-click one to rename.";
-  return sort === "custom" ? `Drag ${things} to reorder. ${menu}` : `Pick "My order" to drag ${things} into place. ${menu}`;
+  // Dragging works in any sort; it switches the list to "My order".
+  return `Drag ${things} to reorder. ${menu}`;
 }

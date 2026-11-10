@@ -172,7 +172,7 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
   // Every category in tree order, for the "Category" menus.
   const categoryOptions = useMemo(() => treeOptions(childCategories), [childCategories]);
 
-  const canDragCategories = folderSort === "custom";
+  const canDragCategories = true;
   const categorySiblings = (category: ArticleCategory) =>
     childCategories(category.parent_id);
 
@@ -188,7 +188,9 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
 
   const searching = query.trim().length > 0;
   // Inside a category your own order applies; All reading and search show the newest first.
-  const canReorder = !searching && view.kind !== "all" && itemSort === "custom";
+  // Dragging to reorder works inside a folder whatever the sort; ▲ ▼ only in your own order.
+  const canReorder = !searching && view.kind !== "all";
+  const canShift = canReorder && itemSort === "custom";
 
   const visibleArticles = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -363,6 +365,20 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
   // Drop one article onto another: it takes the target's place in the list.
   function reorderArticle(draggedId: string, targetId: string) {
     if (draggedId === targetId) return;
+    if (itemSort !== "custom") {
+      // Sorted by date or name: keep the order you see, put the dragged one before the target,
+      // save that as your own order and switch Sort to "My order".
+      const dragged = visibleArticles.find((a) => a.id === draggedId);
+      const rest = visibleArticles.filter((a) => a.id !== draggedId);
+      const at = rest.findIndex((a) => a.id === targetId);
+      if (!dragged || at === -1) return;
+      rest.splice(at, 0, dragged);
+      rest.forEach((a, position) => {
+        if (a.position !== position) updateArticle(a.id, { position });
+      });
+      setItemSort("custom");
+      return;
+    }
     const list = visibleArticles.filter((a) => a.id !== draggedId);
     const index = list.findIndex((a) => a.id === targetId);
     if (index === -1) return;
@@ -500,7 +516,11 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
     if (draggingId) return () => moveArticle(draggingId, category.id);
     const dragged = categories.find((c) => c.id === draggingCategoryId);
     if (dragged && dragged.id !== category.id && dragged.parent_id === category.parent_id) {
-      return () => moveCategoryTo(dragged.id, category.id);
+      return () => {
+        moveCategoryTo(dragged.id, category.id);
+        // Dragging sets your own order, so the list switches to "My order" and keeps it.
+        if (folderSort !== "custom") setFolderSort("custom");
+      };
     }
     return undefined;
   };
@@ -777,7 +797,7 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
                       onDragStart={() => setDraggingId(article.id)}
                       onDragEnd={() => setDraggingId(null)}
                       onDropOnto={() => draggingId && reorderArticle(draggingId, article.id)}
-                      onShift={canReorder ? (step) => shiftArticle(article.id, step) : null}
+                      onShift={canShift ? (step) => shiftArticle(article.id, step) : null}
                       isFirst={index === 0}
                       isLast={index === visibleArticles.length - 1}
                       onRename={() => renameArticle(article)}
