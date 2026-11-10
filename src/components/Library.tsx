@@ -37,7 +37,7 @@ import {
 import VideoThumb from "@/components/VideoThumb";
 import { findSavedElsewhere } from "@/lib/find-saved";
 import { createClient } from "@/lib/supabase/client";
-import type { Folder, Video } from "@/lib/types";
+import type { VideoCategory, Video } from "@/lib/types";
 import { onAiJobDone, runAiJob, useAiJobs } from "@/lib/ai-jobs";
 import { askVideoAi } from "@/lib/video-ai";
 import { askConfirm } from "./ConfirmDialog";
@@ -51,7 +51,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
 
-  const [folders, setFolders] = useState<Folder[]>([]);
+  const [folders, setFolders] = useState<VideoCategory[]>([]);
   const [videos, setVideos] = useState<Video[]>([]);
   const videosRef = useRef(videos);
   videosRef.current = videos;
@@ -81,7 +81,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
 
   const load = useCallback(async () => {
     const [f, v, n] = await Promise.all([
-      supabase.from("folders").select("*").order("position").order("name"),
+      supabase.from("video_categories").select("*").order("position").order("name"),
       supabase.from("videos").select("*").order("position"),
       supabase.from("notes").select("video_id"),
     ]);
@@ -90,7 +90,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
     if (f.error || v.error) {
       notify((f.error ?? v.error)!.message, true);
     } else {
-      setFolders(f.data as Folder[]);
+      setFolders(f.data as VideoCategory[]);
       setVideos(v.data as Video[]);
     }
     setLoading(false);
@@ -103,7 +103,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
   // New here: show the short tour once the library has loaded.
   const tour = useSectionTour("videos", !loading, userEmail);
 
-  // ---------- Folder helpers ----------
+  // ---------- Category helpers ----------
 
   const childFolders = useCallback(
     (parentId: string | null) =>
@@ -152,11 +152,11 @@ export default function Library({ userEmail }: { userEmail: string }) {
     const folderId = view.kind === "folder" ? view.id : null;
     const shown = q
       ? videos.filter((v) =>
-          [v.title, v.channel, v.note, folderPath(v.folder_id), ...v.tags].some((s) => s?.toLowerCase().includes(q)),
+          [v.title, v.channel, v.note, folderPath(v.category_id), ...v.tags].some((s) => s?.toLowerCase().includes(q)),
         )
       : view.kind === "all"
         ? [...videos]
-        : videos.filter((v) => v.folder_id === folderId);
+        : videos.filter((v) => v.category_id === folderId);
     const days = PERIODS.find((p) => p.value === period)!.days;
     const since = days ? Date.now() - days * 86_400_000 : 0;
     return shown
@@ -167,7 +167,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
 
   // New and moved videos go to the top of their folder.
   const topPosition = (folderId: string | null) => {
-    const siblings = videos.filter((v) => v.folder_id === folderId);
+    const siblings = videos.filter((v) => v.category_id === folderId);
     return siblings.length ? Math.min(...siblings.map((v) => v.position)) - 1 : 0;
   };
 
@@ -175,8 +175,8 @@ export default function Library({ userEmail }: { userEmail: string }) {
 
   // Points at a saved video: opens its folder and rings it in green for a few seconds.
   function showSaved(video: Video) {
-    const where = video.folder_id ? folderPath(video.folder_id) : "Uncategorized";
-    openView(video.folder_id ? { kind: "folder", id: video.folder_id } : { kind: "unsorted" });
+    const where = video.category_id ? folderPath(video.category_id) : "Uncategorized";
+    openView(video.category_id ? { kind: "folder", id: video.category_id } : { kind: "unsorted" });
     setPeriod("any");
     setWatchFilter("all");
     setFlashId(video.id);
@@ -222,7 +222,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
 
     // Inside a folder, the video goes there. Otherwise it goes into its channel's folder.
     let folderId = currentFolderId;
-    let newFolder: Folder | null = null;
+    let newFolder: VideoCategory | null = null;
     if (!folderId && info.channel) {
       const picked = await channelFolder(info.channel);
       if (!picked) return false;
@@ -232,7 +232,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
 
     const { data, error } = await supabase
       .from("videos")
-      .insert({ ...info, folder_id: folderId, position: topPosition(folderId) })
+      .insert({ ...info, category_id: folderId, position: topPosition(folderId) })
       .select()
       .single();
     if (error) {
@@ -284,7 +284,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
   );
 
   // Finds the top-level folder named after a channel, creating it the first time.
-  async function channelFolder(channel: string): Promise<Folder | null> {
+  async function channelFolder(channel: string): Promise<VideoCategory | null> {
     const name = channel.trim().slice(0, 100);
     const existing = folders.find((f) => f.parent_id === null && f.name.toLowerCase() === name.toLowerCase());
     if (existing) return existing;
@@ -292,7 +292,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
     const topLevel = folders.filter((f) => f.parent_id === null);
     const position = topLevel.length ? Math.max(...topLevel.map((f) => f.position)) + 1 : 0;
     const { data, error } = await supabase
-      .from("folders")
+      .from("video_categories")
       .insert({ name, parent_id: null, position })
       .select()
       .single();
@@ -300,7 +300,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
       notify(error.message, true);
       return null;
     }
-    return data as Folder;
+    return data as VideoCategory;
   }
 
   async function updateVideo(id: string, changes: Partial<Video>) {
@@ -325,8 +325,8 @@ export default function Library({ userEmail }: { userEmail: string }) {
 
   function moveVideo(id: string, folderId: string | null) {
     const video = videos.find((v) => v.id === id);
-    if (!video || video.folder_id === folderId) return;
-    updateVideo(id, { folder_id: folderId, position: topPosition(folderId) });
+    if (!video || video.category_id === folderId) return;
+    updateVideo(id, { category_id: folderId, position: topPosition(folderId) });
     notify(`Moved to ${folderId ? folderPath(folderId) : "Uncategorized"}`);
   }
 
@@ -353,7 +353,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
     const target = list[index];
     const before = list[index - 1];
     const position = before ? (before.position + target.position) / 2 : target.position - 1;
-    updateVideo(draggedId, { position, folder_id: target.folder_id });
+    updateVideo(draggedId, { position, category_id: target.category_id });
   }
 
   // Swap a video with its neighbor: -1 moves it earlier, +1 later.
@@ -403,7 +403,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
     }
   }
 
-  // ---------- Folder actions ----------
+  // ---------- Category actions ----------
 
   async function createFolder(parentId: string | null) {
     const name = window.prompt(parentId ? `New subcategory inside "${folderPath(parentId)}":` : "New category name:");
@@ -411,14 +411,14 @@ export default function Library({ userEmail }: { userEmail: string }) {
     const siblings = folders.filter((f) => f.parent_id === parentId);
     const position = siblings.length ? Math.max(...siblings.map((f) => f.position)) + 1 : 0;
     const { data, error } = await supabase
-      .from("folders")
+      .from("video_categories")
       .insert({ name: name.trim(), parent_id: parentId, position })
       .select()
       .single();
     if (error) return notify(error.message, true);
-    setFolders((prev) => [...prev, data as Folder]);
+    setFolders((prev) => [...prev, data as VideoCategory]);
     if (parentId) setExpanded((prev) => new Set(prev).add(parentId));
-    setView({ kind: "folder", id: (data as Folder).id });
+    setView({ kind: "folder", id: (data as VideoCategory).id });
   }
 
   // Drop one folder onto another next to it: it takes that folder's place, and the rest are renumbered so the order sticks.
@@ -434,7 +434,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
     const changed = siblings.map((f, position) => ({ id: f.id, position })).filter((f, i) => siblings[i].position !== f.position);
     setFolders((prev) => prev.map((f) => ({ ...f, position: changed.find((c) => c.id === f.id)?.position ?? f.position })));
     const results = await Promise.all(
-      changed.map((c) => supabase.from("folders").update({ position: c.position }).eq("id", c.id)),
+      changed.map((c) => supabase.from("video_categories").update({ position: c.position }).eq("id", c.id)),
     );
     const failed = results.find((r) => r.error);
     if (failed) {
@@ -445,12 +445,12 @@ export default function Library({ userEmail }: { userEmail: string }) {
 
   // Lifts a subfolder out to the top level, at the end of the list. Its own subfolders come with it.
   // Moves a subfolder out of its folder, into the folder one level above (or the top level).
-  async function moveFolderUp(folder: Folder) {
+  async function moveFolderUp(folder: VideoCategory) {
     const parent = folders.find((f) => f.id === folder.parent_id);
     const parent_id = parent?.parent_id ?? null;
     const position = Math.max(-1, ...childFolders(parent_id).map((f) => f.position)) + 1;
     setFolders((prev) => prev.map((f) => (f.id === folder.id ? { ...f, parent_id, position } : f)));
-    const { error } = await supabase.from("folders").update({ parent_id, position }).eq("id", folder.id);
+    const { error } = await supabase.from("video_categories").update({ parent_id, position }).eq("id", folder.id);
     if (error) {
       notify(error.message, true);
       load();
@@ -460,7 +460,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
     notify(into ? `Moved "${folder.name}" up into "${into.name}"` : `Moved "${folder.name}" up to the top level`);
   }
 
-  function openFolderMenu(folder: Folder, e: React.MouseEvent) {
+  function openFolderMenu(folder: VideoCategory, e: React.MouseEvent) {
     e.preventDefault();
     setMenu({
       x: e.clientX,
@@ -483,39 +483,39 @@ export default function Library({ userEmail }: { userEmail: string }) {
     });
   }
 
-  async function renameFolder(folder: Folder) {
+  async function renameFolder(folder: VideoCategory) {
     const name = window.prompt("Rename category:", folder.name);
     if (!name?.trim() || name.trim() === folder.name) return;
     setFolders((prev) => prev.map((f) => (f.id === folder.id ? { ...f, name: name.trim() } : f)));
-    const { error } = await supabase.from("folders").update({ name: name.trim() }).eq("id", folder.id);
+    const { error } = await supabase.from("video_categories").update({ name: name.trim() }).eq("id", folder.id);
     if (error) {
       notify(error.message, true);
       load();
     }
   }
 
-  async function deleteFolder(folder: Folder) {
+  async function deleteFolder(folder: VideoCategory) {
     const ok = window.confirm(
       `Delete "${folder.name}" and any categories inside it?\nThe videos inside will move to Uncategorized, not be deleted.`,
     );
     if (!ok) return;
-    const { error } = await supabase.from("folders").delete().eq("id", folder.id);
+    const { error } = await supabase.from("video_categories").delete().eq("id", folder.id);
     if (error) return notify(error.message, true);
     setView({ kind: "all" });
     load();
   }
 
-  async function toggleShare(folder: Folder) {
+  async function toggleShare(folder: VideoCategory) {
     if (folder.share_token) {
       if (!window.confirm("Turn off the share link? People with the old link won't be able to see it anymore.")) return;
-      const { error } = await supabase.from("folders").update({ share_token: null }).eq("id", folder.id);
+      const { error } = await supabase.from("video_categories").update({ share_token: null }).eq("id", folder.id);
       if (error) return notify(error.message, true);
       setFolders((prev) => prev.map((f) => (f.id === folder.id ? { ...f, share_token: null } : f)));
       notify("Sharing turned off");
       return;
     }
     const token = crypto.randomUUID();
-    const { error } = await supabase.from("folders").update({ share_token: token }).eq("id", folder.id);
+    const { error } = await supabase.from("video_categories").update({ share_token: token }).eq("id", folder.id);
     if (error) return notify(error.message, true);
     setFolders((prev) => prev.map((f) => (f.id === folder.id ? { ...f, share_token: token } : f)));
     copyShareLink(token);
@@ -609,7 +609,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
             icon={Inbox}
             tone="blue"
             label="Uncategorized"
-            count={videos.filter((v) => !v.folder_id).length}
+            count={videos.filter((v) => !v.category_id).length}
             active={view.kind === "unsorted" && !searching}
             onClick={() => openView({ kind: "unsorted" })}
             dropTarget={draggingId !== null}
@@ -843,7 +843,7 @@ function NavItem(props: {
 function FolderTree(props: {
   parentId: string | null;
   depth: number;
-  childFolders: (parentId: string | null) => Folder[];
+  childFolders: (parentId: string | null) => VideoCategory[];
   videos: Video[];
   expanded: Set<string>;
   setExpanded: React.Dispatch<React.SetStateAction<Set<string>>>;
@@ -851,12 +851,12 @@ function FolderTree(props: {
   onOpen: (id: string) => void;
   draggingId: string | null;
   onDropVideo: (folderId: string) => void;
-  draggingFolder: Folder | null;
+  draggingFolder: VideoCategory | null;
   onFolderDragStart: (id: string) => void;
   onFolderDragEnd: () => void;
   onDropFolder: (targetId: string) => void;
   canDragFolders: boolean;
-  onFolderMenu: (folder: Folder, e: React.MouseEvent) => void;
+  onFolderMenu: (folder: VideoCategory, e: React.MouseEvent) => void;
 }) {
   const { draggingFolder } = props;
   const inTree = (folderId: string | null, rootId: string): boolean =>
@@ -880,7 +880,7 @@ function FolderTree(props: {
               tone={folder.share_token ? "sky" : "amber"}
               label={folder.name}
               // A top-level folder counts the videos in all its subfolders too; a subfolder counts only its own.
-              count={props.videos.filter((v) => (props.depth === 0 ? inTree(v.folder_id, folder.id) : v.folder_id === folder.id)).length}
+              count={props.videos.filter((v) => (props.depth === 0 ? inTree(v.category_id, folder.id) : v.category_id === folder.id)).length}
               active={props.activeId === folder.id}
               onClick={() => props.onOpen(folder.id)}
               indent={props.depth}
@@ -1056,7 +1056,7 @@ function VideoCard(props: {
             YouTube
           </a>
           <select
-            value={video.folder_id ?? ""}
+            value={video.category_id ?? ""}
             onChange={(e) => props.onMove(e.target.value || null)}
             className="max-w-48 min-w-0 rounded-md border border-slate-300 bg-white px-1 py-1 text-xs"
             aria-label="Move to category"
