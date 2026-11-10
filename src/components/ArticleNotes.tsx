@@ -8,16 +8,23 @@ import type { Article } from "@/lib/types";
 import { askArticleAi } from "@/lib/video-ai";
 import { Brush, CircleHelp, FileText, Footprints, Lightbulb, List, NotebookText, Sparkles, TriangleAlert, type LucideIcon } from "lucide-react";
 import { Ico, type Tone } from "@/components/Icon";
+import { ClipButton, DeleteClipButton } from "@/components/ClipButtons";
+import { clipUrl, joinTypedClips, splitTypedClips, type TypedClip } from "@/lib/clips";
 
 type SaveState = "saved" | "saving" | "unsaved" | "error";
 
 const MISSING_COLUMN =
   "Notes can't be saved yet. In Supabase, open SQL Editor and run the file supabase/article-notes.sql once, then reload.";
 
-// Adds an AI answer to the end of the notes.
+// Adds an AI answer to the end of the typed notes (the text, not the clips saved after it).
 function addAnswer(notes: string, answer: string) {
   const current = notes.trimEnd();
   return `${current ? `${current}\n\n` : ""}${answer}`;
+}
+
+function addAnswerToSaved(saved: string, answer: string) {
+  const { text, clips } = splitTypedClips(saved);
+  return joinTypedClips(addAnswer(text, answer), clips);
 }
 
 const presets = (word: string): { label: string; icon: LucideIcon; tone: Tone; prompt: string }[] => [
@@ -42,7 +49,9 @@ export default function ArticleNotes(props: {
   const { article } = props;
   const supabase = useState(() => createClient())[0];
   const word = article.kind === "tutorial" ? "tutorial" : "article";
-  const [notes, setNotes] = useState(article.notes ?? "");
+  // The typed text and the clips (screenshots) are kept apart here and saved together.
+  const [notes, setNotes] = useState(() => splitTypedClips(article.notes ?? "").text);
+  const [clips, setClips] = useState<TypedClip[]>(() => splitTypedClips(article.notes ?? "").clips);
   const [saveState, setSaveState] = useState<SaveState>("saved");
   const [saveError, setSaveError] = useState<string | null>(null);
   const box = useRef<HTMLTextAreaElement>(null);
@@ -57,17 +66,19 @@ export default function ArticleNotes(props: {
 
   const notesRef = useRef(notes);
   notesRef.current = notes;
+  const clipsRef = useRef(clips);
+  clipsRef.current = clips;
   const { onNotesChange } = props;
 
   const save = useCallback(async () => {
     setSaveState("saving");
-    const text = notesRef.current;
+    const text = joinTypedClips(notesRef.current, clipsRef.current);
     const { error } = await supabase.from("articles").update({ notes: text }).eq("id", article.id);
     if (error) {
       setSaveState("error");
       setSaveError(/notes/.test(error.message) ? MISSING_COLUMN : error.message);
     } else {
-      setSaveState(notesRef.current === text ? "saved" : "unsaved");
+      setSaveState(joinTypedClips(notesRef.current, clipsRef.current) === text ? "saved" : "unsaved");
       setSaveError(null);
       onNotesChange(text);
     }
@@ -77,7 +88,7 @@ export default function ArticleNotes(props: {
     if (saveState !== "unsaved") return;
     const timer = setTimeout(save, 1200);
     return () => clearTimeout(timer);
-  }, [notes, saveState, save]);
+  }, [notes, clips, saveState, save]);
 
   // Save right away when the notes are closed or the person leaves for another page.
   const saveStateRef = useRef(saveState);
@@ -103,6 +114,16 @@ export default function ArticleNotes(props: {
     setSaveState("unsaved");
   }
 
+  function changeClips(next: TypedClip[]) {
+    setClips(next);
+    setSaveState("unsaved");
+  }
+
+  const addClip = useCallback((_image: unknown, path: string) => {
+    setClips((c) => [...c, { path, t: null }]);
+    setSaveState("unsaved");
+  }, []);
+
   // ---------- Ask AI ----------
 
   // The answer goes to the end of the notes. The AI keeps working if the person leaves
@@ -122,7 +143,7 @@ export default function ArticleNotes(props: {
         const { data } = await supabase.from("articles").select("notes").eq("id", article.id).maybeSingle();
         const { error } = await supabase
           .from("articles")
-          .update({ notes: addAnswer((data?.notes ?? "") as string, answer) })
+          .update({ notes: addAnswerToSaved((data?.notes ?? "") as string, answer) })
           .eq("id", article.id);
         if (error) throw error;
       },
@@ -163,7 +184,8 @@ export default function ArticleNotes(props: {
         ) : (
           <span className="text-xs text-slate-500">{saveState === "saved" ? "Saved" : "Saving…"}</span>
         )}
-        <span className="ml-auto flex gap-1">
+        <span className="ml-auto flex items-center gap-1">
+          <ClipButton what={word} onPicture={addClip} compact />
           {notes.trim() && (
             <button
               onClick={async () => {
@@ -198,6 +220,30 @@ export default function ArticleNotes(props: {
       )}
 
       <AskAi word={word} startedAt={aiStartedAt} error={aiError} onAsk={askAi} />
+
+      {clips.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {clips.map((c, i) => (
+            <div key={`${c.path}-${i}`} className="relative w-48 shrink-0 overflow-hidden rounded-md bg-white ring-1 ring-slate-200">
+              <a href={clipUrl(supabase, c.path)} target="_blank" rel="noreferrer" title="Open full size">
+                <img src={clipUrl(supabase, c.path)} alt={`Picture from the ${word}`} className="block w-full" />
+              </a>
+              <DeleteClipButton
+                onClick={async () => {
+                  const ok = await askConfirm({
+                    title: "Delete this picture?",
+                    message: "It will be removed from your notes.",
+                    confirmLabel: "Yes, delete",
+                    cancelLabel: "Keep it",
+                    danger: true,
+                  });
+                  if (ok) changeClips(clipsRef.current.filter((_, j) => j !== i));
+                }}
+              />
+            </div>
+          ))}
+        </div>
+      )}
 
       <div className="relative rounded-lg bg-white shadow-sm ring-1 ring-slate-200 focus-within:ring-2 focus-within:ring-slate-400">
         {/* The text is drawn here, behind the (see-through) typing box, so AI prompts can be shown in bold. */}

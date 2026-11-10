@@ -32,7 +32,7 @@ import {
 import { SectionWelcome } from "@/components/GettingStarted";
 import { createClient } from "@/lib/supabase/client";
 import type { ArticleCategory, Scrap } from "@/lib/types";
-import { ArrowUp, Copy, Eye, FileText, Link2, Link2Off, Inbox, NotebookPen, Pencil, Tag, Trash2 } from "lucide-react";
+import { Images, ArrowUp, Copy, Eye, FileText, Link2, Link2Off, Inbox, NotebookPen, Pencil, Tag, Trash2 } from "lucide-react";
 import { Ico } from "@/components/Icon";
 
 type View = { kind: "all" } | { kind: "uncategorized" } | { kind: "category"; id: string };
@@ -445,6 +445,14 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
           placeholder="Search titles and text…"
           className="ml-auto w-full max-w-xs rounded-md border border-slate-300 px-3 py-1.5 text-sm"
         />
+        <Link
+          href="/clips"
+          className="flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1 text-sm text-slate-600 hover:bg-slate-100"
+          title="See and delete your clips to free up space"
+        >
+          <Ico icon={Images} tone="sky" />
+          Clips
+        </Link>
         <div className="hidden items-center gap-2 text-sm text-slate-500 sm:flex">
           <span className="max-w-40 truncate">{userEmail}</span>
           <button onClick={signOut} className="rounded-md px-2 py-1 hover:bg-slate-100">
