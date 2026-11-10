@@ -13,7 +13,7 @@ export default function PrivacyPage() {
       <h2 className="mt-6 mb-2 text-xl font-semibold">What we collect</h2>
       <ul className="mb-4 list-disc pl-6">
         <li>Your email address and name from Google, so you can sign in.</li>
-        <li>The folders, video links, titles and tags you add to your library.</li>
+        <li>The categories, video links, titles and tags you add to your library.</li>
       </ul>
       <h2 className="mt-6 mb-2 text-xl font-semibold">How it&apos;s used</h2>
       <p className="mb-4">

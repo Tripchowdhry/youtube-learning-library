@@ -31,9 +31,9 @@ const SLIDES: Slide[] = [
     icon: Link2,
     tone: "sky",
     title: "Paste a link",
-    text: "A YouTube video, an article, an X post or a tutorial. BrainShelf fills in the title and keeps it on your shelf, sorted into folders.",
+    text: "A YouTube video, an article, an X post or a tutorial. BrainShelf fills in the title and keeps it on your shelf, sorted into categories.",
     src: "/landing/videos.webp",
-    alt: "Your video library, with folders, notes and summaries",
+    alt: "Your video library, with categories, notes and summaries",
   },
   {
     icon: Pencil,
