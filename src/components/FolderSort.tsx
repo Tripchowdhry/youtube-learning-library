@@ -116,5 +116,6 @@ export function ItemSortSelect({ sort, onChange }: { sort: FolderSort; onChange:
 export function sortHint(sort: FolderSort, things: string) {
   const menu = things === "folders" ? "Right-click one to rename or share." : "Right-click one to rename.";
   // Dragging works in any sort; it switches the list to "My order".
-  return `Drag ${things} to reorder. ${menu}`;
+  const heading = things === "folders" ? "Folders" : "Categories";
+  return `Drag ${things} to reorder. ${menu} Right-click "${heading}" to add a new one.`;
 }
