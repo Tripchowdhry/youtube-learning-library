@@ -121,7 +121,7 @@ export function sortHint(sort: FolderSort, things: string) {
   return `Drag ${things} to reorder. ${menu} Right-click "${heading}" to add a new one.`;
 }
 
-// The "Folders" / "Categories" heading in the sidebar. Hovering it lights it up and shows a + icon,
+// The "Folders" / "Categories" heading in the sidebar. Hovering it lights it up and shows a small + folder icon,
 // so you can see it's the place to right-click for a new one.
 export function SidebarHeading({ label, children }: { label: string; children?: ReactNode }) {
   const thing = label === "Folders" ? "folder" : "category";
@@ -132,10 +132,7 @@ export function SidebarHeading({ label, children }: { label: string; children?: 
         title={`Right-click to add a new ${thing}`}
       >
         {label}
-        <FolderPlus size={13} className="opacity-0 transition-opacity group-hover:opacity-100" aria-hidden />
-        <span className="text-[10px] font-normal tracking-normal normal-case opacity-0 transition-opacity group-hover:opacity-100">
-          right-click for new
-        </span>
+        <FolderPlus size={12} className="opacity-0 transition-opacity group-hover:opacity-100" aria-hidden />
       </span>
       {children}
     </div>
