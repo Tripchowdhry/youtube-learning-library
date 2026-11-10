@@ -1,6 +1,6 @@
 // Helpers for folders and categories that can sit inside each other, any number of levels deep.
 
-export type TreeNode = { id: string; parent_id: string | null; name: string };
+export type TreeNode = { id: string; parent_id: string | null; name: string; share_token?: string | null };
 
 // "Outer › Inner › This", for labels and search.
 export function treePath(nodes: TreeNode[], id: string | null): string {

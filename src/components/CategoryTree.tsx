@@ -1,6 +1,6 @@
 "use client";
 
-import { Tag } from "lucide-react";
+import { Link2, Tag } from "lucide-react";
 import { NavItem } from "@/components/ReadingLibrary";
 import type { TreeNode } from "@/lib/category-tree";
 
@@ -38,8 +38,8 @@ export default function CategoryTree<C extends TreeNode>(props: {
               </button>
               <div className="min-w-0 flex-1">
                 <NavItem
-                  icon={Tag}
-                  tone="orange"
+                  icon={cat.share_token ? Link2 : Tag}
+                  tone={cat.share_token ? "sky" : "orange"}
                   label={cat.name}
                   count={props.count(cat.id)}
                   active={props.activeId === cat.id}

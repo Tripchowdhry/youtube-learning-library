@@ -44,6 +44,10 @@ import {
   TriangleAlert,
   type LucideIcon,
   ArrowUp,
+  Copy,
+  Eye,
+  Link2,
+  Link2Off,
 } from "lucide-react";
 import { SectionWelcome } from "./GettingStarted";
 
@@ -478,6 +482,13 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
         ...(category.parent_id
           ? [{ label: "Move up a level", icon: ArrowUp, tone: "violet" as const, onClick: () => moveCategoryUp(category) }]
           : []),
+        ...(category.share_token
+          ? [
+              { label: "Preview what others see", icon: Eye, tone: "violet" as const, onClick: () => previewShare(category.share_token!) },
+              { label: "Copy share link", icon: Copy, tone: "sky" as const, onClick: () => copyShareLink(category.share_token!) },
+              { label: "Stop sharing", icon: Link2Off, tone: "slate" as const, onClick: () => toggleShare(category) },
+            ]
+          : [{ label: "Share", icon: Link2, tone: "sky" as const, onClick: () => toggleShare(category) }]),
         { label: "Delete", icon: Trash2, tone: "red" as const, onClick: () => deleteCategory(category), danger: true },
       ],
     });
@@ -514,6 +525,42 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
     if (error) return notify(error.message, true);
     setView({ kind: "all" });
     load();
+  }
+
+  // ---------- Sharing a category with a link ----------
+
+  const shareError = (message: string) =>
+    /share_token/.test(message) ? "To share categories, run supabase/share-categories.sql in Supabase first." : message;
+
+  async function toggleShare(category: ArticleCategory) {
+    if (category.share_token) {
+      if (!window.confirm("Turn off the share link? People with the old link won't be able to see it anymore.")) return;
+      const { error } = await supabase.from("article_categories").update({ share_token: null }).eq("id", category.id);
+      if (error) return notify(shareError(error.message), true);
+      setCategories((prev) => prev.map((c) => (c.id === category.id ? { ...c, share_token: null } : c)));
+      notify("Sharing turned off");
+      return;
+    }
+    const token = crypto.randomUUID();
+    const { error } = await supabase.from("article_categories").update({ share_token: token }).eq("id", category.id);
+    if (error) return notify(shareError(error.message), true);
+    setCategories((prev) => prev.map((c) => (c.id === category.id ? { ...c, share_token: token } : c)));
+    copyShareLink(token);
+  }
+
+  // Opens the shared page in a new tab, marked as a preview, so you see exactly what people with the link see.
+  function previewShare(token: string) {
+    window.open(`/share/${token}?preview=1`, "_blank", "noopener");
+  }
+
+  async function copyShareLink(token: string) {
+    const link = `${window.location.origin}/share/${token}`;
+    try {
+      await navigator.clipboard.writeText(link);
+      notify("Share link copied. Anyone with it can view this category.");
+    } catch {
+      window.prompt("Copy this share link:", link);
+    }
   }
 
   async function signOut() {
@@ -625,6 +672,28 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
                   <>
                     <SmallButton onClick={() => createCategory(currentCategory.id)}>+ Subcategory</SmallButton>
                     <SmallButton onClick={() => renameCategory(currentCategory)}>Rename</SmallButton>
+                    <SmallButton
+                      onClick={() => toggleShare(currentCategory)}
+                      icon={currentCategory.share_token ? Link2Off : Link2}
+                      tone={currentCategory.share_token ? "slate" : "sky"}
+                    >
+                      {currentCategory.share_token ? "Stop sharing" : "Share"}
+                    </SmallButton>
+                    {currentCategory.share_token && (
+                      <>
+                        <SmallButton
+                          onClick={() => previewShare(currentCategory.share_token!)}
+                          icon={Eye}
+                          tone="violet"
+                          title="See this category the way people with the link see it"
+                        >
+                          Preview
+                        </SmallButton>
+                        <SmallButton onClick={() => copyShareLink(currentCategory.share_token!)} icon={Copy} tone="sky">
+                          Copy link
+                        </SmallButton>
+                      </>
+                    )}
                     <SmallButton onClick={() => deleteCategory(currentCategory)} danger>
                       Delete
                     </SmallButton>
