@@ -598,12 +598,21 @@ function ScrapRow(props: {
       onDragStart={(e) => {
         e.dataTransfer.effectAllowed = "move";
         e.dataTransfer.setData("text/plain", scrap.id);
-        props.onDragStart();
+        // Re-render after the drag has started; Safari can cancel a drag whose row changes during dragstart.
+        const start = props.onDragStart;
+        setTimeout(() => start?.(), 0);
       }}
       onDragEnd={props.onDragEnd}
+      // Safari only drops where both dragenter and dragover are cancelled and the drop effect says "move".
+      onDragEnter={(e) => {
+        if (!props.canReorder) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "move";
+      }}
       onDragOver={(e) => {
         if (!props.canReorder) return;
         e.preventDefault();
+        e.dataTransfer.dropEffect = "move";
         setOver(true);
       }}
       onDragLeave={() => setOver(false)}

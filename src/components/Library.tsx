@@ -792,15 +792,24 @@ function NavItem(props: {
         if (!props.onDragStart) return;
         e.dataTransfer.effectAllowed = "move";
         e.dataTransfer.setData("text/plain", props.label);
-        props.onDragStart();
+        // Re-render after the drag has started; Safari can cancel a drag whose row changes during dragstart.
+        const start = props.onDragStart;
+        setTimeout(() => start?.(), 0);
       }}
       onDragEnd={props.onDragEnd}
       onContextMenu={props.onContextMenu}
       className={`flex items-center rounded-md text-sm ${props.active ? "bg-slate-900 text-white" : "hover:bg-slate-100"} ${over ? "ring-2 ring-blue-500" : ""}`}
       style={{ paddingLeft: (props.indent ?? 0) * 14 }}
+      // Safari only drops where both dragenter and dragover are cancelled and the drop effect says "move".
+      onDragEnter={(e) => {
+        if (!props.dropTarget) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "move";
+      }}
       onDragOver={(e) => {
         if (!props.dropTarget) return;
         e.preventDefault();
+        e.dataTransfer.dropEffect = "move";
         setOver(true);
       }}
       onDragLeave={() => setOver(false)}
@@ -962,12 +971,21 @@ function VideoCard(props: {
       onDragStart={(e) => {
         e.dataTransfer.effectAllowed = "move";
         e.dataTransfer.setData("text/plain", video.id);
-        props.onDragStart();
+        // Re-render after the drag has started; Safari can cancel a drag whose row changes during dragstart.
+        const start = props.onDragStart;
+        setTimeout(() => start?.(), 0);
       }}
       onDragEnd={props.onDragEnd}
+      // Safari only drops where both dragenter and dragover are cancelled and the drop effect says "move".
+      onDragEnter={(e) => {
+        if (!props.canReorder) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "move";
+      }}
       onDragOver={(e) => {
         if (!props.canReorder) return;
         e.preventDefault();
+        e.dataTransfer.dropEffect = "move";
         setOver(true);
       }}
       onDragLeave={() => setOver(false)}
