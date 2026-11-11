@@ -175,14 +175,18 @@ export default function Library({ userEmail }: { userEmail: string }) {
 
   // ---------- Video actions ----------
 
-  // Points at a saved video: opens its folder and rings it in green for a few seconds.
-  function showSaved(video: Video) {
-    const where = video.category_id ? folderPath(video.category_id) : "Uncategorized";
+  // Points at a saved video: opens its category and rings it in green for a few seconds.
+  function pointAt(video: Video) {
     openView(video.category_id ? { kind: "folder", id: video.category_id } : { kind: "unsorted" });
     setPeriod("any");
     setWatchFilter("all");
     setFlashId(video.id);
     setTimeout(() => setFlashId((id) => (id === video.id ? null : id)), 4000);
+  }
+
+  function showSaved(video: Video) {
+    pointAt(video);
+    const where = video.category_id ? folderPath(video.category_id) : "Uncategorized";
     setToast({ text: `Duplicate: this video is already saved here, in Videos › ${where}.`, warn: true });
     setTimeout(() => setToast(null), 8000);
   }
@@ -192,11 +196,15 @@ export default function Library({ userEmail }: { userEmail: string }) {
   useEffect(() => {
     if (loading || shown.current) return;
     shown.current = true;
-    const id = new URLSearchParams(window.location.search).get("show");
+    const params = new URLSearchParams(window.location.search);
+    const id = params.get("show");
     if (!id) return;
     window.history.replaceState(null, "", "/");
     const video = videos.find((v) => v.id === id);
-    if (video) showSaved(video);
+    // ?show=id&find=1 comes from a video's own page: just open its category.
+    if (!video) return;
+    if (params.get("find")) pointAt(video);
+    else showSaved(video);
     // Runs once, when the list first loads.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading]);
@@ -806,6 +814,15 @@ export default function Library({ userEmail }: { userEmail: string }) {
                     onAiNote={() => writeAiNote(video)}
                     onDelete={() => deleteVideo(video)}
                     onTagClick={(tag) => setQuery(tag)}
+                    where={
+                      searching || view.kind !== "folder"
+                        ? video.category_id ? folderPath(video.category_id) || "Uncategorized" : "Uncategorized"
+                        : null
+                    }
+                    onShowWhere={() => {
+                      setQuery("");
+                      pointAt(video);
+                    }}
                   />
                 ))}
               </div>
@@ -988,6 +1005,9 @@ function VideoCard(props: {
   onAiNote: () => void;
   onDelete: () => void;
   onTagClick: (tag: string) => void;
+  /** The video's category path, shown when the list mixes categories (All videos, search). */
+  where: string | null;
+  onShowWhere: () => void;
   flash: boolean;
 }) {
   const { video } = props;
@@ -1033,6 +1053,16 @@ function VideoCard(props: {
         >
           {video.title}
         </a>
+        {props.where && (
+          <button
+            onClick={props.onShowWhere}
+            title="Open this category"
+            className="inline-flex max-w-full items-center gap-1 self-start rounded-md bg-amber-50 px-1.5 py-0.5 text-xs font-medium text-amber-900 ring-1 ring-amber-200 hover:bg-amber-100"
+          >
+            <Ico icon={props.where === "Uncategorized" ? Inbox : FolderIcon} tone="amber" size={12} />
+            <span className="truncate">{props.where}</span>
+          </button>
+        )}
         <p className="text-xs text-slate-500">
           {video.channel && `${video.channel} · `}Added {formatDate(video.created_at)}
           {video.watched_at && <span className="text-green-700"> · Watched {formatDate(video.watched_at)}</span>}
