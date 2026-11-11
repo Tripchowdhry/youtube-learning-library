@@ -8,13 +8,13 @@ export default function ReportWriterLink() {
     <div className="mb-3">
       <Link
         href="/reports"
-        className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 px-3.5 py-1.5 text-sm text-white shadow-sm hover:from-emerald-600 hover:to-teal-600"
+        className="inline-flex items-center gap-2 rounded-lg bg-slate-800 px-3 py-1.5 text-sm text-white shadow-sm ring-1 ring-slate-900/10 hover:bg-slate-900"
         title="Turn your notes from videos, readings and tutorials into one report"
       >
         <ScrollText size={16} aria-hidden />
         <span className="font-semibold">Report Writer</span>
-        <span className="hidden text-emerald-50 md:inline">· turn your notes into one report</span>
-        <ArrowRight size={14} aria-hidden />
+        <span className="hidden text-slate-300 md:inline">Turn your notes into one report</span>
+        <ArrowRight size={14} className="text-slate-400" aria-hidden />
       </Link>
     </div>
   );

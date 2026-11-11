@@ -561,7 +561,7 @@ function Shell({ title, status, children }: { title: React.ReactNode; status?: s
     <div className="flex min-h-screen flex-col">
       <header className="sticky top-0 z-20 flex items-center gap-2 border-b border-slate-200 bg-white px-4 py-3">
         <Link href="/reports" className="flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-sm text-slate-600 hover:bg-slate-100">
-          <ArrowLeft size={16} aria-hidden /> <span className="font-medium text-emerald-700">Report Writer</span>
+          <ArrowLeft size={16} aria-hidden /> <span className="font-medium text-slate-800">Report Writer</span>
         </Link>
         {typeof title === "string" ? <span className="text-lg font-semibold">{title}</span> : title}
         {status && <span className="shrink-0 text-xs text-slate-500">{status}</span>}
