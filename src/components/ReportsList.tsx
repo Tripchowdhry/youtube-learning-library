@@ -94,12 +94,12 @@ export default function ReportsList({ userEmail }: { userEmail: string }) {
           <>
             <div className="mb-2 flex flex-wrap items-center gap-2">
               <h1 className="mr-auto flex items-center gap-2 text-2xl font-bold text-slate-900">
-                <ReportIcon size={26} /> Report Writer
+                <ReportIcon size={34} /> Report Writer
               </h1>
               <button
                 onClick={create}
                 disabled={creating}
-                className="flex items-center gap-1.5 rounded-md bg-[#ece6ff] px-3 py-1.5 text-sm font-medium text-[#4c3a99] ring-1 ring-[#d6cbfb] hover:bg-[#e2d9ff] disabled:opacity-60"
+                className="flex items-center gap-1.5 rounded-md bg-[#2b3b5e] px-3 py-1.5 text-sm font-medium text-white hover:bg-[#22304d] disabled:opacity-60"
               >
                 <FilePlus2 size={16} aria-hidden />
                 {creating ? "Starting…" : "New report"}
@@ -116,7 +116,7 @@ export default function ReportsList({ userEmail }: { userEmail: string }) {
               <p className="text-sm text-slate-500">Loading…</p>
             ) : reports.length === 0 ? (
               <div className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center text-slate-600">
-                <ReportIcon size={32} className="mx-auto mb-2" />
+                <ReportIcon size={48} className="mx-auto mb-2" />
                 No reports yet. Click <b>New report</b> to make your first one.
               </div>
             ) : (
@@ -125,7 +125,7 @@ export default function ReportsList({ userEmail }: { userEmail: string }) {
                   const count = r.report_sources?.[0]?.count ?? 0;
                   return (
                     <li key={r.id} className="flex items-center gap-3 px-4 py-3">
-                      <ReportIcon />
+                      <ReportIcon size={24} />
                       <Link href={`/report/${r.id}`} className="min-w-0 flex-1">
                         <span className="block truncate font-medium text-slate-900 hover:underline">{r.title}</span>
                         <span className="text-xs text-slate-500">
