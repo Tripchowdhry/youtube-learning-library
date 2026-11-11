@@ -3,6 +3,7 @@
 import { Tour, TourButton, useSectionTour } from "@/components/Tour";
 import BrandMark from "@/components/BrandMark";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import CategoryTag from "@/components/CategoryTag";
 import { usePointerDrag } from "@/lib/pointer-drag";
 import { isWithin, treeOptions, treePath } from "@/lib/category-tree";
 import CategoryTree from "@/components/CategoryTree";
@@ -63,6 +64,7 @@ export default function VaultLibrary({ userEmail }: { userEmail: string }) {
   const [query, setQuery] = useState("");
   const [showCategories, setShowCategories] = useState(false);
   const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [flashId, setFlashId] = useState<string | null>(null);
   const [draggingCategoryId, setDraggingCategoryId] = useState<string | null>(null);
   const [menu, setMenu] = useState<MenuState | null>(null);
   const closeMenu = useCallback(() => setMenu(null), []);
@@ -462,6 +464,13 @@ export default function VaultLibrary({ userEmail }: { userEmail: string }) {
     setShowCategories(false);
   }
 
+  // Opens an entry's category and rings the entry in green for a few seconds.
+  function pointAt(entry: VaultEntry) {
+    openView(entry.category_id ? { kind: "category", id: entry.category_id } : { kind: "uncategorized" });
+    setFlashId(entry.id);
+    setTimeout(() => setFlashId((id) => (id === entry.id ? null : id)), 4000);
+  }
+
   // ---------- Render ----------
 
   const title = searching
@@ -636,6 +645,9 @@ export default function VaultLibrary({ userEmail }: { userEmail: string }) {
                         unlocked={Boolean(key)}
                         revealed={revealed}
                         categoryLabel={categoryPath(entry.category_id) || "Uncategorized"}
+                        showCategory={searching || view.kind !== "category"}
+                        onShowCategory={() => pointAt(entry)}
+                        flash={flashId === entry.id}
                         categoryOptions={categoryOptions}
                         onMove={(categoryId) => moveEntry(entry.id, categoryId)}
                         dragging={draggingId === entry.id}
@@ -689,6 +701,10 @@ function EntryRow(props: {
   unlocked: boolean;
   revealed: Record<string, string>;
   categoryLabel: string;
+  /** Show the category tag: on lists that mix categories (All, search). */
+  showCategory: boolean;
+  onShowCategory: () => void;
+  flash: boolean;
   categoryOptions: { id: string; label: string }[];
   onMove: (categoryId: string | null) => void;
   dragging: boolean;
@@ -703,15 +719,19 @@ function EntryRow(props: {
   const { entry } = props;
   const href = /^https?:\/\//i.test(entry.url) ? entry.url : entry.url ? `https://${entry.url}` : "";
   const { ref, handlers } = usePointerDrag<HTMLLIElement>({ onDragStart: props.onDragStart, onDragEnd: props.onDragEnd });
+  useEffect(() => {
+    if (props.flash) ref.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [props.flash, ref]);
   return (
     <li
       ref={ref}
       {...handlers}
-      className={`flex cursor-grab items-start gap-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm transition ${props.dragging ? "opacity-40" : ""}`}
+      className={`flex cursor-grab items-start gap-3 rounded-xl border bg-white p-3 shadow-sm transition ${props.dragging ? "opacity-40" : ""} ${props.flash ? "border-green-500 ring-4 ring-green-400" : "border-slate-200"}`}
     >
       <Ico icon={KeyRound} tone="yellow" size={22} className="mt-0.5" />
       <div className="flex min-w-0 flex-1 flex-col gap-1.5">
         <p className="font-medium">{entry.name}</p>
+        {props.showCategory && <CategoryTag path={props.categoryLabel} onClick={props.onShowCategory} />}
         {entry.url && (
           <PlainLine label="Web address">
             <a href={href} target="_blank" rel="noopener noreferrer" className="truncate text-blue-700 hover:underline">

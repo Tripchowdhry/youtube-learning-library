@@ -12,6 +12,8 @@ import { createClient } from "@/lib/supabase/client";
 import type { ArticleCategory, NoteImage, NotePage, NoteStroke, Scrap } from "@/lib/types";
 import { Keyboard, PenLine, Trash2 } from "lucide-react";
 import { Ico } from "@/components/Icon";
+import { CategoryCrumb } from "@/components/CategoryTag";
+import { treePath } from "@/lib/category-tree";
 
 const PEN_COLORS = ["#111827", "#2563eb", "#dc2626", "#16a34a"];
 const HIGHLIGHT_COLORS = ["#facc15", "#4ade80", "#f472b6", "#60a5fa"];
@@ -350,7 +352,16 @@ export default function ScrapEditor({ scrapId }: { scrapId: string }) {
         <Link href="/scrapbook" className="shrink-0 rounded-md px-2 py-1 text-sm text-slate-600 hover:bg-slate-100">
           ← ScrapBook
         </Link>
-        <span className="min-w-0 flex-1 truncate font-medium">{title || "Untitled"}</span>
+        <div className="min-w-0 flex-1">
+          <p className="truncate font-medium leading-tight">{title || "Untitled"}</p>
+          {scrap && (
+            <CategoryCrumb
+              section="ScrapBook"
+              path={treePath(categories, categoryId) || "Uncategorized"}
+              href={`/scrapbook?show=${scrapId}`}
+            />
+          )}
+        </div>
         <SaveBadge state={saveState} onRetry={save} />
         <button
           onClick={deleteScrap}

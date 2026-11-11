@@ -2,6 +2,7 @@
 
 import { Tour, TourButton, useSectionTour } from "@/components/Tour";
 import Link from "next/link";
+import { CategoryCrumb } from "@/components/CategoryTag";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import NotePageCanvas, { PAGE_HEIGHT, type Tool } from "@/components/NotePageCanvas";
 import { DeleteClipButton } from "@/components/ClipButtons";
@@ -20,7 +21,7 @@ import type { NoteImage, NotePage, NoteStroke, Video } from "@/lib/types";
 import { onAiJobDone, runAiJob, useAiJobs, useSecondsSince } from "@/lib/ai-jobs";
 import { askVideoAi } from "@/lib/video-ai";
 import { askConfirm } from "./ConfirmDialog";
-import { Brush, Camera, ClipboardPaste, FileText, Folder, Footprints, Inbox, Keyboard, Lightbulb, List, PenLine, Sparkles, Timer, Trash2, TriangleAlert, type LucideIcon } from "lucide-react";
+import { Brush, Camera, ClipboardPaste, FileText, Footprints, Keyboard, Lightbulb, List, PenLine, Sparkles, Timer, Trash2, TriangleAlert, type LucideIcon } from "lucide-react";
 import { Ico, type Tone } from "@/components/Icon";
 
 const PEN_COLORS = ["#111827", "#2563eb", "#dc2626", "#16a34a"];
@@ -620,14 +621,7 @@ export default function StudyPage({ videoId }: { videoId: string }) {
         <div className="min-w-0 flex-1">
           <h1 className="truncate font-semibold leading-tight">{video?.title ?? "Loading…"}</h1>
           {categoryPath && (
-            <Link
-              href={`/?show=${videoId}&find=1`}
-              title="Open this category in your library"
-              className="flex max-w-full items-center gap-1 truncate text-xs text-amber-800 hover:underline"
-            >
-              <Ico icon={categoryPath === "Uncategorized" ? Inbox : Folder} tone="amber" size={12} />
-              <span className="truncate">Videos › {categoryPath}</span>
-            </Link>
+            <CategoryCrumb section="Videos" path={categoryPath} href={`/?show=${videoId}&find=1`} />
           )}
         </div>
         <SaveBadge state={saveState} onRetry={save} />
