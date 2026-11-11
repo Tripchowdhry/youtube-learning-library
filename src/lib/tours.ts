@@ -8,7 +8,7 @@ export const TOURS = {
     {
       target: "add-video",
       title: "Save what you're learning",
-      text: "Paste any YouTube link here. BrainShelf fills in the details and sorts it into a category by channel.",
+      text: "Paste any YouTube link here. BrainShelf fills in the details. It goes into the category you have open, or Uncategorized.",
     },
     {
       target: "sections",

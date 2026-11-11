@@ -222,15 +222,8 @@ export default function Library({ userEmail }: { userEmail: string }) {
       return true;
     }
 
-    // Inside a folder, the video goes there. Otherwise it goes into its channel's folder.
-    let folderId = currentFolderId;
-    let newFolder: VideoCategory | null = null;
-    if (!folderId && info.channel) {
-      const picked = await channelFolder(info.channel);
-      if (!picked) return false;
-      folderId = picked.id;
-      if (!folders.some((f) => f.id === picked.id)) newFolder = picked;
-    }
+    // Inside a category, the video goes there. Anywhere else it goes to Uncategorized, for you to sort.
+    const folderId = currentFolderId;
 
     const { data, error } = await supabase
       .from("videos")
@@ -241,9 +234,8 @@ export default function Library({ userEmail }: { userEmail: string }) {
       notify(error.message, true);
       return false;
     }
-    if (newFolder) setFolders((prev) => [...prev, newFolder!]);
     setVideos((prev) => [...prev, data as Video]);
-    notify(folderId && !currentFolderId ? `Saved to ${info.channel}` : `Saved "${info.title}"`);
+    notify(folderId ? `Saved "${info.title}"` : `Saved "${info.title}" to Uncategorized`);
     writeAiNote(data as Video);
     return true;
   }
@@ -284,26 +276,6 @@ export default function Library({ userEmail }: { userEmail: string }) {
       }),
     [notify],
   );
-
-  // Finds the top-level folder named after a channel, creating it the first time.
-  async function channelFolder(channel: string): Promise<VideoCategory | null> {
-    const name = channel.trim().slice(0, 100);
-    const existing = folders.find((f) => f.parent_id === null && f.name.toLowerCase() === name.toLowerCase());
-    if (existing) return existing;
-
-    const topLevel = folders.filter((f) => f.parent_id === null);
-    const position = topLevel.length ? Math.max(...topLevel.map((f) => f.position)) + 1 : 0;
-    const { data, error } = await supabase
-      .from("video_categories")
-      .insert({ name, parent_id: null, position })
-      .select()
-      .single();
-    if (error) {
-      notify(error.message, true);
-      return null;
-    }
-    return data as VideoCategory;
-  }
 
   async function updateVideo(id: string, changes: Partial<Video>) {
     setVideos((prev) => prev.map((v) => (v.id === id ? { ...v, ...changes } : v)));
