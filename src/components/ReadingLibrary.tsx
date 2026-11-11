@@ -4,6 +4,7 @@ import ReportWriterLink from "@/components/ReportWriterLink";
 import { Tour, TourButton, useSectionTour } from "@/components/Tour";
 import BrandMark from "@/components/BrandMark";
 import Link from "next/link";
+import CategoryTag from "@/components/CategoryTag";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { usePointerDrag } from "@/lib/pointer-drag";
@@ -202,13 +203,17 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
 
   // A link that's already saved isn't added twice: its category opens and the saved one
   // gets a green ring for a few seconds.
-  function bringToTop(existing: Article) {
-    const where = categoryPath(existing.category_id) || "Uncategorized";
+  function pointAt(existing: Article) {
     openView(existing.category_id ? { kind: "category", id: existing.category_id } : { kind: "uncategorized" });
     setPeriod("any");
     setReadFilter("all");
     setFlashId(existing.id);
     setTimeout(() => setFlashId((id) => (id === existing.id ? null : id)), 4000);
+  }
+
+  function bringToTop(existing: Article) {
+    const where = categoryPath(existing.category_id) || "Uncategorized";
+    pointAt(existing);
     warn(`Duplicate: this is already saved here, in ${section.name} › ${where}.`);
   }
 
@@ -225,11 +230,15 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
   useEffect(() => {
     if (loading || shown.current) return;
     shown.current = true;
-    const id = new URLSearchParams(window.location.search).get("show");
+    const params = new URLSearchParams(window.location.search);
+    const id = params.get("show");
     if (!id) return;
     window.history.replaceState(null, "", section.path);
     const article = articles.find((a) => a.id === id);
-    if (article) bringToTop(article);
+    if (!article) return;
+    // ?show=id&find=1 comes from the article's own page: just open its category.
+    if (params.get("find")) pointAt(article);
+    else bringToTop(article);
     // Runs once, when the list first loads.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading]);
@@ -802,6 +811,8 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
                       key={article.id}
                       article={article}
                       categoryLabel={categoryPath(article.category_id) || "Uncategorized"}
+                      showCategory={searching || view.kind !== "category"}
+                      onShowCategory={() => pointAt(article)}
                       categoryOptions={categoryOptions}
                       onToggleRead={() => toggleRead(article)}
                       onMove={(categoryId) => moveArticle(article.id, categoryId)}
@@ -881,6 +892,9 @@ export function ReadCheck({ read, onClick, word = "read" }: { read: boolean; onC
 function ArticleRow(props: {
   article: Article;
   categoryLabel: string;
+  /** Show the category tag: on lists that mix categories (All, search). */
+  showCategory: boolean;
+  onShowCategory: () => void;
   categoryOptions: { id: string; label: string }[];
   onToggleRead: () => void;
   onMove: (categoryId: string | null) => void;
@@ -933,6 +947,7 @@ function ArticleRow(props: {
           )}
           {article.title || article.url}
         </Link>
+        {props.showCategory && <CategoryTag path={props.categoryLabel} onClick={props.onShowCategory} />}
         <p className="text-xs text-slate-500">
           {[article.site, article.author].filter(Boolean).join(" · ")}
           {" · "}Added {formatDate(article.created_at)}

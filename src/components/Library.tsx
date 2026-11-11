@@ -36,6 +36,7 @@ import {
   useItemSort,
 } from "@/components/FolderSort";
 import VideoThumb from "@/components/VideoThumb";
+import CategoryTag from "@/components/CategoryTag";
 import { findSavedElsewhere } from "@/lib/find-saved";
 import { createClient } from "@/lib/supabase/client";
 import type { VideoCategory, Video } from "@/lib/types";
@@ -1054,14 +1055,7 @@ function VideoCard(props: {
           {video.title}
         </a>
         {props.where && (
-          <button
-            onClick={props.onShowWhere}
-            title="Open this category"
-            className="inline-flex max-w-full items-center gap-1 self-start rounded-md bg-amber-50 px-1.5 py-0.5 text-xs font-medium text-amber-900 ring-1 ring-amber-200 hover:bg-amber-100"
-          >
-            <Ico icon={props.where === "Uncategorized" ? Inbox : FolderIcon} tone="amber" size={12} />
-            <span className="truncate">{props.where}</span>
-          </button>
+          <CategoryTag path={props.where} onClick={props.onShowWhere} />
         )}
         <p className="text-xs text-slate-500">
           {video.channel && `${video.channel} · `}Added {formatDate(video.created_at)}

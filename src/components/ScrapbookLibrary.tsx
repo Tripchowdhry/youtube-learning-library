@@ -3,7 +3,8 @@
 import { Tour, TourButton, useSectionTour } from "@/components/Tour";
 import BrandMark from "@/components/BrandMark";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import CategoryTag from "@/components/CategoryTag";
 import { usePointerDrag } from "@/lib/pointer-drag";
 import { isWithin, treeOptions, treePath } from "@/lib/category-tree";
 import CategoryTree from "@/components/CategoryTree";
@@ -70,6 +71,7 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
   const [period, setPeriod] = useState<Period>("any");
   const [showCategories, setShowCategories] = useState(false);
   const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [flashId, setFlashId] = useState<string | null>(null);
   const [draggingCategoryId, setDraggingCategoryId] = useState<string | null>(null);
   const [menu, setMenu] = useState<MenuState | null>(null);
   const closeMenu = useCallback(() => setMenu(null), []);
@@ -437,6 +439,28 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
     setShowCategories(false);
   }
 
+  // Opens a page's category and rings the page in green for a few seconds.
+  function pointAt(scrap: ScrapSummary) {
+    openView(scrap.category_id ? { kind: "category", id: scrap.category_id } : { kind: "uncategorized" });
+    setPeriod("any");
+    setFlashId(scrap.id);
+    setTimeout(() => setFlashId((id) => (id === scrap.id ? null : id)), 4000);
+  }
+
+  // Arriving from a page's own screen with ?show=id: open its category.
+  const shown = useRef(false);
+  useEffect(() => {
+    if (loading || shown.current) return;
+    shown.current = true;
+    const id = new URLSearchParams(window.location.search).get("show");
+    if (!id) return;
+    window.history.replaceState(null, "", "/scrapbook");
+    const scrap = scraps.find((s) => s.id === id);
+    if (scrap) pointAt(scrap);
+    // Runs once, when the list first loads.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading]);
+
   // ---------- Render ----------
 
   const title = searching
@@ -629,6 +653,9 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
                         key={scrap.id}
                         scrap={scrap}
                         categoryLabel={categoryPath(scrap.category_id) || "Uncategorized"}
+                        showCategory={searching || view.kind !== "category"}
+                        onShowCategory={() => pointAt(scrap)}
+                        flash={flashId === scrap.id}
                         categoryOptions={categoryOptions}
                         onMove={(categoryId) => moveScrap(scrap.id, categoryId)}
                         canReorder={canReorder}
@@ -669,6 +696,10 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
 function ScrapRow(props: {
   scrap: ScrapSummary;
   categoryLabel: string;
+  /** Show the category tag: on lists that mix categories (All, search). */
+  showCategory: boolean;
+  onShowCategory: () => void;
+  flash: boolean;
   categoryOptions: { id: string; label: string }[];
   onMove: (categoryId: string | null) => void;
   canReorder: boolean;
@@ -689,19 +720,23 @@ function ScrapRow(props: {
     canDrop: props.canReorder && !props.dragging,
     onDrop: props.onDropOnto,
   });
+  useEffect(() => {
+    if (props.flash) ref.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [props.flash, ref]);
   const preview = plainText(scrap.body);
   const edited = formatDate(scrap.updated_at);
   return (
     <li
       ref={ref}
       {...handlers}
-      className={`flex cursor-grab items-start gap-3 rounded-xl border bg-white p-3 shadow-sm transition ${props.dragging ? "opacity-40" : ""} ${over ? "border-blue-500 ring-2 ring-blue-500" : "border-slate-200"}`}
+      className={`flex cursor-grab items-start gap-3 rounded-xl border bg-white p-3 shadow-sm transition ${props.dragging ? "opacity-40" : ""} ${over ? "border-blue-500 ring-2 ring-blue-500" : props.flash ? "border-green-500 ring-4 ring-green-400" : "border-slate-200"}`}
     >
       <Ico icon={FileText} tone="sky" size={22} className="mt-0.5" />
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <Link href={`/scrap/${scrap.id}`} className="line-clamp-2 font-medium hover:underline">
           {scrap.title}
         </Link>
+        {props.showCategory && <CategoryTag path={props.categoryLabel} onClick={props.onShowCategory} />}
         <p className="text-xs text-slate-500">
           Created {formatDate(scrap.created_at)}
           {edited !== formatDate(scrap.created_at) && ` · Edited ${edited}`}
