@@ -99,7 +99,7 @@ export default function ReportsList({ userEmail }: { userEmail: string }) {
               <button
                 onClick={create}
                 disabled={creating}
-                className="flex items-center gap-1.5 rounded-md bg-[#2b3b5e] px-3 py-1.5 text-sm font-medium text-white hover:bg-[#22304d] disabled:opacity-60"
+                className="flex items-center gap-1.5 rounded-md bg-[#ece6ff] px-3 py-1.5 text-sm font-medium text-[#2b3b5e] ring-1 ring-[#d6cbfb] hover:bg-[#e2d9ff] disabled:opacity-60"
               >
                 <FilePlus2 size={16} aria-hidden />
                 {creating ? "Starting…" : "New report"}
