@@ -38,6 +38,7 @@ import VideoThumb from "@/components/VideoThumb";
 import { findSavedElsewhere } from "@/lib/find-saved";
 import { createClient } from "@/lib/supabase/client";
 import type { VideoCategory, Video } from "@/lib/types";
+import { isWithin } from "@/lib/category-tree";
 import { onAiJobDone, runAiJob, useAiJobs } from "@/lib/ai-jobs";
 import { askVideoAi } from "@/lib/video-ai";
 import { askConfirm } from "./ConfirmDialog";
@@ -421,25 +422,47 @@ export default function Library({ userEmail }: { userEmail: string }) {
     setView({ kind: "folder", id: (data as VideoCategory).id });
   }
 
-  // Drop one folder onto another next to it: it takes that folder's place, and the rest are renumbered so the order sticks.
+  // Drop a category onto another and it goes next to it, at that one's level. At the same level that just
+  // changes the order; onto one at another level (its parent, say) it moves up or down to that level, just below it.
   async function moveFolderTo(draggedId: string, targetId: string) {
-    const dragged = folders.find((f) => f.id === draggedId);
-    const target = folders.find((f) => f.id === targetId);
-    if (!dragged || !target || dragged.id === target.id || dragged.parent_id !== target.parent_id) return;
-    const siblings = childFolders(dragged.parent_id).filter((f) => f.id !== dragged.id);
-    const index = siblings.findIndex((f) => f.id === target.id);
-    const draggedIndex = childFolders(dragged.parent_id).findIndex((f) => f.id === dragged.id);
-    // Dragging down puts it after the target; dragging up puts it before.
-    siblings.splice(draggedIndex <= index ? index + 1 : index, 0, dragged);
-    const changed = siblings.map((f, position) => ({ id: f.id, position })).filter((f, i) => siblings[i].position !== f.position);
-    setFolders((prev) => prev.map((f) => ({ ...f, position: changed.find((c) => c.id === f.id)?.position ?? f.position })));
+    const dragged = folders.find((c) => c.id === draggedId);
+    const target = folders.find((c) => c.id === targetId);
+    // It can't go next to itself, or into one of its own subcategories.
+    if (!dragged || !target || isWithin(folders, target.id, dragged.id)) return;
+    const parent_id = target.parent_id;
+    const sameLevel = dragged.parent_id === parent_id;
+    const all = childFolders(parent_id);
+    const siblings = all.filter((c) => c.id !== dragged.id);
+    const index = siblings.findIndex((c) => c.id === target.id);
+    // Same level: dragging down puts it after the target, dragging up before it.
+    siblings.splice(sameLevel && all.indexOf(dragged) > index ? index : index + 1, 0, dragged);
+    const changed = siblings
+      .map((c, position) => ({ id: c.id, position }))
+      .filter((c, i) => siblings[i].position !== c.position || (!sameLevel && c.id === dragged.id));
+    setFolders((prev) =>
+      prev.map((c) => {
+        const m = changed.find((x) => x.id === c.id);
+        if (!m) return c;
+        return c.id === dragged.id ? { ...c, position: m.position, parent_id } : { ...c, position: m.position };
+      }),
+    );
     const results = await Promise.all(
-      changed.map((c) => supabase.from("video_categories").update({ position: c.position }).eq("id", c.id)),
+      changed.map((c) =>
+        supabase
+          .from("video_categories")
+          .update(c.id === dragged.id && !sameLevel ? { position: c.position, parent_id } : { position: c.position })
+          .eq("id", c.id),
+      ),
     );
     const failed = results.find((r) => r.error);
     if (failed) {
       notify(failed.error!.message, true);
       load();
+      return;
+    }
+    if (!sameLevel) {
+      const into = folders.find((c) => c.id === parent_id);
+      notify(into ? `Moved "${dragged.name}" into "${into.name}"` : `Moved "${dragged.name}" to the top level`);
     }
   }
 
@@ -884,10 +907,10 @@ function FolderTree(props: {
               active={props.activeId === folder.id}
               onClick={() => props.onOpen(folder.id)}
               indent={props.depth}
-              // A dragged video drops into the folder; a dragged folder reorders among folders next to it.
+              // A dragged video drops into the category; a dragged category goes next to this one, at its level.
               dropTarget={
                 props.draggingId !== null ||
-                (draggingFolder !== null && draggingFolder.id !== folder.id && draggingFolder.parent_id === folder.parent_id)
+                (draggingFolder !== null && !inTree(folder.id, draggingFolder.id))
               }
               onDrop={() => (draggingFolder ? props.onDropFolder(folder.id) : props.onDropVideo(folder.id))}
               onDragStart={props.canDragFolders ? () => props.onFolderDragStart(folder.id) : undefined}
