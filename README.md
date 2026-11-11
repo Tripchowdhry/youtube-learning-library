@@ -25,6 +25,7 @@ Built with Next.js, Tailwind CSS and Supabase. Hosted on Vercel.
    (Set up before notes existed? Run [`supabase/notes.sql`](supabase/notes.sql) the same way.)
    Then run [`supabase/clips.sql`](supabase/clips.sql) too. It creates the storage space for pictures you paste into notes.
    For the Reading, Tutorials, ScrapBook and Vault sections, also run [`supabase/articles.sql`](supabase/articles.sql), [`supabase/scrapbook.sql`](supabase/scrapbook.sql) and [`supabase/vault.sql`](supabase/vault.sql).
+   For Reports (Report Writer), run [`supabase/reports.sql`](supabase/reports.sql). It only adds its own two tables.
 3. Open **Project Settings → API** (or **Data API**) and copy the **Project URL** and the **anon public** key.
 
 ### 2. Turn on Google sign-in

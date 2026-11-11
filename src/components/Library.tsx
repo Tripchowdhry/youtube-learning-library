@@ -1,5 +1,6 @@
 "use client";
 
+import ReportWriterLink from "@/components/ReportWriterLink";
 import BrandMark from "@/components/BrandMark";
 import { WelcomePanel } from "@/components/GettingStarted";
 import { Tour, TourButton, useSectionTour } from "@/components/Tour";
@@ -658,6 +659,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
         </aside>
 
         <main className="min-w-0 flex-1 p-4 md:p-6">
+          <ReportWriterLink />
           <div className="mb-4 flex flex-wrap items-center gap-2">
             <h1 className="mr-auto text-2xl font-bold">{title}</h1>
             <TourButton onClick={tour.start} />
