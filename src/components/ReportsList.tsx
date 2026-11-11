@@ -3,10 +3,10 @@
 import BrandMark from "@/components/BrandMark";
 import { askConfirm } from "@/components/ConfirmDialog";
 import { Ico } from "@/components/Icon";
-import { SectionSwitch, SetupNotice, formatDate } from "@/components/ReadingLibrary";
+import { SetupNotice, formatDate } from "@/components/ReadingLibrary";
 import { isMissingTable, type Report } from "@/lib/report";
 import { createClient } from "@/lib/supabase/client";
-import { FilePlus2, ScrollText, Trash2 } from "lucide-react";
+import { ArrowLeft, FilePlus2, ScrollText, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -76,7 +76,9 @@ export default function ReportsList({ userEmail }: { userEmail: string }) {
     <div className="flex min-h-screen flex-col">
       <header className="sticky top-0 z-20 flex items-center gap-3 border-b border-slate-200 bg-white px-4 py-3">
         <BrandMark />
-        <SectionSwitch active="reports" />
+        <Link href="/" className="flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-sm text-slate-600 hover:bg-slate-100">
+          <ArrowLeft size={16} aria-hidden /> My library
+        </Link>
         <div className="ml-auto hidden items-center gap-2 text-sm text-slate-500 sm:flex">
           <span className="max-w-40 truncate">{userEmail}</span>
           <button onClick={signOut} className="rounded-md px-2 py-1 hover:bg-slate-100">
@@ -91,11 +93,13 @@ export default function ReportsList({ userEmail }: { userEmail: string }) {
         ) : (
           <>
             <div className="mb-2 flex flex-wrap items-center gap-2">
-              <h1 className="mr-auto text-2xl font-bold">Reports</h1>
+              <h1 className="mr-auto flex items-center gap-2 text-2xl font-bold text-emerald-700">
+                <ScrollText size={24} aria-hidden /> Report Writer
+              </h1>
               <button
                 onClick={create}
                 disabled={creating}
-                className="flex items-center gap-1.5 rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
+                className="flex items-center gap-1.5 rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-60"
               >
                 <FilePlus2 size={16} aria-hidden />
                 {creating ? "Starting…" : "New report"}
