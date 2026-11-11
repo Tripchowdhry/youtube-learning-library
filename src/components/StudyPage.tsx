@@ -20,7 +20,7 @@ import type { NoteImage, NotePage, NoteStroke, Video } from "@/lib/types";
 import { onAiJobDone, runAiJob, useAiJobs, useSecondsSince } from "@/lib/ai-jobs";
 import { askVideoAi } from "@/lib/video-ai";
 import { askConfirm } from "./ConfirmDialog";
-import { Brush, Camera, ClipboardPaste, FileText, Footprints, Keyboard, Lightbulb, List, PenLine, Sparkles, Timer, Trash2, TriangleAlert, type LucideIcon } from "lucide-react";
+import { Brush, Camera, ClipboardPaste, FileText, Folder, Footprints, Inbox, Keyboard, Lightbulb, List, PenLine, Sparkles, Timer, Trash2, TriangleAlert, type LucideIcon } from "lucide-react";
 import { Ico, type Tone } from "@/components/Icon";
 
 const PEN_COLORS = ["#111827", "#2563eb", "#dc2626", "#16a34a"];
@@ -85,6 +85,8 @@ function timesIn(text: string) {
 export default function StudyPage({ videoId }: { videoId: string }) {
   const supabase = useMemo(() => createClient(), []);
   const [video, setVideo] = useState<Video | null>(null);
+  // Where the video is filed, e.g. "AI › Agents", so you can see and jump back to it.
+  const [categoryPath, setCategoryPath] = useState<string | null>(null);
   const [missing, setMissing] = useState(false);
   const [pages, setPages] = useState<NotePage[]>([emptyPage()]);
   const [typed, setTyped] = useState("");
@@ -135,6 +137,22 @@ export default function StudyPage({ videoId }: { videoId: string }) {
         return;
       }
       setVideo(v.data as Video);
+      const categoryId = (v.data as Video).category_id;
+      if (categoryId) {
+        supabase
+          .from("video_categories")
+          .select("id, name, parent_id")
+          .then(({ data }) => {
+            const all = (data ?? []) as { id: string; name: string; parent_id: string | null }[];
+            const names: string[] = [];
+            let current = all.find((c) => c.id === categoryId);
+            while (current && names.length < 50) {
+              names.unshift(current.name);
+              current = all.find((c) => c.id === current!.parent_id);
+            }
+            setCategoryPath(names.join(" › ") || "Uncategorized");
+          });
+      } else setCategoryPath("Uncategorized");
       const saved = (n.data?.pages ?? []) as NotePage[];
       const savedText = (n.data?.text ?? "") as string;
       if (saved.length) setPages(saved);
@@ -599,7 +617,19 @@ export default function StudyPage({ videoId }: { videoId: string }) {
         <Link href="/" className="shrink-0 rounded-md px-2 py-1 text-sm hover:bg-slate-100">
           ← Library
         </Link>
-        <h1 className="min-w-0 flex-1 truncate font-semibold">{video?.title ?? "Loading…"}</h1>
+        <div className="min-w-0 flex-1">
+          <h1 className="truncate font-semibold leading-tight">{video?.title ?? "Loading…"}</h1>
+          {categoryPath && (
+            <Link
+              href={`/?show=${videoId}&find=1`}
+              title="Open this category in your library"
+              className="flex max-w-full items-center gap-1 truncate text-xs text-amber-800 hover:underline"
+            >
+              <Ico icon={categoryPath === "Uncategorized" ? Inbox : Folder} tone="amber" size={12} />
+              <span className="truncate">Videos › {categoryPath}</span>
+            </Link>
+          )}
+        </div>
         <SaveBadge state={saveState} onRetry={save} />
         <TourButton onClick={tour.start} />
         <button
