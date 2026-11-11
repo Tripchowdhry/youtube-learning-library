@@ -27,7 +27,7 @@ import type { Article, ArticleCategory, SectionKind } from "@/lib/types";
 import { askArticleAi } from "@/lib/video-ai";
 import { askConfirm } from "./ConfirmDialog";
 import { Ico, type Tone } from "./Icon";
-import { Images, Brush, FilePen, ExternalLink, FileText, GraduationCap, Inbox, LockKeyhole, NotebookPen, NotebookText, Pencil, Clapperboard, Sparkles, Tag, Trash2, TriangleAlert, type LucideIcon, ArrowUp, Copy, Eye, Link2, Link2Off } from "lucide-react";
+import { Images, Brush, FilePen, ExternalLink, FileText, GraduationCap, Inbox, LockKeyhole, NotebookPen, NotebookText, Pencil, Clapperboard, Sparkles, Tag, Trash2, TriangleAlert, type LucideIcon, ArrowUp, Copy, Eye, Link2, Link2Off, ScrollText } from "lucide-react";
 import { SectionWelcome } from "./GettingStarted";
 
 type AiNote = { articleId: string; note: string; model?: string };
@@ -819,8 +819,8 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
 
 // ---------- Pieces ----------
 
-// The Videos | Reading | Tutorials | ScrapBook switch in the header of every section.
-export function SectionSwitch({ active }: { active: "videos" | SectionKind | "scrap" | "vault" }) {
+// The Videos | Reading | Tutorials | ScrapBook | Vault | Reports switch in the header of every section.
+export function SectionSwitch({ active }: { active: "videos" | SectionKind | "scrap" | "vault" | "reports" }) {
   const tab = (on: boolean) =>
     `flex items-center gap-1.5 rounded-md px-2.5 py-1 text-sm font-medium ${on ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:text-slate-900"}`;
   const items: { key: string; href: string; name: string; Icon: LucideIcon; tone: Tone }[] = [
@@ -829,13 +829,15 @@ export function SectionSwitch({ active }: { active: "videos" | SectionKind | "sc
     { key: "tutorial", href: "/tutorials", name: "Tutorials", Icon: GraduationCap, tone: "indigo" },
     { key: "scrap", href: "/scrapbook", name: "ScrapBook", Icon: NotebookPen, tone: "amber" },
     { key: "vault", href: "/vault", name: "Vault", Icon: LockKeyhole, tone: "yellow" },
+    { key: "reports", href: "/reports", name: "Reports", Icon: ScrollText, tone: "green" },
   ];
   return (
     <nav className="flex shrink-0 rounded-lg bg-slate-100 p-0.5">
       {items.map(({ key, href, name, Icon, tone }) => (
         <Link key={key} href={href} className={tab(active === key)} title={name}>
           <Ico icon={Icon} tone={tone} />
-          <span className="hidden sm:inline">{name}</span>
+          {/* Reports shows its name only on wide screens, so the header doesn't get any wider than before. */}
+          <span className={key === "reports" ? "hidden xl:inline" : "hidden sm:inline"}>{name}</span>
         </Link>
       ))}
     </nav>
