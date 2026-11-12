@@ -3,7 +3,6 @@
 import { Tour, TourButton, useSectionTour } from "@/components/Tour";
 import BrandMark from "@/components/BrandMark";
 import Link from "next/link";
-import ClipsIcon from "@/components/ClipsIcon";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import CategoryTag from "@/components/CategoryTag";
 import { usePointerDrag } from "@/lib/pointer-drag";
@@ -34,7 +33,7 @@ import {
 import { SectionWelcome } from "@/components/GettingStarted";
 import { createClient } from "@/lib/supabase/client";
 import type { ArticleCategory, Scrap } from "@/lib/types";
-import { ArrowUp, Copy, Eye, FileText, Link2, Link2Off, Inbox, NotebookPen, Pencil, Tag, Trash2 } from "lucide-react";
+import { Images, ArrowUp, Copy, Eye, FileText, Link2, Link2Off, Inbox, NotebookPen, Pencil, Tag, Trash2 } from "lucide-react";
 import { Ico } from "@/components/Icon";
 
 type View = { kind: "all" } | { kind: "uncategorized" } | { kind: "category"; id: string };
@@ -495,7 +494,7 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
           className="flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1 text-sm text-slate-600 hover:bg-slate-100"
           title="See and delete your clips to free up space"
         >
-          <ClipsIcon size={20} />
+          <Ico icon={Images} tone="sky" />
           Clips
         </Link>
         <div className="hidden items-center gap-2 text-sm text-slate-500 sm:flex">

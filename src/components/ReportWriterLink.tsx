@@ -1,7 +1,7 @@
 import { ChevronRight } from "lucide-react";
 import Link from "next/link";
 
-// Report Writer's own icon: a report with charts and a pen. Its navy (#2b3b5e) is used
+// Report Writer's own icon: a page of notes with a sparkle. Its navy (#2b3b5e) is used
 // for Report Writer's text; its buttons have a soft lavender background.
 export function ReportIcon({ size = 16, className }: { size?: number; className?: string }) {
   return (

@@ -2,7 +2,6 @@
 
 import { Tour, TourButton, useSectionTour } from "@/components/Tour";
 import Link from "next/link";
-import ClipsIcon from "@/components/ClipsIcon";
 import { CategoryCrumb } from "@/components/CategoryTag";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import NotePageCanvas, { PAGE_HEIGHT, type Tool } from "@/components/NotePageCanvas";
@@ -1065,7 +1064,7 @@ function Toolbar(props: {
             : "Put a screenshot of the video into your notes"
         }
       >
-        {props.waitingForPaste ? <Ico icon={ClipboardPaste} tone="amber" size={16} /> : <ClipsIcon size={18} />}
+        <Ico icon={props.waitingForPaste ? ClipboardPaste : Camera} tone={props.waitingForPaste ? "amber" : "slate"} size={16} />
         {props.waitingForPaste ? "Paste clip" : "Clip"}
       </button>
       {props.waitingForPaste && (
