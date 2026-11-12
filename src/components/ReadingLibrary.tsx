@@ -4,6 +4,7 @@ import ReportWriterLink from "@/components/ReportWriterLink";
 import { Tour, TourButton, useSectionTour } from "@/components/Tour";
 import BrandMark from "@/components/BrandMark";
 import Link from "next/link";
+import CategoryTag from "@/components/CategoryTag";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { usePointerDrag } from "@/lib/pointer-drag";
@@ -153,9 +154,6 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
   const categoryOptions = useMemo(() => treeOptions(childCategories), [childCategories]);
 
   const canDragCategories = true;
-  const categorySiblings = (category: ArticleCategory) =>
-    childCategories(category.parent_id);
-
   const currentCategory = view.kind === "category" ? categories.find((c) => c.id === view.id) ?? null : null;
 
   // A category shows its own articles plus those in every category inside it.
@@ -205,13 +203,17 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
 
   // A link that's already saved isn't added twice: its category opens and the saved one
   // gets a green ring for a few seconds.
-  function bringToTop(existing: Article) {
-    const where = categoryPath(existing.category_id) || "Uncategorized";
+  function pointAt(existing: Article) {
     openView(existing.category_id ? { kind: "category", id: existing.category_id } : { kind: "uncategorized" });
     setPeriod("any");
     setReadFilter("all");
     setFlashId(existing.id);
     setTimeout(() => setFlashId((id) => (id === existing.id ? null : id)), 4000);
+  }
+
+  function bringToTop(existing: Article) {
+    const where = categoryPath(existing.category_id) || "Uncategorized";
+    pointAt(existing);
     warn(`Duplicate: this is already saved here, in ${section.name} › ${where}.`);
   }
 
@@ -228,11 +230,15 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
   useEffect(() => {
     if (loading || shown.current) return;
     shown.current = true;
-    const id = new URLSearchParams(window.location.search).get("show");
+    const params = new URLSearchParams(window.location.search);
+    const id = params.get("show");
     if (!id) return;
     window.history.replaceState(null, "", section.path);
     const article = articles.find((a) => a.id === id);
-    if (article) bringToTop(article);
+    if (!article) return;
+    // ?show=id&find=1 comes from the article's own page: just open its category.
+    if (params.get("find")) pointAt(article);
+    else bringToTop(article);
     // Runs once, when the list first loads.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading]);
@@ -429,25 +435,47 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
     openView({ kind: "category", id: (data as ArticleCategory).id });
   }
 
-  // Drop one category onto another next to it: it takes that one's place, and the rest are renumbered so the order sticks.
+  // Drop a category onto another and it goes next to it, at that one's level. At the same level that just
+  // changes the order; onto one at another level (its parent, say) it moves up or down to that level, just below it.
   async function moveCategoryTo(draggedId: string, targetId: string) {
     const dragged = categories.find((c) => c.id === draggedId);
     const target = categories.find((c) => c.id === targetId);
-    if (!dragged || !target || dragged.id === target.id || dragged.parent_id !== target.parent_id) return;
-    const all = categorySiblings(dragged);
+    // It can't go next to itself, or into one of its own subcategories.
+    if (!dragged || !target || isWithin(categories, target.id, dragged.id)) return;
+    const parent_id = target.parent_id;
+    const sameLevel = dragged.parent_id === parent_id;
+    const all = childCategories(parent_id);
     const siblings = all.filter((c) => c.id !== dragged.id);
     const index = siblings.findIndex((c) => c.id === target.id);
-    // Dragging down puts it after the target; dragging up puts it before.
-    siblings.splice(all.indexOf(dragged) <= index ? index + 1 : index, 0, dragged);
-    const changed = siblings.map((c, position) => ({ id: c.id, position })).filter((c, i) => siblings[i].position !== c.position);
-    setCategories((prev) => prev.map((c) => ({ ...c, position: changed.find((x) => x.id === c.id)?.position ?? c.position })));
+    // Same level: dragging down puts it after the target, dragging up before it.
+    siblings.splice(sameLevel && all.indexOf(dragged) > index ? index : index + 1, 0, dragged);
+    const changed = siblings
+      .map((c, position) => ({ id: c.id, position }))
+      .filter((c, i) => siblings[i].position !== c.position || (!sameLevel && c.id === dragged.id));
+    setCategories((prev) =>
+      prev.map((c) => {
+        const m = changed.find((x) => x.id === c.id);
+        if (!m) return c;
+        return c.id === dragged.id ? { ...c, position: m.position, parent_id } : { ...c, position: m.position };
+      }),
+    );
     const results = await Promise.all(
-      changed.map((c) => supabase.from("article_categories").update({ position: c.position }).eq("id", c.id)),
+      changed.map((c) =>
+        supabase
+          .from("article_categories")
+          .update(c.id === dragged.id && !sameLevel ? { position: c.position, parent_id } : { position: c.position })
+          .eq("id", c.id),
+      ),
     );
     const failed = results.find((r) => r.error);
     if (failed) {
       notify(failed.error!.message, true);
       load();
+      return;
+    }
+    if (!sameLevel) {
+      const into = categories.find((c) => c.id === parent_id);
+      notify(into ? `Moved "${dragged.name}" into "${into.name}"` : `Moved "${dragged.name}" to the top level`);
     }
   }
 
@@ -495,7 +523,7 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
   const dropOnCategory = (category: ArticleCategory) => {
     if (draggingId) return () => moveArticle(draggingId, category.id);
     const dragged = categories.find((c) => c.id === draggingCategoryId);
-    if (dragged && dragged.id !== category.id && dragged.parent_id === category.parent_id) {
+    if (dragged && !isWithin(categories, category.id, dragged.id)) {
       return () => {
         moveCategoryTo(dragged.id, category.id);
         // Dragging sets your own order, so the list switches to "My order" and keeps it.
@@ -783,6 +811,8 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
                       key={article.id}
                       article={article}
                       categoryLabel={categoryPath(article.category_id) || "Uncategorized"}
+                      showCategory={searching || view.kind !== "category"}
+                      onShowCategory={() => pointAt(article)}
                       categoryOptions={categoryOptions}
                       onToggleRead={() => toggleRead(article)}
                       onMove={(categoryId) => moveArticle(article.id, categoryId)}
@@ -862,6 +892,9 @@ export function ReadCheck({ read, onClick, word = "read" }: { read: boolean; onC
 function ArticleRow(props: {
   article: Article;
   categoryLabel: string;
+  /** Show the category tag: on lists that mix categories (All, search). */
+  showCategory: boolean;
+  onShowCategory: () => void;
   categoryOptions: { id: string; label: string }[];
   onToggleRead: () => void;
   onMove: (categoryId: string | null) => void;
@@ -914,6 +947,7 @@ function ArticleRow(props: {
           )}
           {article.title || article.url}
         </Link>
+        {props.showCategory && <CategoryTag path={props.categoryLabel} onClick={props.onShowCategory} />}
         <p className="text-xs text-slate-500">
           {[article.site, article.author].filter(Boolean).join(" · ")}
           {" · "}Added {formatDate(article.created_at)}

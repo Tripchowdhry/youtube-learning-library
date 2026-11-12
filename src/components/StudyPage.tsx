@@ -2,6 +2,7 @@
 
 import { Tour, TourButton, useSectionTour } from "@/components/Tour";
 import Link from "next/link";
+import { CategoryCrumb } from "@/components/CategoryTag";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import NotePageCanvas, { PAGE_HEIGHT, type Tool } from "@/components/NotePageCanvas";
 import { DeleteClipButton } from "@/components/ClipButtons";
@@ -85,6 +86,8 @@ function timesIn(text: string) {
 export default function StudyPage({ videoId }: { videoId: string }) {
   const supabase = useMemo(() => createClient(), []);
   const [video, setVideo] = useState<Video | null>(null);
+  // Where the video is filed, e.g. "AI › Agents", so you can see and jump back to it.
+  const [categoryPath, setCategoryPath] = useState<string | null>(null);
   const [missing, setMissing] = useState(false);
   const [pages, setPages] = useState<NotePage[]>([emptyPage()]);
   const [typed, setTyped] = useState("");
@@ -135,6 +138,22 @@ export default function StudyPage({ videoId }: { videoId: string }) {
         return;
       }
       setVideo(v.data as Video);
+      const categoryId = (v.data as Video).category_id;
+      if (categoryId) {
+        supabase
+          .from("video_categories")
+          .select("id, name, parent_id")
+          .then(({ data }) => {
+            const all = (data ?? []) as { id: string; name: string; parent_id: string | null }[];
+            const names: string[] = [];
+            let current = all.find((c) => c.id === categoryId);
+            while (current && names.length < 50) {
+              names.unshift(current.name);
+              current = all.find((c) => c.id === current!.parent_id);
+            }
+            setCategoryPath(names.join(" › ") || "Uncategorized");
+          });
+      } else setCategoryPath("Uncategorized");
       const saved = (n.data?.pages ?? []) as NotePage[];
       const savedText = (n.data?.text ?? "") as string;
       if (saved.length) setPages(saved);
@@ -599,7 +618,12 @@ export default function StudyPage({ videoId }: { videoId: string }) {
         <Link href="/" className="shrink-0 rounded-md px-2 py-1 text-sm hover:bg-slate-100">
           ← Library
         </Link>
-        <h1 className="min-w-0 flex-1 truncate font-semibold">{video?.title ?? "Loading…"}</h1>
+        <div className="min-w-0 flex-1">
+          <h1 className="truncate font-semibold leading-tight">{video?.title ?? "Loading…"}</h1>
+          {categoryPath && (
+            <CategoryCrumb section="Videos" path={categoryPath} href={`/?show=${videoId}&find=1`} />
+          )}
+        </div>
         <SaveBadge state={saveState} onRetry={save} />
         <TourButton onClick={tour.start} />
         <button

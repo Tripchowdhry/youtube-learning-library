@@ -3,7 +3,8 @@
 import { Tour, TourButton, useSectionTour } from "@/components/Tour";
 import BrandMark from "@/components/BrandMark";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import CategoryTag from "@/components/CategoryTag";
 import { usePointerDrag } from "@/lib/pointer-drag";
 import { isWithin, treeOptions, treePath } from "@/lib/category-tree";
 import CategoryTree from "@/components/CategoryTree";
@@ -70,6 +71,7 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
   const [period, setPeriod] = useState<Period>("any");
   const [showCategories, setShowCategories] = useState(false);
   const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [flashId, setFlashId] = useState<string | null>(null);
   const [draggingCategoryId, setDraggingCategoryId] = useState<string | null>(null);
   const [menu, setMenu] = useState<MenuState | null>(null);
   const closeMenu = useCallback(() => setMenu(null), []);
@@ -127,9 +129,6 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
   const categoryOptions = useMemo(() => treeOptions(childCategories), [childCategories]);
 
   const canDragCategories = true;
-  const categorySiblings = (category: ArticleCategory) =>
-    childCategories(category.parent_id);
-
   const currentCategory = view.kind === "category" ? categories.find((c) => c.id === view.id) ?? null : null;
 
   // A category shows its own pages plus those in every category inside it.
@@ -272,24 +271,47 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
     openView({ kind: "category", id: (data as ArticleCategory).id });
   }
 
-  // Drop one category onto another next to it: it takes that one's place, and the rest are renumbered so the order sticks.
+  // Drop a category onto another and it goes next to it, at that one's level. At the same level that just
+  // changes the order; onto one at another level (its parent, say) it moves up or down to that level, just below it.
   async function moveCategoryTo(draggedId: string, targetId: string) {
     const dragged = categories.find((c) => c.id === draggedId);
     const target = categories.find((c) => c.id === targetId);
-    if (!dragged || !target || dragged.id === target.id || dragged.parent_id !== target.parent_id) return;
-    const all = categorySiblings(dragged);
+    // It can't go next to itself, or into one of its own subcategories.
+    if (!dragged || !target || isWithin(categories, target.id, dragged.id)) return;
+    const parent_id = target.parent_id;
+    const sameLevel = dragged.parent_id === parent_id;
+    const all = childCategories(parent_id);
     const siblings = all.filter((c) => c.id !== dragged.id);
     const index = siblings.findIndex((c) => c.id === target.id);
-    siblings.splice(all.indexOf(dragged) <= index ? index + 1 : index, 0, dragged);
-    const changed = siblings.map((c, position) => ({ id: c.id, position })).filter((c, i) => siblings[i].position !== c.position);
-    setCategories((prev) => prev.map((c) => ({ ...c, position: changed.find((x) => x.id === c.id)?.position ?? c.position })));
+    // Same level: dragging down puts it after the target, dragging up before it.
+    siblings.splice(sameLevel && all.indexOf(dragged) > index ? index : index + 1, 0, dragged);
+    const changed = siblings
+      .map((c, position) => ({ id: c.id, position }))
+      .filter((c, i) => siblings[i].position !== c.position || (!sameLevel && c.id === dragged.id));
+    setCategories((prev) =>
+      prev.map((c) => {
+        const m = changed.find((x) => x.id === c.id);
+        if (!m) return c;
+        return c.id === dragged.id ? { ...c, position: m.position, parent_id } : { ...c, position: m.position };
+      }),
+    );
     const results = await Promise.all(
-      changed.map((c) => supabase.from("article_categories").update({ position: c.position }).eq("id", c.id)),
+      changed.map((c) =>
+        supabase
+          .from("article_categories")
+          .update(c.id === dragged.id && !sameLevel ? { position: c.position, parent_id } : { position: c.position })
+          .eq("id", c.id),
+      ),
     );
     const failed = results.find((r) => r.error);
     if (failed) {
       notify(failed.error!.message, true);
       load();
+      return;
+    }
+    if (!sameLevel) {
+      const into = categories.find((c) => c.id === parent_id);
+      notify(into ? `Moved "${dragged.name}" into "${into.name}"` : `Moved "${dragged.name}" to the top level`);
     }
   }
 
@@ -337,7 +359,7 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
   const dropOnCategory = (category: ArticleCategory) => {
     if (draggingId) return () => moveScrap(draggingId, category.id);
     const dragged = categories.find((c) => c.id === draggingCategoryId);
-    if (dragged && dragged.id !== category.id && dragged.parent_id === category.parent_id) {
+    if (dragged && !isWithin(categories, category.id, dragged.id)) {
       return () => {
         moveCategoryTo(dragged.id, category.id);
         // Dragging sets your own order, so the list switches to "My order" and keeps it.
@@ -416,6 +438,28 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
     setQuery("");
     setShowCategories(false);
   }
+
+  // Opens a page's category and rings the page in green for a few seconds.
+  function pointAt(scrap: ScrapSummary) {
+    openView(scrap.category_id ? { kind: "category", id: scrap.category_id } : { kind: "uncategorized" });
+    setPeriod("any");
+    setFlashId(scrap.id);
+    setTimeout(() => setFlashId((id) => (id === scrap.id ? null : id)), 4000);
+  }
+
+  // Arriving from a page's own screen with ?show=id: open its category.
+  const shown = useRef(false);
+  useEffect(() => {
+    if (loading || shown.current) return;
+    shown.current = true;
+    const id = new URLSearchParams(window.location.search).get("show");
+    if (!id) return;
+    window.history.replaceState(null, "", "/scrapbook");
+    const scrap = scraps.find((s) => s.id === id);
+    if (scrap) pointAt(scrap);
+    // Runs once, when the list first loads.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading]);
 
   // ---------- Render ----------
 
@@ -609,6 +653,9 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
                         key={scrap.id}
                         scrap={scrap}
                         categoryLabel={categoryPath(scrap.category_id) || "Uncategorized"}
+                        showCategory={searching || view.kind !== "category"}
+                        onShowCategory={() => pointAt(scrap)}
+                        flash={flashId === scrap.id}
                         categoryOptions={categoryOptions}
                         onMove={(categoryId) => moveScrap(scrap.id, categoryId)}
                         canReorder={canReorder}
@@ -649,6 +696,10 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
 function ScrapRow(props: {
   scrap: ScrapSummary;
   categoryLabel: string;
+  /** Show the category tag: on lists that mix categories (All, search). */
+  showCategory: boolean;
+  onShowCategory: () => void;
+  flash: boolean;
   categoryOptions: { id: string; label: string }[];
   onMove: (categoryId: string | null) => void;
   canReorder: boolean;
@@ -669,19 +720,23 @@ function ScrapRow(props: {
     canDrop: props.canReorder && !props.dragging,
     onDrop: props.onDropOnto,
   });
+  useEffect(() => {
+    if (props.flash) ref.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [props.flash, ref]);
   const preview = plainText(scrap.body);
   const edited = formatDate(scrap.updated_at);
   return (
     <li
       ref={ref}
       {...handlers}
-      className={`flex cursor-grab items-start gap-3 rounded-xl border bg-white p-3 shadow-sm transition ${props.dragging ? "opacity-40" : ""} ${over ? "border-blue-500 ring-2 ring-blue-500" : "border-slate-200"}`}
+      className={`flex cursor-grab items-start gap-3 rounded-xl border bg-white p-3 shadow-sm transition ${props.dragging ? "opacity-40" : ""} ${over ? "border-blue-500 ring-2 ring-blue-500" : props.flash ? "border-green-500 ring-4 ring-green-400" : "border-slate-200"}`}
     >
       <Ico icon={FileText} tone="sky" size={22} className="mt-0.5" />
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <Link href={`/scrap/${scrap.id}`} className="line-clamp-2 font-medium hover:underline">
           {scrap.title}
         </Link>
+        {props.showCategory && <CategoryTag path={props.categoryLabel} onClick={props.onShowCategory} />}
         <p className="text-xs text-slate-500">
           Created {formatDate(scrap.created_at)}
           {edited !== formatDate(scrap.created_at) && ` · Edited ${edited}`}

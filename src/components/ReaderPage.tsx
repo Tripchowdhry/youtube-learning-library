@@ -8,6 +8,8 @@ import { fileViewLink } from "@/lib/links";
 import { createClient } from "@/lib/supabase/client";
 import type { Article, ArticleContent } from "@/lib/types";
 import { ExternalLink, FilePen, NotebookText, Pencil } from "lucide-react";
+import { CategoryCrumb } from "@/components/CategoryTag";
+import { treePath, type TreeNode } from "@/lib/category-tree";
 import { Ico } from "@/components/Icon";
 
 // How long the end of the article must stay on screen before it counts as read.
@@ -39,6 +41,8 @@ function loadTwitter(): Promise<TwitterWidgets> {
 export default function ReaderPage({ articleId }: { articleId: string }) {
   const supabase = useMemo(() => createClient(), []);
   const [article, setArticle] = useState<Article | null>(null);
+  // Where the article is filed, e.g. "AI › Agents", shown under the title.
+  const [categoryPath, setCategoryPath] = useState<string | null>(null);
   const [missing, setMissing] = useState(false);
   const [content, setContent] = useState<ArticleContent | null>(null);
   // True once the post or text is on screen, so the end marker only counts after that.
@@ -62,6 +66,12 @@ export default function ReaderPage({ articleId }: { articleId: string }) {
       const { data } = await supabase.from("articles").select("*").eq("id", articleId).maybeSingle();
       if (!data) return setMissing(true);
       setArticle(data as Article);
+      if (data.category_id) {
+        supabase
+          .from("article_categories")
+          .select("id, name, parent_id")
+          .then(({ data: cats }) => setCategoryPath(treePath((cats ?? []) as TreeNode[], data.category_id) || "Uncategorized"));
+      } else setCategoryPath("Uncategorized");
       // Already-read articles shouldn't be re-marked after someone unticks them here.
       if (data.read_at) autoMarked.current = true;
       try {
@@ -160,7 +170,12 @@ export default function ReaderPage({ articleId }: { articleId: string }) {
         <Link href={section.path} className="shrink-0 rounded-md px-2 py-1 text-sm text-slate-600 hover:bg-slate-100">
           ← {section.name}
         </Link>
-        <span className="min-w-0 flex-1 truncate font-medium">{article?.title}</span>
+        <div className="min-w-0 flex-1">
+          <p className="truncate font-medium leading-tight">{article?.title}</p>
+          {article && categoryPath && (
+            <CategoryCrumb section={section.name} path={categoryPath} href={`${section.path}?show=${article.id}&find=1`} />
+          )}
+        </div>
         {article && (
           <>
             <a
