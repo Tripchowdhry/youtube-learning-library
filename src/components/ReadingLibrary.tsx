@@ -4,6 +4,7 @@ import ReportWriterLink from "@/components/ReportWriterLink";
 import { Tour, TourButton, useSectionTour } from "@/components/Tour";
 import BrandMark from "@/components/BrandMark";
 import Link from "next/link";
+import ClipsIcon from "@/components/ClipsIcon";
 import CategoryTag from "@/components/CategoryTag";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -29,7 +30,7 @@ import type { Article, ArticleCategory, SectionKind } from "@/lib/types";
 import { askArticleAi } from "@/lib/video-ai";
 import { askConfirm } from "./ConfirmDialog";
 import { Ico, type Tone } from "./Icon";
-import { Images, Brush, FilePen, ExternalLink, FileText, GraduationCap, Inbox, LockKeyhole, NotebookPen, NotebookText, Pencil, Clapperboard, Sparkles, Tag, Trash2, TriangleAlert, type LucideIcon, ArrowUp, Copy, Eye, Link2, Link2Off } from "lucide-react";
+import { Brush, FilePen, ExternalLink, FileText, GraduationCap, Inbox, LockKeyhole, NotebookPen, NotebookText, Pencil, Clapperboard, Sparkles, Tag, Trash2, TriangleAlert, type LucideIcon, ArrowUp, Copy, Eye, Link2, Link2Off } from "lucide-react";
 import { SectionWelcome } from "./GettingStarted";
 
 type AiNote = { articleId: string; note: string; model?: string };
@@ -638,7 +639,7 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
           className="flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1 text-sm text-slate-600 hover:bg-slate-100"
           title="See and delete your clips to free up space"
         >
-          <Ico icon={Images} tone="sky" />
+          <ClipsIcon size={20} />
           Clips
         </Link>
         <div className="hidden items-center gap-2 text-sm text-slate-500 sm:flex">

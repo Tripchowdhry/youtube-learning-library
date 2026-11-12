@@ -1,6 +1,7 @@
 "use client";
 
-import { Camera, Trash2 } from "lucide-react";
+import { Trash2 } from "lucide-react";
+import ClipsIcon from "@/components/ClipsIcon";
 import { Ico } from "@/components/Icon";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -117,7 +118,10 @@ export default function ClipsManager() {
         <Link href="/" className="rounded-md px-2 py-1 text-sm hover:bg-slate-100">
           ← Library
         </Link>
-        <h1 className="text-lg font-bold">Manage clips</h1>
+        <h1 className="flex items-center gap-2 text-lg font-bold">
+          <ClipsIcon size={28} />
+          Manage clips
+        </h1>
       </header>
 
       <main className="mx-auto flex max-w-3xl flex-col gap-4 p-4">
@@ -157,7 +161,7 @@ export default function ClipsManager() {
             </section>
 
             {clips.length === 0 ? (
-              <p className="text-slate-500">No clips yet. Press <Ico icon={Camera} tone="slate" size={14} className="inline align-[-2px]" /> Clip in the notes of a video, an article or a ScrapBook page to add one.</p>
+              <p className="text-slate-500">No clips yet. Press <ClipsIcon size={16} className="align-[-3px]" /> Clip in the notes of a video, an article or a ScrapBook page to add one.</p>
             ) : (
               <>
                 <div className="flex items-center gap-2 text-sm">
