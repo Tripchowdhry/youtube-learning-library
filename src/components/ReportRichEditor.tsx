@@ -5,7 +5,7 @@
 // Copy and Download Word read, so nothing else changes.
 
 import { useEffect, useRef, useState } from "react";
-import { Bold, Link2, List, ListOrdered, Quote, Redo2, Undo2, type LucideIcon } from "lucide-react";
+import { Bold, Italic, Link2, List, ListOrdered, Quote, Redo2, Underline, Undo2, type LucideIcon } from "lucide-react";
 import { parseReport, type Block, type Inline } from "@/lib/report";
 
 type Resolve = (src: string) => string;
@@ -27,6 +27,8 @@ function inlineHtml(parts: Inline[]) {
     .map((p) => {
       let html = esc(p.text);
       if (p.bold) html = `<strong>${html}</strong>`;
+      if (p.italic) html = `<em>${html}</em>`;
+      if (p.underline) html = `<u>${html}</u>`;
       if (p.href) html = `<a href="${esc(p.href)}">${html}</a>`;
       return html;
     })
@@ -64,25 +66,42 @@ export function editorHtml(blocks: Block[], resolve: Resolve) {
 
 // ---------- Editor HTML → report text ----------
 
-function inlineText(node: Node, bold = false): string {
+type Mark = "bold" | "italic" | "underline";
+const WRAP: Record<Mark, string> = { bold: "**", italic: "_", underline: "++" };
+
+// The marks an element adds: by its tag, or by its style (text pasted from Word or the web).
+function marksOf(el: HTMLElement): Mark[] {
+  const tag = el.tagName;
+  const out: Mark[] = [];
+  if (tag === "STRONG" || tag === "B" || /^(bold|[6-9]00)$/.test(el.style.fontWeight)) out.push("bold");
+  if (tag === "EM" || tag === "I" || el.style.fontStyle === "italic") out.push("italic");
+  if (tag === "U" || /underline/.test(el.style.textDecoration || el.style.textDecorationLine)) out.push("underline");
+  return out;
+}
+
+function inlineText(node: Node, active: Set<Mark> = new Set()): string {
   if (node.nodeType === Node.TEXT_NODE) return (node.textContent ?? "").replace(/\s+/g, " ");
   if (!(node instanceof HTMLElement)) return "";
   const tag = node.tagName;
   if (tag === "BR") return " ";
-  const isBold = tag === "STRONG" || tag === "B" || /^(bold|[6-9]00)$/.test(node.style.fontWeight);
+  const added = marksOf(node).filter((m) => !active.has(m));
   const inner = Array.from(node.childNodes)
-    .map((c) => inlineText(c, bold || isBold))
+    .map((c) => inlineText(c, new Set([...active, ...added])))
     .join("");
+  let out = inner;
+  const t = inner.trim();
+  if (t && added.length) {
+    // Bold outside, then italic, then underline: **_x_** style nesting the parser reads back.
+    const open = added.map((m) => WRAP[m]).join("");
+    const close = [...added].reverse().map((m) => WRAP[m]).join("");
+    out = inner.replace(t, `${open}${t}${close}`);
+  }
   if (tag === "A") {
     const href = node.getAttribute("href") ?? "";
-    const text = inner.trim();
-    return /^https?:\/\//.test(href) && text ? (text === href ? href : `[${text}](${href})`) : inner;
+    const text = out.trim();
+    return /^https?:\/\//.test(href) && text ? (inner.trim() === href ? href : `[${text}](${href})`) : out;
   }
-  if (isBold && !bold) {
-    const t = inner.trim();
-    return t ? inner.replace(t, `**${t}**`) : inner;
-  }
-  return inner;
+  return out;
 }
 
 const BLOCK_TAGS = new Set(["P", "DIV", "H1", "H2", "H3", "H4", "H5", "H6", "UL", "OL", "BLOCKQUOTE", "FIGURE", "SECTION", "ARTICLE"]);
@@ -146,7 +165,7 @@ export default function ReportRichEditor({ body, onChange, resolve }: { body: st
   const lastEmitted = useRef<string | null>(null);
   const savedRange = useRef<Range | null>(null);
   const [style, setStyle] = useState<Style | "">("p");
-  const [bold, setBold] = useState(false);
+  const [marks, setMarks] = useState({ bold: false, italic: false, underline: false });
   const [linking, setLinking] = useState<string | null>(null);
 
   // Show the report, unless the change came from typing here (that would move the cursor).
@@ -164,7 +183,11 @@ export default function ReportRichEditor({ body, onChange, resolve }: { body: st
       savedRange.current = sel.getRangeAt(0).cloneRange();
       const block = String(document.queryCommandValue("formatBlock") || "p").toLowerCase();
       setStyle((STYLES.some((s) => s.value === block) ? block : block === "div" ? "p" : "") as Style | "");
-      setBold(document.queryCommandState("bold"));
+      setMarks({
+        bold: document.queryCommandState("bold"),
+        italic: document.queryCommandState("italic"),
+        underline: document.queryCommandState("underline"),
+      });
     };
     document.addEventListener("selectionchange", update);
     return () => document.removeEventListener("selectionchange", update);
@@ -177,7 +200,10 @@ export default function ReportRichEditor({ body, onChange, resolve }: { body: st
     onChange(next);
   };
 
+  // Puts the cursor back after using the toolbar's menu or link box. Left alone when the editor
+  // still has it, so a pending style (Bold then Underline before typing) isn't lost.
   const restore = () => {
+    if (document.activeElement === ref.current) return;
     ref.current?.focus();
     const r = savedRange.current;
     if (r) {
@@ -241,7 +267,9 @@ export default function ReportRichEditor({ body, onChange, resolve }: { body: st
           ))}
         </select>
         <Divider />
-        <ToolButton label="Bold" Icon={Bold} active={bold} onClick={() => run("bold")} />
+        <ToolButton label="Bold" Icon={Bold} active={marks.bold} onClick={() => run("bold")} />
+        <ToolButton label="Italic" Icon={Italic} active={marks.italic} onClick={() => run("italic")} />
+        <ToolButton label="Underline" Icon={Underline} active={marks.underline} onClick={() => run("underline")} />
         <ToolButton label="Bullet list" Icon={List} onClick={() => run("insertUnorderedList")} />
         <ToolButton label="Numbered list" Icon={ListOrdered} onClick={() => run("insertOrderedList")} />
         <ToolButton label="Quote" Icon={Quote} onClick={() => run("formatBlock", style === "" ? "<p>" : "<blockquote>")} />

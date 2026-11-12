@@ -14,6 +14,8 @@ function inlineHtml(parts: Inline[]) {
     .map((p) => {
       let html = escapeHtml(p.text);
       if (p.bold) html = `<strong>${html}</strong>`;
+      if (p.italic) html = `<em>${html}</em>`;
+      if (p.underline) html = `<u>${html}</u>`;
       if (p.href) html = `<a href="${escapeHtml(p.href)}">${html}</a>`;
       return html;
     })
@@ -120,11 +122,12 @@ export async function downloadWord(title: string, body: string, resolve: Resolve
   const docx = await import("docx");
   const { AlignmentType, Document, ExternalHyperlink, HeadingLevel, ImageRun, LevelFormat, Packer, Paragraph, TextRun } = docx;
 
+  const look = (p: Inline) => ({ bold: p.bold, italics: p.italic, underline: p.underline ? {} : undefined });
   const runs = (parts: Inline[]) =>
     parts.map((p) =>
       p.href
-        ? new ExternalHyperlink({ link: p.href, children: [new TextRun({ text: p.text, bold: p.bold, style: "Hyperlink" })] })
-        : new TextRun({ text: p.text, bold: p.bold }),
+        ? new ExternalHyperlink({ link: p.href, children: [new TextRun({ text: p.text, ...look(p), style: "Hyperlink" })] })
+        : new TextRun({ text: p.text, ...look(p) }),
     );
 
   const children: InstanceType<typeof Paragraph>[] = [];
