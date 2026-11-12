@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { Camera, ClipboardPaste, Trash2 } from "lucide-react";
+import { ClipboardPaste, Trash2 } from "lucide-react";
+import ClipsIcon from "@/components/ClipsIcon";
 import { Ico } from "@/components/Icon";
 import { compressImage, uploadClip, type ClipImage } from "@/lib/clips";
 import { createClient } from "@/lib/supabase/client";
@@ -126,7 +127,7 @@ export function ClipButton({
             : `Put a screenshot of the ${what} into your notes`
         }
       >
-        <Ico icon={waiting ? ClipboardPaste : Camera} tone={waiting ? "amber" : "slate"} size={compact ? 14 : 16} />
+        {waiting ? <Ico icon={ClipboardPaste} tone="amber" size={compact ? 14 : 16} /> : <ClipsIcon size={compact ? 16 : 18} />}
         {waiting ? "Paste clip" : "Clip"}
       </button>
       {waiting && (

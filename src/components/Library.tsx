@@ -5,9 +5,10 @@ import BrandMark from "@/components/BrandMark";
 import { WelcomePanel } from "@/components/GettingStarted";
 import { Tour, TourButton, useSectionTour } from "@/components/Tour";
 import { SAMPLE_VIDEO } from "@/lib/onboarding";
-import { Brush, Clapperboard, ExternalLink, FilePen, Folder as FolderIcon, ArrowUp, Copy, Eye, FolderPlus, Images, Inbox, Link2, Link2Off, NotebookText, Pencil, Sparkles, Trash2, TriangleAlert, type LucideIcon } from "lucide-react";
+import { Brush, Clapperboard, ExternalLink, FilePen, Folder as FolderIcon, ArrowUp, Copy, Eye, FolderPlus, Inbox, Link2, Link2Off, NotebookText, Pencil, Sparkles, Trash2, TriangleAlert, type LucideIcon } from "lucide-react";
 import { Ico, type Tone } from "@/components/Icon";
 import Link from "next/link";
+import ClipsIcon from "@/components/ClipsIcon";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePointerDrag } from "@/lib/pointer-drag";
 import { useRouter } from "next/navigation";
@@ -616,7 +617,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
           className="flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1 text-sm text-slate-600 hover:bg-slate-100"
           title="See and delete your clips to free up space"
         >
-          <Ico icon={Images} tone="sky" />
+          <ClipsIcon size={20} />
           Clips
         </Link>
         <div className="hidden items-center gap-2 text-sm text-slate-500 sm:flex">
