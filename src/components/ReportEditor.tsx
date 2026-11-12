@@ -444,9 +444,7 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
             <p className="mb-1 flex items-center gap-1.5 font-medium">
               <Ico icon={Layers} tone="slate" /> Put my notes together
             </p>
-            <p className="mb-3 text-sm text-slate-600">
-              No AI. Each item&apos;s notes go under its own heading, with its link and clips, in the order above.
-            </p>
+            <p className="mb-3 text-sm text-slate-600">Your notes as they are, no AI.</p>
             <button
               onClick={compile}
               disabled={aiBusy}
@@ -459,15 +457,13 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
             <p className="mb-1 flex items-center gap-1.5 font-medium">
               <Ico icon={Sparkles} tone="violet" /> Draft with AI
             </p>
-            <p className="mb-2 text-sm text-slate-600">
-              Gemini writes one report from your typed notes, marking each point with its source like [2].
-            </p>
-            <textarea
+            <p className="mb-2 text-sm text-slate-600">AI writes one report from your notes.</p>
+            <input
               value={focus}
               onChange={(e) => setFocus(e.target.value)}
-              rows={2}
               maxLength={2000}
-              placeholder="Optional: what should it focus on? E.g. “Compare the approaches and end with next steps.”"
+              placeholder="Optional: what should it focus on?"
+              aria-label="What the AI draft should focus on"
               className="mb-2 w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm"
             />
             <button
@@ -529,9 +525,10 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
               placeholder="Build the report above, or start typing here."
               className="w-full rounded-md border border-slate-300 px-3 py-2 font-mono text-sm leading-relaxed"
             />
-            <p className="mt-1 text-xs text-slate-500">
-              # Title, ## Heading, - bullet, 1. step, **bold**. A line like ![caption](picture) shows a picture.
-            </p>
+            <details className="mt-1 text-xs text-slate-500">
+              <summary className="cursor-pointer select-none">Formatting help</summary>
+              <p className="mt-1"># Title, ## Heading, - bullet, 1. step, **bold**. A line like ![caption](picture) shows a picture.</p>
+            </details>
           </>
         ) : blocks.length ? (
           <article className="max-w-none text-slate-800">
