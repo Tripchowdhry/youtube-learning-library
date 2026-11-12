@@ -8,12 +8,9 @@ import {
   hasNotes,
   isMissingTable,
   loadSources,
-  parseReport,
   pictureUrl,
   sourceKey,
   sourcesSection,
-  type Block,
-  type Inline,
   type Report,
   type ReportSource,
   type SourceKind,
@@ -28,17 +25,16 @@ import {
   ArrowUp,
   Clapperboard,
   Copy,
-  Eye,
   FileDown,
   FileText,
   GraduationCap,
   Layers,
-  Pencil,
   Sparkles,
   X,
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
+import ReportRichEditor from "@/components/ReportRichEditor";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 type Chosen = { kind: SourceKind; id: string };
@@ -82,7 +78,6 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
   const [focus, setFocus] = useState("");
   const [aiBusy, setAiBusy] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
-  const [view, setView] = useState<"edit" | "preview">("edit");
   const [toast, setToast] = useState<{ text: string; isError?: boolean } | null>(null);
 
   const mounted = useRef(true);
@@ -223,7 +218,6 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
     if (!chosenSources.length) return notify("Choose at least one video, reading or tutorial first.", true);
     if (!(await okToReplace())) return;
     setBody(compileReport(title.trim() || "Untitled report", chosenSources));
-    setView("preview");
   }
 
   async function draftWithAi() {
@@ -250,8 +244,7 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
       await saveText(reportTitle, draft);
       if (mounted.current) {
         setBody(draft);
-        setView("preview");
-        notify(data.model ? `Drafted by ${data.model}. Check it against your notes.` : "Draft ready.");
+            notify(data.model ? `Drafted by ${data.model}. Check it against your notes.` : "Draft ready.");
       }
     } catch {
       if (mounted.current) setAiError("The AI couldn't be reached. Check your connection and try again.");
@@ -327,8 +320,6 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
       </Shell>
     );
   }
-
-  const blocks = parseReport(body);
 
   return (
     <Shell
@@ -483,23 +474,6 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
       <section className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
         <div className="mb-3 flex flex-wrap items-center gap-2">
           <h2 className="mr-auto font-semibold">3. Edit and export</h2>
-          <nav className="flex rounded-lg bg-slate-100 p-0.5">
-            {(
-              [
-                ["edit", "Edit", Pencil],
-                ["preview", "Preview", Eye],
-              ] as const
-            ).map(([key, name, Icon]) => (
-              <button
-                key={key}
-                onClick={() => setView(key)}
-                className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-sm font-medium ${view === key ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:text-slate-900"}`}
-              >
-                <Icon size={14} aria-hidden />
-                {name}
-              </button>
-            ))}
-          </nav>
           <button
             onClick={copy}
             disabled={!body.trim()}
@@ -516,29 +490,7 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
           </button>
         </div>
 
-        {view === "edit" ? (
-          <>
-            <textarea
-              value={body}
-              onChange={(e) => setBody(e.target.value)}
-              rows={22}
-              placeholder="Build the report above, or start typing here."
-              className="w-full rounded-md border border-slate-300 px-3 py-2 font-mono text-sm leading-relaxed"
-            />
-            <details className="mt-1 text-xs text-slate-500">
-              <summary className="cursor-pointer select-none">Formatting help</summary>
-              <p className="mt-1"># Title, ## Heading, - bullet, 1. step, **bold**. A line like ![caption](picture) shows a picture.</p>
-            </details>
-          </>
-        ) : blocks.length ? (
-          <article className="max-w-none text-slate-800">
-            {blocks.map((b, i) => (
-              <PreviewBlock key={i} block={b} resolve={resolve} />
-            ))}
-          </article>
-        ) : (
-          <p className="py-6 text-center text-sm text-slate-500">Nothing yet. Build the report above, or type it in Edit.</p>
-        )}
+        <ReportRichEditor body={body} onChange={setBody} resolve={resolve} />
       </section>
 
       {toast && (
@@ -581,75 +533,4 @@ function IconButton({ label, onClick, disabled, Icon }: { label: string; onClick
       <Icon size={14} />
     </button>
   );
-}
-
-function InlineText({ parts }: { parts: Inline[] }) {
-  return (
-    <>
-      {parts.map((p, i) => {
-        const text = p.bold ? <strong>{p.text}</strong> : p.text;
-        return p.href ? (
-          <a key={i} href={p.href} target="_blank" rel="noreferrer" className="text-blue-600 underline">
-            {text}
-          </a>
-        ) : (
-          <span key={i}>{text}</span>
-        );
-      })}
-    </>
-  );
-}
-
-function PreviewBlock({ block: b, resolve }: { block: Block; resolve: (src: string) => string }) {
-  switch (b.type) {
-    case "h1":
-      return (
-        <h1 className="mb-4 text-2xl font-bold">
-          <InlineText parts={b.inline} />
-        </h1>
-      );
-    case "h2":
-      return (
-        <h2 className="mt-6 mb-2 text-xl font-semibold">
-          <InlineText parts={b.inline} />
-        </h2>
-      );
-    case "h3":
-      return (
-        <h3 className="mt-4 mb-1 font-semibold">
-          <InlineText parts={b.inline} />
-        </h3>
-      );
-    case "li":
-      return (
-        <p className="relative mb-1 pl-5 before:absolute before:left-1.5 before:content-['•']">
-          <InlineText parts={b.inline} />
-        </p>
-      );
-    case "ol":
-      return (
-        <p className="mb-1 pl-5 -indent-4">
-          {b.num}. <InlineText parts={b.inline} />
-        </p>
-      );
-    case "quote":
-      return (
-        <blockquote className="mb-2 border-l-4 border-slate-300 pl-3 text-slate-600">
-          <InlineText parts={b.inline} />
-        </blockquote>
-      );
-    case "img":
-      return (
-        <figure className="my-3">
-          <img src={resolve(b.src)} alt={b.caption || "Picture from the notes"} className="max-w-full rounded-md ring-1 ring-slate-200 sm:max-w-xl" />
-          {b.caption && <figcaption className="mt-1 text-xs text-slate-500 italic">{b.caption}</figcaption>}
-        </figure>
-      );
-    default:
-      return (
-        <p className="mb-2">
-          <InlineText parts={b.inline} />
-        </p>
-      );
-  }
 }
