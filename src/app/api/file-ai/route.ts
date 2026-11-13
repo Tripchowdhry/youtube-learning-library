@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { GeminiError, askAboutFile, askAboutUploadedVideo, geminiConfigured } from "@/lib/gemini";
+import { GeminiError, askAboutFile, askAboutUploadedVideo, geminiConfigured, uploadVideoInPieces } from "@/lib/gemini";
 import { FILES_BUCKET, aiReadable, fileType } from "@/lib/files";
 import { createClient } from "@/lib/supabase/server";
 
@@ -30,6 +30,32 @@ export async function POST(request: Request) {
     "Keep formatting simple: '## ' for a short heading, '- ' for bullet points, '1. ' for steps,",
     "and **bold** only for a few key words. No tables.",
   ].join("\n");
+
+  // The backup route: a video in pieces in the person's temporary folder. They're passed on to
+  // the AI one by one and deleted, whatever happens.
+  const parts: string[] = Array.isArray(body.parts) ? body.parts.map(String) : [];
+  if (parts.length) {
+    if (!parts.every((p) => p.startsWith(`${user.id}/tmp/`))) {
+      return NextResponse.json({ error: "That file isn't yours." }, { status: 403 });
+    }
+    const size = Number(body.size);
+    try {
+      const geminiFile = await uploadVideoInPieces(size, String(body.type ?? "video/mp4"), user.id, async function* () {
+        for (const part of parts) {
+          const { data, error } = await supabase.storage.from(FILES_BUCKET).download(part);
+          if (error || !data) throw new GeminiError("Part of the video went missing on the way. Try again.", 404);
+          yield Buffer.from(await data.arrayBuffer());
+        }
+      });
+      await supabase.storage.from(FILES_BUCKET).remove(parts);
+      const { text, model } = await askAboutUploadedVideo(geminiFile, user.id, instructions, ask);
+      return NextResponse.json({ text, model });
+    } catch (e) {
+      await supabase.storage.from(FILES_BUCKET).remove(parts);
+      if (e instanceof GeminiError) return NextResponse.json({ error: e.message }, { status: e.status });
+      return NextResponse.json({ error: "The AI couldn't be reached. Try again." }, { status: 502 });
+    }
+  }
 
   if (body.geminiFile) {
     try {

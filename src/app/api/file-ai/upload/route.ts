@@ -22,7 +22,7 @@ export async function POST(request: Request) {
   if (!(size > 0)) return NextResponse.json({ error: "The video looks empty." }, { status: 400 });
   if (size > MAX_BYTES) return NextResponse.json({ error: "The video is bigger than 2 GB, the AI's limit." }, { status: 413 });
   try {
-    return NextResponse.json({ uploadUrl: await startBrowserUpload(size, type, user.id) });
+    return NextResponse.json({ uploadUrl: await startBrowserUpload(size, type, user.id, request.headers.get("origin")) });
   } catch (e) {
     if (e instanceof GeminiError) return NextResponse.json({ error: e.message }, { status: e.status });
     return NextResponse.json({ error: "The AI couldn't be reached. Try again." }, { status: 502 });

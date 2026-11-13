@@ -146,11 +146,19 @@ const INLINE_MAX = 14_000_000;
 
 type StoredFile = { name: string; uri: string; state?: string };
 
-// Opens a one-time upload link so the browser can send a video from the computer straight to
-// Gemini's file store (kept 48 hours) without it passing through BrainShelf. The key stays
-// here: it goes in a header, so the link only carries an upload id. The display name tags
-// the file with its owner, so only they can ask about it.
-export async function startBrowserUpload(size: number, mimeType: string, owner: string) {
+// Gemini names some video types its own way (a .mov is "video/quicktime" in the browser).
+export function geminiVideoType(type: string) {
+  return (
+    ({ "video/quicktime": "video/mov", "video/x-msvideo": "video/avi", "video/x-ms-wmv": "video/wmv", "video/x-flv": "video/x-flv" } as Record<string, string>)[
+      type
+    ] ?? type
+  );
+}
+
+// Opens a resumable upload in Gemini's file store (kept 48 hours). The display name tags the
+// file with its owner, so only they can ask about it. The key goes in a header, so the
+// returned link carries only an upload id.
+async function startUpload(size: number, mimeType: string, owner: string, origin?: string) {
   const start = await fetch("https://generativelanguage.googleapis.com/upload/v1beta/files", {
     method: "POST",
     headers: {
@@ -158,15 +166,60 @@ export async function startBrowserUpload(size: number, mimeType: string, owner: 
       "X-Goog-Upload-Protocol": "resumable",
       "X-Goog-Upload-Command": "start",
       "X-Goog-Upload-Header-Content-Length": String(size),
-      "X-Goog-Upload-Header-Content-Type": mimeType,
+      "X-Goog-Upload-Header-Content-Type": geminiVideoType(mimeType),
       "Content-Type": "application/json",
+      // Google's upload server only lets a browser send to the link from the site that opened it.
+      ...(origin ? { Origin: origin } : {}),
     },
     body: JSON.stringify({ file: { display_name: `brainshelf:${owner}` } }),
   });
   const uploadUrl = start.headers.get("x-goog-upload-url");
-  if (!start.ok || !uploadUrl) throw new GeminiError("The AI couldn't take the video right now. Try again.", 502);
+  if (!start.ok || !uploadUrl) {
+    console.error("Gemini upload start failed", start.status, await start.text().catch(() => ""));
+    throw new GeminiError("The AI couldn't take the video right now. Try again.", 502);
+  }
+  const granularity = Number(start.headers.get("x-goog-upload-chunk-granularity")) || 8 * 1024 * 1024;
+  return { uploadUrl, granularity };
+}
+
+// A one-time link for the browser to send a video from the computer straight to Gemini.
+export async function startBrowserUpload(size: number, mimeType: string, owner: string, origin: string | null) {
+  const { uploadUrl } = await startUpload(size, mimeType, owner, origin ?? undefined);
   if (/[?&]key=/.test(uploadUrl)) throw new GeminiError("Direct upload isn't available.", 501);
   return uploadUrl;
+}
+
+// Sends a video to Gemini from pieces read one after another (the backup route, from a
+// temporary Supabase folder). Google takes it in chunks of its chosen size; the last one ends it.
+export async function uploadVideoInPieces(size: number, mimeType: string, owner: string, pieces: () => AsyncGenerator<Buffer>) {
+  const { uploadUrl, granularity } = await startUpload(size, mimeType, owner);
+  const failed = () => new GeminiError("The video couldn't be sent to the AI. Try again.", 502);
+  const chunk = Math.max(granularity, Math.floor((16 * 1024 * 1024) / granularity) * granularity);
+  let pending = Buffer.alloc(0);
+  let offset = 0;
+  const send = async (bytes: Buffer, last: boolean) => {
+    const res = await fetch(uploadUrl, {
+      method: "POST",
+      headers: { "X-Goog-Upload-Offset": String(offset), "X-Goog-Upload-Command": last ? "upload, finalize" : "upload" },
+      body: new Uint8Array(bytes),
+    });
+    if (!res.ok) {
+      console.error("Gemini chunk upload failed", res.status, await res.text().catch(() => ""));
+      throw failed();
+    }
+    offset += bytes.length;
+    return last ? ((await res.json().catch(() => null))?.file?.name as string | undefined) : undefined;
+  };
+  for await (const piece of pieces()) {
+    pending = Buffer.concat([pending, piece]);
+    while (pending.length > chunk) {
+      await send(pending.subarray(0, chunk), false);
+      pending = pending.subarray(chunk);
+    }
+  }
+  const name = await send(pending, true);
+  if (!name) throw failed();
+  return name;
 }
 
 // Asks about a video the browser sent to Gemini's file store, once Gemini has it ready.
@@ -185,7 +238,7 @@ export async function askAboutUploadedVideo(fileName: string, owner: string, ins
   }
   if (file?.state === "PROCESSING") throw new GeminiError("The AI is still getting the video ready. Try again in a minute.", 504);
   if (file?.state === "FAILED") throw new GeminiError("The AI couldn't open this video. It may be damaged or in a format it can't read.", 422);
-  const video = { file_data: { mime_type: file!.mimeType ?? "video/mp4", file_uri: file!.uri } };
+  const video = { file_data: { mime_type: geminiVideoType(file!.mimeType ?? "video/mp4"), file_uri: file!.uri } };
   return generate(
     (full) => ({
       systemInstruction: { parts: [{ text: instructions }] },

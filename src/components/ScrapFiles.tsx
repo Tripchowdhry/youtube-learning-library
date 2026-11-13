@@ -193,12 +193,12 @@ export default function ScrapFiles(props: {
       key: aiKey,
       label: `AI answer about "${f.name}"`,
       work: async (signal) => {
-        let target: { path?: string; geminiFile?: string } = { path: f.path };
+        let target: { path?: string; geminiFile?: string; parts?: string[]; size?: number } = { path: f.path };
         try {
           if (video) {
             const sent = await sendVideo(supabase, video, f.type, signal);
             if (sent.error) return { error: sent.error };
-            target = sent;
+            target = { geminiFile: sent.geminiFile, parts: sent.parts, size: sent.size };
           }
           const res = await fetch("/api/file-ai", {
             method: "POST",
@@ -212,8 +212,8 @@ export default function ScrapFiles(props: {
           }
           return { result: answerHtml(`${clean} (${f.name})`, data.model, data.text) };
         } catch {
-          // Stopped or failed before the AI got it: tidy away a temporary copy.
-          if (video && target.path?.includes("/tmp/")) await supabase.storage.from(FILES_BUCKET).remove([target.path]);
+          // Stopped or failed before the AI got it: tidy away the temporary pieces.
+          if (target.parts?.length) await supabase.storage.from(FILES_BUCKET).remove(target.parts);
           return { error: "The AI couldn't be reached. Check your connection and try again." };
         }
       },
@@ -335,14 +335,17 @@ export default function ScrapFiles(props: {
   );
 }
 
+// Pieces of a video sent through Supabase, under its 25 MB per-file limit.
+const PIECE_BYTES = 20 * 1024 * 1024;
+
 // Sends a video from this computer to the AI: straight to Google when the browser may, or
-// through a temporary Supabase folder (emptied right after) when it may not.
+// in pieces through a temporary Supabase folder (emptied right after) when it may not.
 async function sendVideo(
   supabase: SupabaseClient,
   video: File,
   type: string,
   signal: AbortSignal,
-): Promise<{ geminiFile?: string; path?: string; error?: string }> {
+): Promise<{ geminiFile?: string; parts?: string[]; size?: number; error?: string }> {
   const start = await fetch("/api/file-ai/upload", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -368,20 +371,32 @@ async function sendVideo(
     return { error: link.error ?? `The video couldn't be sent to the AI (error ${start.status}).` };
   }
   if (video.size > BACKUP_MAX_BYTES) {
-    return { error: "This browser couldn't send the video to the AI directly, and it's over 25 MB. Try a shorter clip." };
+    return { error: "The video is over 300 MB, too big to send from this browser. Try a shorter clip." };
   }
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { error: "You're signed out. Sign in again." };
-  const path = `${user.id}/tmp/${crypto.randomUUID()}/${video.name.replace(/[^\w.\-]+/g, "_").slice(-100) || "video"}`;
-  const { error } = await supabase.storage.from(FILES_BUCKET).upload(path, video, { contentType: type });
-  if (error) return { error: `The video couldn't be sent to the AI: ${error.message}` };
-  if (signal.aborted) {
-    await supabase.storage.from(FILES_BUCKET).remove([path]);
-    throw new DOMException("Stopped", "AbortError");
+  // In pieces small enough for Supabase's per-file limit; the server joins them for the AI.
+  const folder = `${user.id}/tmp/${crypto.randomUUID()}`;
+  const parts: string[] = [];
+  const tidy = () => (parts.length ? supabase.storage.from(FILES_BUCKET).remove(parts) : Promise.resolve());
+  for (let from = 0, i = 0; from < video.size; from += PIECE_BYTES, i++) {
+    const path = `${folder}/part-${String(i).padStart(3, "0")}`;
+    const { error } = await supabase.storage.from(FILES_BUCKET).upload(path, video.slice(from, from + PIECE_BYTES), {
+      contentType: "application/octet-stream",
+    });
+    if (error) {
+      await tidy();
+      return { error: `The video couldn't be sent to the AI: ${error.message}` };
+    }
+    parts.push(path);
+    if (signal.aborted) {
+      await tidy();
+      throw new DOMException("Stopped", "AbortError");
+    }
   }
-  return { path };
+  return { parts, size: video.size };
 }
 
 function SmallButton(props: { onClick: () => void; icon: typeof Eye; children: React.ReactNode; danger?: boolean; disabled?: boolean }) {

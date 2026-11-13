@@ -18,8 +18,9 @@ export function aiReadable(file: { name: string; type: string }) {
   return /^(application\/pdf|text\/plain|text\/markdown|image\/(png|jpeg|webp)|video\/[\w.+-]+)$/.test(fileType(file));
 }
 
-// Videos up to this size can go through Supabase when the browser can't send them to Google directly.
-export const BACKUP_MAX_BYTES = FILE_MAX_BYTES;
+// Videos up to this size can go through Supabase, in pieces, when the browser can't send them
+// to Google directly. Bigger ones would take too long for one request to pass on.
+export const BACKUP_MAX_BYTES = 300 * 1024 * 1024;
 
 // The browser sometimes leaves the type empty; go by the name then.
 export function fileType(file: { name: string; type: string }) {
