@@ -107,7 +107,8 @@ export async function listClips(supabase: SupabaseClient): Promise<StoredClip[]>
 
 type NoteRow = { video_id: string; pages: NotePage[] | null; text: string | null };
 // Reading and ScrapBook keep clips too: typed article notes, and a ScrapBook page's text and sheets.
-export type ArticleRow = { id: string; title: string | null; notes: string | null };
+// pages (handwriting) is missing until supabase/article-pages.sql is run.
+export type ArticleRow = { id: string; title: string | null; notes: string | null; pages?: NotePage[] | null };
 export type ScrapRow = { id: string; title: string; body: string | null; pages: NotePage[] | null };
 export type ClipHomes = { notes: NoteRow[]; articles: ArticleRow[]; scraps: ScrapRow[] };
 
@@ -129,7 +130,9 @@ export function clipOwners(homes: ClipHomes) {
     for (const c of splitTypedClips(note.text ?? "").clips) where.set(c.path, owner);
   }
   for (const a of homes.articles) {
-    for (const c of splitTypedClips(a.notes ?? "").clips) where.set(c.path, { kind: "article", id: a.id });
+    const owner = { kind: "article" as const, id: a.id };
+    for (const page of a.pages ?? []) for (const im of page.images ?? []) where.set(im.path, owner);
+    for (const c of splitTypedClips(a.notes ?? "").clips) where.set(c.path, owner);
   }
   for (const sc of homes.scraps) {
     const owner = { kind: "scrap" as const, id: sc.id };
@@ -166,10 +169,16 @@ export async function deleteClips(supabase: SupabaseClient, homes: ClipHomes, pa
   }
   for (const a of homes.articles) {
     const typed = splitTypedClips(a.notes ?? "");
-    if (!typed.clips.some((c) => gone.has(c.path))) continue;
+    const pages = a.pages ?? [];
+    const usesGone =
+      pages.some((p) => (p.images ?? []).some((im) => gone.has(im.path))) || typed.clips.some((c) => gone.has(c.path));
+    if (!usesGone) continue;
     const { error } = await supabase
       .from("articles")
-      .update({ notes: joinTypedClips(typed.text, typed.clips.filter((c) => !gone.has(c.path))) })
+      .update({
+        notes: joinTypedClips(typed.text, typed.clips.filter((c) => !gone.has(c.path))),
+        ...(a.pages ? { pages: withoutImages(pages, gone) } : {}),
+      })
       .eq("id", a.id);
     if (error) throw new Error(error.message);
   }

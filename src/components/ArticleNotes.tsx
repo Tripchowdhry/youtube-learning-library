@@ -5,12 +5,27 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { askConfirm } from "@/components/ConfirmDialog";
 import { onAiJobDone, runAiJob, useAiJobs, useSecondsSince } from "@/lib/ai-jobs";
 import { createClient } from "@/lib/supabase/client";
-import type { Article } from "@/lib/types";
+import type { Article, NotePage } from "@/lib/types";
 import { askArticleAi } from "@/lib/video-ai";
-import { Brush, CircleHelp, FileText, Footprints, Lightbulb, List, NotebookText, Sparkles, TriangleAlert, type LucideIcon } from "lucide-react";
+import {
+  Brush,
+  CircleHelp,
+  FileText,
+  Footprints,
+  Keyboard,
+  Lightbulb,
+  List,
+  NotebookText,
+  PenLine,
+  Sparkles,
+  TriangleAlert,
+  type LucideIcon,
+} from "lucide-react";
 import { Ico, type Tone } from "@/components/Icon";
 import { ClipButton, DeleteClipButton } from "@/components/ClipButtons";
-import { clipUrl, joinTypedClips, splitTypedClips, type TypedClip } from "@/lib/clips";
+import { clipUrl, joinTypedClips, splitTypedClips, type ClipImage, type TypedClip } from "@/lib/clips";
+import { HandwritingPad, withPicture } from "@/components/Handwriting";
+import { hasWriting, openingMode, type NoteMode } from "@/lib/note-mode";
 import ReportRichEditor, { type RichEditorHandle } from "@/components/ReportRichEditor";
 import NotesExport from "@/components/NotesExport";
 import { answerHeading, boldPrompts, notesDocument } from "@/lib/notes-format";
@@ -20,6 +35,9 @@ type SaveState = "saved" | "saving" | "unsaved" | "error";
 
 const MISSING_COLUMN =
   "Notes can't be saved yet. In Supabase, open SQL Editor and run the file supabase/article-notes.sql once, then reload.";
+const PAGES_SETUP =
+  "Handwriting can't be saved yet. In Supabase, open SQL Editor and run the file supabase/article-pages.sql once, then reload.";
+const MODE_KEY = "reading-notes-mode";
 
 // Adds an AI answer to the end of the typed notes (the text, not the clips saved after it).
 function addAnswer(notes: string, answer: string) {
@@ -33,10 +51,30 @@ function addAnswerToSaved(saved: string, answer: string) {
 }
 
 const presets = (word: string): { label: string; icon: LucideIcon; tone: Tone; prompt: string }[] => [
-  { label: "Summary in 100 words", icon: FileText, tone: "sky", prompt: `Summarize this ${word} in 100 words.` },
-  { label: "Key ideas", icon: Lightbulb, tone: "yellow", prompt: `List the key ideas in this ${word}, one line each.` },
-  { label: "How to use it in 3 steps", icon: Footprints, tone: "green", prompt: `Explain in 3 steps how to use what this ${word} teaches.` },
-  { label: "Report in bullets", icon: List, tone: "slate", prompt: `Write a report on this ${word} in bullet points.` },
+  {
+    label: "Summary in 100 words",
+    icon: FileText,
+    tone: "sky",
+    prompt: `Summarize this ${word} in 100 words.`,
+  },
+  {
+    label: "Key ideas",
+    icon: Lightbulb,
+    tone: "yellow",
+    prompt: `List the key ideas in this ${word}, one line each.`,
+  },
+  {
+    label: "How to use it in 3 steps",
+    icon: Footprints,
+    tone: "green",
+    prompt: `Explain in 3 steps how to use what this ${word} teaches.`,
+  },
+  {
+    label: "Report in bullets",
+    icon: List,
+    tone: "slate",
+    prompt: `Write a report on this ${word} in bullet points.`,
+  },
   {
     label: "Quiz me",
     icon: CircleHelp,
@@ -45,10 +83,10 @@ const presets = (word: string): { label: string; icon: LucideIcon; tone: Tone; p
   },
 ];
 
-// The notes side of the reading page: Ask AI about the article, and a box for typed notes.
+// The notes side of the reading page: Ask AI about the article, and typed or handwritten notes.
 export default function ArticleNotes(props: {
   article: Article;
-  onNotesChange: (notes: string) => void;
+  onNotesChange: (changes: { notes: string; pages?: NotePage[] }) => void;
   onClose: () => void;
 }) {
   const { article } = props;
@@ -57,6 +95,19 @@ export default function ArticleNotes(props: {
   // The typed text and the clips (screenshots) are kept apart here and saved together.
   const [notes, setNotes] = useState(() => boldPrompts(splitTypedClips(article.notes ?? "").text));
   const [clips, setClips] = useState<TypedClip[]>(() => splitTypedClips(article.notes ?? "").clips);
+  // Handwriting sheets; the column holding them exists once supabase/article-pages.sql is run.
+  const pagesReady = "pages" in article;
+  const [pages, setPages] = useState<NotePage[]>(() => article.pages ?? []);
+  // Opens the side that holds the notes, like Videos and ScrapBook.
+  const [mode, setMode] = useState<NoteMode>(() =>
+    openingMode(
+      MODE_KEY,
+      !!splitTypedClips(article.notes ?? "").text.trim() || splitTypedClips(article.notes ?? "").clips.length > 0,
+      hasWriting(article.pages),
+    ),
+  );
+  const modeRef = useRef(mode);
+  modeRef.current = mode;
   const [saveState, setSaveState] = useState<SaveState>("saved");
   const [saveError, setSaveError] = useState<string | null>(null);
   const box = useRef<RichEditorHandle>(null);
@@ -73,27 +124,36 @@ export default function ArticleNotes(props: {
   notesRef.current = notes;
   const clipsRef = useRef(clips);
   clipsRef.current = clips;
+  const pagesRef = useRef(pages);
+  pagesRef.current = pages;
+  // Counts changes, so a save can tell whether more came in while it ran.
+  const revision = useRef(0);
   const { onNotesChange } = props;
 
   const save = useCallback(async () => {
     setSaveState("saving");
+    const started = revision.current;
     const text = joinTypedClips(notesRef.current, clipsRef.current);
-    const { error } = await supabase.from("articles").update({ notes: text }).eq("id", article.id);
+    const sheets = pagesRef.current;
+    const { error } = await supabase
+      .from("articles")
+      .update(pagesReady ? { notes: text, pages: sheets } : { notes: text })
+      .eq("id", article.id);
     if (error) {
       setSaveState("error");
-      setSaveError(/notes/.test(error.message) ? MISSING_COLUMN : error.message);
+      setSaveError(/pages/.test(error.message) ? PAGES_SETUP : /notes/.test(error.message) ? MISSING_COLUMN : error.message);
     } else {
-      setSaveState(joinTypedClips(notesRef.current, clipsRef.current) === text ? "saved" : "unsaved");
+      setSaveState(revision.current === started ? "saved" : "unsaved");
       setSaveError(null);
-      onNotesChange(text);
+      onNotesChange(pagesReady ? { notes: text, pages: sheets } : { notes: text });
     }
-  }, [supabase, article.id, onNotesChange]);
+  }, [supabase, article.id, onNotesChange, pagesReady]);
 
   useEffect(() => {
     if (saveState !== "unsaved") return;
     const timer = setTimeout(save, 1200);
     return () => clearTimeout(timer);
-  }, [notes, clips, saveState, save]);
+  }, [notes, clips, pages, saveState, save]);
 
   // Save right away when the notes are closed or the person leaves for another page.
   const saveStateRef = useRef(saveState);
@@ -115,19 +175,42 @@ export default function ArticleNotes(props: {
   }, [save]);
 
   function change(text: string) {
+    revision.current += 1;
     setNotes(text);
     setSaveState("unsaved");
   }
 
   function changeClips(next: TypedClip[]) {
+    revision.current += 1;
     setClips(next);
     setSaveState("unsaved");
   }
 
-  const addClip = useCallback((_image: unknown, path: string) => {
-    setClips((c) => [...c, { path, t: null }]);
+  function changePages(next: NotePage[]) {
+    revision.current += 1;
+    setPages(next);
     setSaveState("unsaved");
-  }, []);
+  }
+
+  // In Handwriting the picture goes on the sheet; in Typing it joins the typed notes.
+  const addClip = useCallback(
+    (image: ClipImage, path: string) => {
+      revision.current += 1;
+      if (modeRef.current === "write" && pagesReady) setPages((p) => withPicture(p, image, path));
+      else setClips((c) => [...c, { path, t: null }]);
+      setSaveState("unsaved");
+    },
+    [pagesReady],
+  );
+
+  function chooseMode(next: NoteMode) {
+    setMode(next);
+    try {
+      localStorage.setItem(MODE_KEY, next);
+    } catch {
+      // Storage can be blocked (private browsing); the choice just isn't remembered.
+    }
+  }
 
   // ---------- Ask AI ----------
 
@@ -135,19 +218,34 @@ export default function ArticleNotes(props: {
   // this page; the answer is then saved to the notes for them.
   function askAi(prompt: string) {
     if (aiStartedAt !== null) return;
+    // The answer is typed text, so show the typed notes where it lands.
+    setMode("type");
     runAiJob<string>({
       key: aiKey,
       label: `AI answer for "${article.title ?? article.site ?? `your ${word}`}"`,
       work: async (signal) => {
-        const result = await askArticleAi({ url: article.url, title: article.title, kind: word, task: "ask", prompt }, signal);
+        const result = await askArticleAi(
+          {
+            url: article.url,
+            title: article.title,
+            kind: word,
+            task: "ask",
+            prompt,
+          },
+          signal,
+        );
         if (result.error || !result.text) return { error: result.error ?? "The AI didn't answer." };
-        return { result: `${answerHeading(prompt, result.model)}\n${result.text}\n` };
+        return {
+          result: `${answerHeading(prompt, result.model)}\n${result.text}\n`,
+        };
       },
       fallback: async (answer) => {
         const { data } = await supabase.from("articles").select("notes").eq("id", article.id).maybeSingle();
         const { error } = await supabase
           .from("articles")
-          .update({ notes: addAnswerToSaved((data?.notes ?? "") as string, answer) })
+          .update({
+            notes: addAnswerToSaved((data?.notes ?? "") as string, answer),
+          })
           .eq("id", article.id);
         if (error) throw error;
       },
@@ -159,6 +257,7 @@ export default function ArticleNotes(props: {
     () =>
       onAiJobDone((key, answer) => {
         if (key !== `article-ask:${article.id}`) return false;
+        revision.current += 1;
         setNotes(addAnswer(notesRef.current, answer as string));
         setSaveState("unsaved");
         requestAnimationFrame(() => box.current?.scrollToEnd());
@@ -176,7 +275,7 @@ export default function ArticleNotes(props: {
         </h2>
         <span className="ml-auto flex items-center gap-1">
           <ClipButton what={word} onPicture={addClip} compact />
-          {notes.trim() && (
+          {mode === "type" && notes.trim() && (
             <button
               onClick={async () => {
                 const ok = await askConfirm({
@@ -211,51 +310,89 @@ export default function ArticleNotes(props: {
 
       <AskAi jobKey={aiKey} word={word} startedAt={aiStartedAt} error={aiError} onAsk={askAi} />
 
-      {clips.length > 0 && (
-        <div className="flex flex-wrap gap-2">
-          {clips.map((c, i) => (
-            <div key={`${c.path}-${i}`} className="relative w-48 shrink-0 overflow-hidden rounded-md bg-white ring-1 ring-slate-200">
-              <a href={clipUrl(supabase, c.path)} target="_blank" rel="noreferrer" title="Open full size">
-                <img src={clipUrl(supabase, c.path)} alt={`Picture from the ${word}`} className="block w-full" />
-              </a>
-              <DeleteClipButton
-                onClick={async () => {
-                  const ok = await askConfirm({
-                    title: "Delete this picture?",
-                    message: "It will be removed from your notes.",
-                    confirmLabel: "Yes, delete",
-                    cancelLabel: "Keep it",
-                    danger: true,
-                  });
-                  if (ok) changeClips(clipsRef.current.filter((_, j) => j !== i));
-                }}
-              />
-            </div>
+      <div className="flex items-center gap-2">
+        <div className="flex overflow-hidden rounded-lg bg-slate-100 p-0.5">
+          {(
+            [
+              ["type", "Typing", Keyboard],
+              ["write", "Handwriting", PenLine],
+            ] as const
+          ).map(([id, label, icon]) => (
+            <button
+              key={id}
+              onClick={() => chooseMode(id)}
+              className={`flex items-center gap-1.5 rounded-md px-3 py-1 text-sm ${mode === id ? "bg-white font-semibold shadow-sm" : "text-slate-600"}`}
+            >
+              <Ico icon={icon} tone={id === "write" ? "indigo" : "slate"} size={15} />
+              {label}
+            </button>
           ))}
         </div>
-      )}
+        {mode === "write" && pagesReady && (
+          <span className="ml-auto text-xs text-slate-500" title="Your handwriting saves itself as you write">
+            {saveState === "error" ? "Not saved" : saveState === "saved" ? "Saved" : "Saving…"}
+          </span>
+        )}
+      </div>
 
-      <div className="flex justify-end">
-        <NotesExport
-          saveState={saveState}
-          onRetry={save}
-          title={article.title || article.site || `Notes on this ${word}`}
-          makeDocument={() => notesDocument(article.title || article.site || `Notes on this ${word}`, article.url, notes, clips)}
-          resolve={resolve}
-          empty={!notes.trim() && !clips.length}
-        />
-      </div>
-      <div className="rounded-lg bg-white shadow-sm">
-        <ReportRichEditor
-          body={notes}
-          onChange={change}
-          resolve={resolve}
-          handle={box}
-          label="My notes"
-          placeholder="Type your notes here. Ask the AI above for a summary or key ideas; the answer lands here, ready to edit."
-          boxClassName="h-[60vh] min-h-48 resize-y overflow-y-auto"
-        />
-      </div>
+      {mode === "write" ? (
+        pagesReady ? (
+          <HandwritingPad pages={pages} onChange={changePages} imageUrl={(path) => clipUrl(supabase, path)} />
+        ) : (
+          <p className="flex items-center gap-1.5 rounded-md bg-amber-50 px-2 py-1.5 text-sm text-amber-900 ring-1 ring-amber-200">
+            <Ico icon={TriangleAlert} tone="amber" size={15} />
+            {PAGES_SETUP}
+          </p>
+        )
+      ) : (
+        <>
+          {clips.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {clips.map((c, i) => (
+                <div key={`${c.path}-${i}`} className="relative w-48 shrink-0 overflow-hidden rounded-md bg-white ring-1 ring-slate-200">
+                  <a href={clipUrl(supabase, c.path)} target="_blank" rel="noreferrer" title="Open full size">
+                    <img src={clipUrl(supabase, c.path)} alt={`Picture from the ${word}`} className="block w-full" />
+                  </a>
+                  <DeleteClipButton
+                    onClick={async () => {
+                      const ok = await askConfirm({
+                        title: "Delete this picture?",
+                        message: "It will be removed from your notes.",
+                        confirmLabel: "Yes, delete",
+                        cancelLabel: "Keep it",
+                        danger: true,
+                      });
+                      if (ok) changeClips(clipsRef.current.filter((_, j) => j !== i));
+                    }}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="flex justify-end">
+            <NotesExport
+              saveState={saveState}
+              onRetry={save}
+              title={article.title || article.site || `Notes on this ${word}`}
+              makeDocument={() => notesDocument(article.title || article.site || `Notes on this ${word}`, article.url, notes, clips)}
+              resolve={resolve}
+              empty={!notes.trim() && !clips.length}
+            />
+          </div>
+          <div className="rounded-lg bg-white shadow-sm">
+            <ReportRichEditor
+              body={notes}
+              onChange={change}
+              resolve={resolve}
+              handle={box}
+              label="My notes"
+              placeholder="Type your notes here. Ask the AI above for a summary or key ideas; the answer lands here, ready to edit."
+              boxClassName="h-[60vh] min-h-48 resize-y overflow-y-auto"
+            />
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -331,8 +468,8 @@ function Working({ startedAt, word, jobKey }: { startedAt: number; word: string;
     <div className="flex items-start gap-2 rounded-md bg-violet-50 px-2 py-1.5 text-sm text-violet-800 ring-1 ring-violet-200">
       <p className="min-w-0 flex-1">
         <span className="mr-2 inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-violet-300 border-t-violet-700 align-[-2px]" />
-        The AI is reading the {word} ({Math.floor(s / 60)}:{String(s % 60).padStart(2, "0")}). You can leave this page;
-        the answer is still added to your notes.
+        The AI is reading the {word} ({Math.floor(s / 60)}:{String(s % 60).padStart(2, "0")}). You can leave this page; the answer is still
+        added to your notes.
       </p>
       <StopAiButton jobKey={jobKey} />
     </div>

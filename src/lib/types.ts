@@ -105,6 +105,8 @@ export type Article = {
   note: string;
   // Study notes typed on the reading page (and AI answers). Missing until the SQL is run.
   notes?: string;
+  // Handwritten notes on the reading page. Missing until supabase/article-pages.sql is run.
+  pages?: NotePage[];
   position: number;
   kind: SectionKind;
   read_at: string | null;

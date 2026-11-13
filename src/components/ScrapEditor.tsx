@@ -4,12 +4,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { compareFolders, useFolderSort } from "@/components/FolderSort";
-import NotePageCanvas, { PAGE_HEIGHT, type Tool } from "@/components/NotePageCanvas";
+import NotePageCanvas, { type Tool } from "@/components/NotePageCanvas";
 import { ClipButton } from "@/components/ClipButtons";
 import { clipUrl, type ClipImage } from "@/lib/clips";
 import { formatDate } from "@/components/ReadingLibrary";
 import { createClient } from "@/lib/supabase/client";
-import type { ArticleCategory, NoteImage, NotePage, NoteStroke, Scrap } from "@/lib/types";
+import type { ArticleCategory, NotePage, NoteStroke, Scrap } from "@/lib/types";
 import { hasWriting, openingMode } from "@/lib/note-mode";
 import { Bold, Highlighter, Italic, Keyboard, List, ListOrdered, PenLine, RemoveFormatting, Trash2, Underline } from "lucide-react";
 import { Divider, ToolButton, editorToReport } from "@/components/ReportRichEditor";
@@ -18,17 +18,10 @@ import ScrapFiles, { AttachFileButton, addFiles } from "@/components/ScrapFiles"
 import { FILES_SETUP, deleteScrapFiles, type ScrapFile } from "@/lib/files";
 import { pictureUrl } from "@/lib/report";
 import { Ico } from "@/components/Icon";
+import { HIGHLIGHT_COLORS, InkTools, PEN_COLORS, SIZES, emptyPage, withPicture } from "@/components/Handwriting";
 import { CategoryCrumb } from "@/components/CategoryTag";
 import { treePath } from "@/lib/category-tree";
 
-const PEN_COLORS = ["#111827", "#2563eb", "#dc2626", "#16a34a"];
-const HIGHLIGHT_COLORS = ["#facc15", "#4ade80", "#f472b6", "#60a5fa"];
-const SIZES = [
-  { label: "Fine", value: 2 },
-  { label: "Medium", value: 4 },
-  { label: "Bold", value: 7 },
-];
-const emptyPage = (): NotePage => ({ strokes: [], stamps: [] });
 
 type SaveState = "saved" | "saving" | "unsaved" | "error";
 type Mode = "write" | "type";
@@ -279,20 +272,7 @@ export default function ScrapEditor({ scrapId }: { scrapId: string }) {
 
   // On a handwriting sheet the picture goes under the last one, or onto a new sheet when there's no room.
   function placeImage(image: ClipImage, path: string) {
-    const current = pagesRef.current;
-    const w = 640;
-    const h = Math.round((w * image.height) / image.width);
-    let page = current.length - 1;
-    const bottom = Math.max(60, ...(current[page].images ?? []).map((im) => im.y + im.h + 30));
-    let y = bottom;
-    let next = current;
-    if (y + h > PAGE_HEIGHT - 20) {
-      page += 1;
-      y = 60;
-      next = [...current, emptyPage()];
-    }
-    const im: NoteImage = { id: crypto.randomUUID(), path, x: 100, y, w, h, t: 0 };
-    change(next.map((p, i) => (i === page ? { ...p, images: [...(p.images ?? []), im] } : p)));
+    change(withPicture(pagesRef.current, image, path));
   }
 
   function deleteImage(pageIndex: number, imageId: string) {
@@ -636,78 +616,6 @@ function TypingTools({ onFormat }: { onFormat: (command: string, value?: string)
       <ToolButton label="Highlight" Icon={Highlighter} onClick={() => onFormat("hiliteColor", "#fef08a")} />
       <ToolButton label="Clear formatting" Icon={RemoveFormatting} onClick={() => onFormat("removeFormat")} />
     </div>
-  );
-}
-
-function InkTools(props: {
-  tool: Tool;
-  setTool: (t: Tool) => void;
-  color: string;
-  setColor: (c: string) => void;
-  colors: string[];
-  size: number;
-  setSize: (s: number) => void;
-  canUndo: boolean;
-  onUndo: () => void;
-  fingerDraws: boolean;
-  setFingerDraws: (v: boolean) => void;
-}) {
-  const tools: { id: Tool; label: string }[] = [
-    { id: "pen", label: "Pen" },
-    { id: "highlighter", label: "Highlighter" },
-    { id: "eraser", label: "Eraser" },
-  ];
-  return (
-    <>
-      <div className="flex overflow-hidden rounded-lg ring-1 ring-slate-300">
-        {tools.map((t) => (
-          <button
-            key={t.id}
-            onClick={() => props.setTool(t.id)}
-            className={`px-3 py-1.5 text-sm ${props.tool === t.id ? "bg-slate-900 text-white" : "hover:bg-slate-100"}`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
-      {props.tool !== "eraser" && (
-        <>
-          <div className="flex items-center gap-1.5">
-            {props.colors.map((c) => (
-              <button
-                key={c}
-                onClick={() => props.setColor(c)}
-                aria-label={`Color ${c}`}
-                className={`h-7 w-7 rounded-full ring-offset-2 ${props.color === c ? "ring-2 ring-slate-900" : ""}`}
-                style={{ background: c }}
-              />
-            ))}
-          </div>
-          <div className="flex overflow-hidden rounded-lg ring-1 ring-slate-300">
-            {SIZES.map((s) => (
-              <button
-                key={s.value}
-                onClick={() => props.setSize(s.value)}
-                className={`px-2.5 py-1.5 text-xs ${props.size === s.value ? "bg-slate-200 font-semibold" : "hover:bg-slate-100"}`}
-              >
-                {s.label}
-              </button>
-            ))}
-          </div>
-        </>
-      )}
-      <button
-        onClick={props.onUndo}
-        disabled={!props.canUndo}
-        className="rounded-lg px-3 py-1.5 text-sm ring-1 ring-slate-300 hover:bg-slate-100 disabled:opacity-40"
-      >
-        Undo
-      </button>
-      <label className="ml-auto flex items-center gap-1.5 text-xs text-slate-600">
-        <input type="checkbox" checked={props.fingerDraws} onChange={(e) => props.setFingerDraws(e.target.checked)} />
-        Draw with finger
-      </label>
-    </>
   );
 }
 
