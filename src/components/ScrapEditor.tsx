@@ -10,6 +10,7 @@ import { clipUrl, type ClipImage } from "@/lib/clips";
 import { formatDate } from "@/components/ReadingLibrary";
 import { createClient } from "@/lib/supabase/client";
 import type { ArticleCategory, NoteImage, NotePage, NoteStroke, Scrap } from "@/lib/types";
+import { hasWriting, openingMode } from "@/lib/note-mode";
 import { Bold, Highlighter, Italic, Keyboard, List, ListOrdered, PenLine, RemoveFormatting, Trash2, Underline } from "lucide-react";
 import { Divider, ToolButton, editorToReport } from "@/components/ReportRichEditor";
 import NotesExport from "@/components/NotesExport";
@@ -84,16 +85,6 @@ export function scrapDocument(title: string, html: string) {
   return `# ${title}\n\n${editorToReport(box)}`;
 }
 
-// The mode last picked on this device; otherwise typing with a mouse or trackpad, handwriting on an iPad.
-function preferredMode(): Mode {
-  try {
-    const stored = localStorage.getItem(MODE_KEY);
-    if (stored === "write" || stored === "type") return stored;
-  } catch {
-    // Fall through to the device default.
-  }
-  return window.matchMedia("(any-pointer: fine)").matches ? "type" : "write";
-}
 
 export default function ScrapEditor({ scrapId }: { scrapId: string }) {
   const supabase = useMemo(() => createClient(), []);
@@ -151,9 +142,9 @@ export default function ScrapEditor({ scrapId }: { scrapId: string }) {
       if (loaded.pages?.length) setPages(loaded.pages);
       setCategories((c.data ?? []) as ArticleCategory[]);
       // Open in whichever kind of writing the page already has.
-      const hasText = loaded.body.replace(/<[^>]+>/g, "").trim().length > 0;
-      const hasInk = (loaded.pages ?? []).some((p) => p.strokes.length);
-      setMode(hasInk && !hasText ? "write" : hasText && !hasInk ? "type" : preferredMode());
+      // Typed text or pictures count as typed notes; ink, stamps or pictures on a page as handwriting.
+      const hasTyped = /<img\b/i.test(loaded.body) || loaded.body.replace(/<[^>]+>|&nbsp;/g, "").trim().length > 0;
+      setMode(openingMode(MODE_KEY, hasTyped, hasWriting(loaded.pages)));
     })();
   }, [supabase, scrapId, clipPrefix]);
 

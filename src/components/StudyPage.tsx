@@ -19,6 +19,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { formatTime, loadYouTubeApi, type YouTubePlayer } from "@/lib/youtube-player";
 import type { NoteImage, NotePage, NoteStroke, Video } from "@/lib/types";
+import { hasWriting, openingMode } from "@/lib/note-mode";
 import { onAiJobDone, runAiJob, useAiJobs, useSecondsSince } from "@/lib/ai-jobs";
 import { askVideoAi } from "@/lib/video-ai";
 import { askConfirm } from "./ConfirmDialog";
@@ -46,17 +47,6 @@ const MODE_KEY = "notes-mode";
 // The Mac shortcut (in Apple's Shortcuts app) that Clip runs to start a screenshot.
 const MAC_SHORTCUT = "Clip Video";
 
-// The mode last picked on this device; otherwise typing when there's a mouse or
-// trackpad, and handwriting on touch-only devices like an iPad.
-function preferredMode(): Mode {
-  try {
-    const stored = localStorage.getItem(MODE_KEY);
-    if (stored === "write" || stored === "type") return stored;
-  } catch {
-    // Fall through to the device default.
-  }
-  return window.matchMedia("(any-pointer: fine)").matches ? "type" : "write";
-}
 
 // Typed notes mark video times as [m:ss] or [h:mm:ss].
 const TIME_PATTERN = /\[(\d+):(\d{2})(?::(\d{2}))?\]/g;
@@ -84,7 +74,7 @@ function isEmptyNotes(text: string, clips: TypedClip[], pages: NotePage[]) {
   return (
     !text.trim() &&
     !clips.length &&
-    pages.every((p) => !p.strokes?.length && !p.stamps?.length && !p.images?.length)
+    !hasWriting(pages)
   );
 }
 
@@ -176,7 +166,7 @@ export default function StudyPage({ videoId }: { videoId: string }) {
       const { text, clips } = splitTypedClips(savedText);
       setTyped(boldPrompts(text));
       setTypedClips(clips);
-      setMode(preferredMode());
+      setMode(openingMode(MODE_KEY, !!text.trim() || clips.length > 0, hasWriting(saved)));
       setLoaded(true);
     })();
   }, [supabase, videoId]);
