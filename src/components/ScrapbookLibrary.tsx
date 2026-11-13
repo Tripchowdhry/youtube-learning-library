@@ -490,6 +490,7 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
           className="ml-auto w-full max-w-xs rounded-md border border-slate-300 px-3 py-1.5 text-sm"
         />
         <Link
+          data-tour="clips"
           href="/clips"
           className="flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1 text-sm text-slate-600 hover:bg-slate-100"
           title="See and delete your clips to free up space"

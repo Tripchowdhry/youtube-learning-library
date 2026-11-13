@@ -796,7 +796,7 @@ function TypedNotes(props: {
             ))}
           </div>
         )}
-        <div className="ml-auto">
+        <div data-tour="notes-export" className="ml-auto">
           <NotesExport
             saveState={props.saveState}
             onRetry={props.onRetry}
@@ -1050,6 +1050,7 @@ function Toolbar(props: {
         Stamp time
       </button>
       <button
+        data-tour="clip"
         onClick={props.onClip}
         disabled={props.clipBusy}
         className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold ring-1 ring-slate-300 hover:bg-slate-100 disabled:opacity-50"
