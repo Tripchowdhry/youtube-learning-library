@@ -10,7 +10,10 @@ import { clipUrl, type ClipImage } from "@/lib/clips";
 import { formatDate } from "@/components/ReadingLibrary";
 import { createClient } from "@/lib/supabase/client";
 import type { ArticleCategory, NoteImage, NotePage, NoteStroke, Scrap } from "@/lib/types";
-import { Keyboard, PenLine, Trash2 } from "lucide-react";
+import { Bold, Highlighter, Italic, Keyboard, List, ListOrdered, PenLine, RemoveFormatting, Trash2, Underline } from "lucide-react";
+import { Divider, ToolButton, editorToReport } from "@/components/ReportRichEditor";
+import NotesExport from "@/components/NotesExport";
+import { pictureUrl } from "@/lib/report";
 import { Ico } from "@/components/Icon";
 import { CategoryCrumb } from "@/components/CategoryTag";
 import { treePath } from "@/lib/category-tree";
@@ -58,6 +61,25 @@ function cleanHtml(html: string, clipPrefix: string) {
   const root = doc.body.firstElementChild!;
   walk(root);
   return root.innerHTML;
+}
+
+// The page as one document for Copy and Download Word. Clips sit inside the text here, so each
+// is moved to its own line after the paragraph it was in.
+export function scrapDocument(title: string, html: string) {
+  const box = document.createElement("div");
+  box.innerHTML = html;
+  const after = new Map<Node, Node>();
+  for (const img of Array.from(box.querySelectorAll("img"))) {
+    let top: Node = img;
+    while (top.parentNode && top.parentNode !== box) top = top.parentNode;
+    const figure = document.createElement("figure");
+    figure.dataset.src = img.getAttribute("src") ?? "";
+    box.insertBefore(figure, (after.get(top) ?? top).nextSibling);
+    after.set(top, figure);
+    if (top !== img) img.remove();
+  }
+  for (const img of Array.from(box.querySelectorAll("img"))) img.remove();
+  return `# ${title}\n\n${editorToReport(box)}`;
 }
 
 // The mode last picked on this device; otherwise typing with a mouse or trackpad, handwriting on an iPad.
@@ -179,7 +201,16 @@ export default function ScrapEditor({ scrapId }: { scrapId: string }) {
   // ---------- Typing ----------
 
   function format(command: string, value?: string) {
-    editor.current?.focus();
+    // The style menu takes the focus; put the typing spot back first.
+    if (document.activeElement !== editor.current) {
+      editor.current?.focus();
+      const r = lastRange.current;
+      if (r && editor.current?.contains(r.startContainer)) {
+        const sel = window.getSelection();
+        sel?.removeAllRanges();
+        sel?.addRange(r);
+      }
+    }
     document.execCommand("styleWithCSS", false, command === "hiliteColor" ? "true" : "false");
     document.execCommand(command, false, value);
     onTyped();
@@ -362,7 +393,8 @@ export default function ScrapEditor({ scrapId }: { scrapId: string }) {
             />
           )}
         </div>
-        <SaveBadge state={saveState} onRetry={save} />
+        {/* In typing mode it shows next to Copy instead. */}
+        {mode !== "type" && <SaveBadge state={saveState} onRetry={save} />}
         <button
           onClick={deleteScrap}
           className="inline-flex shrink-0 items-center gap-1 rounded-md border border-red-200 px-2 py-1 text-xs text-red-600 hover:bg-red-50"
@@ -430,7 +462,19 @@ export default function ScrapEditor({ scrapId }: { scrapId: string }) {
               </div>
               <ClipButton what="screen" onPicture={addClip} />
               {mode === "type" ? (
-                <TypingTools onFormat={format} />
+                <>
+                  <TypingTools onFormat={format} />
+                  <div className="ml-auto">
+                    <NotesExport
+                      saveState={saveState}
+                      onRetry={save}
+                      title={title.trim() || "Untitled"}
+                      makeDocument={() => scrapDocument(title.trim() || "Untitled", cleanHtml(bodyRef.current, clipPrefix))}
+                      resolve={(src) => pictureUrl(supabase, src)}
+                      empty={isEmpty}
+                    />
+                  </div>
+                </>
               ) : (
                 <InkTools
                   tool={tool}
@@ -518,34 +562,35 @@ export default function ScrapEditor({ scrapId }: { scrapId: string }) {
   );
 }
 
+// The same kind of toolbar as Report Writer, plus Highlight.
 function TypingTools({ onFormat }: { onFormat: (command: string, value?: string) => void }) {
-  const tools: { label: React.ReactNode; title: string; command: string; value?: string }[] = [
-    { label: <b>B</b>, title: "Bold (Ctrl/Cmd+B)", command: "bold" },
-    { label: <i>I</i>, title: "Italic (Ctrl/Cmd+I)", command: "italic" },
-    { label: <u>U</u>, title: "Underline (Ctrl/Cmd+U)", command: "underline" },
-    { label: "Heading", title: "Big heading", command: "formatBlock", value: "<h1>" },
-    { label: "Subheading", title: "Smaller heading", command: "formatBlock", value: "<h2>" },
-    { label: "Normal", title: "Normal text", command: "formatBlock", value: "<p>" },
-    { label: "• List", title: "Bulleted list", command: "insertUnorderedList" },
-    { label: "1. List", title: "Numbered list", command: "insertOrderedList" },
-    { label: <span className="bg-yellow-200 px-0.5">Highlight</span>, title: "Highlight", command: "hiliteColor", value: "#fef08a" },
-    { label: "Clear", title: "Remove bold, italic, highlight…", command: "removeFormat" },
-  ];
   return (
-    <div className="flex flex-wrap items-center gap-1">
-      {tools.map((t) => (
-        <button
-          key={t.title}
-          title={t.title}
-          aria-label={t.title}
-          // Keep the text selection when a button is pressed.
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={() => onFormat(t.command, t.value)}
-          className="min-w-8 rounded-md px-2 py-1.5 text-sm ring-1 ring-slate-300 hover:bg-slate-100"
-        >
-          {t.label}
-        </button>
-      ))}
+    <div
+      className="flex flex-wrap items-center gap-1"
+      // Keep the text selection when a button is pressed.
+      onMouseDown={(e) => e.target instanceof HTMLSelectElement || e.preventDefault()}
+    >
+      <select
+        value=""
+        onChange={(e) => e.target.value && onFormat("formatBlock", `<${e.target.value}>`)}
+        aria-label="Text style"
+        className="rounded-md border border-slate-300 bg-white px-1.5 py-1 text-sm"
+      >
+        <option value="" disabled>
+          Style
+        </option>
+        <option value="p">Normal text</option>
+        <option value="h1">Heading</option>
+        <option value="h2">Subheading</option>
+      </select>
+      <Divider />
+      <ToolButton label="Bold (Ctrl/Cmd+B)" Icon={Bold} onClick={() => onFormat("bold")} />
+      <ToolButton label="Italic (Ctrl/Cmd+I)" Icon={Italic} onClick={() => onFormat("italic")} />
+      <ToolButton label="Underline (Ctrl/Cmd+U)" Icon={Underline} onClick={() => onFormat("underline")} />
+      <ToolButton label="Bullet list" Icon={List} onClick={() => onFormat("insertUnorderedList")} />
+      <ToolButton label="Numbered list" Icon={ListOrdered} onClick={() => onFormat("insertOrderedList")} />
+      <ToolButton label="Highlight" Icon={Highlighter} onClick={() => onFormat("hiliteColor", "#fef08a")} />
+      <ToolButton label="Clear formatting" Icon={RemoveFormatting} onClick={() => onFormat("removeFormat")} />
     </div>
   );
 }
