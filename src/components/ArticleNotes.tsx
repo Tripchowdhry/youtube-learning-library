@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { askConfirm } from "@/components/ConfirmDialog";
 import { onAiJobDone, runAiJob, useAiJobs, useSecondsSince } from "@/lib/ai-jobs";
 import { createClient } from "@/lib/supabase/client";
@@ -10,6 +10,10 @@ import { Brush, CircleHelp, FileText, Footprints, Lightbulb, List, NotebookText,
 import { Ico, type Tone } from "@/components/Icon";
 import { ClipButton, DeleteClipButton } from "@/components/ClipButtons";
 import { clipUrl, joinTypedClips, splitTypedClips, type TypedClip } from "@/lib/clips";
+import ReportRichEditor, { type RichEditorHandle } from "@/components/ReportRichEditor";
+import NotesExport from "@/components/NotesExport";
+import { answerHeading, boldPrompts, notesDocument } from "@/lib/notes-format";
+import { pictureUrl } from "@/lib/report";
 
 type SaveState = "saved" | "saving" | "unsaved" | "error";
 
@@ -50,12 +54,12 @@ export default function ArticleNotes(props: {
   const supabase = useState(() => createClient())[0];
   const word = article.kind === "tutorial" ? "tutorial" : "article";
   // The typed text and the clips (screenshots) are kept apart here and saved together.
-  const [notes, setNotes] = useState(() => splitTypedClips(article.notes ?? "").text);
+  const [notes, setNotes] = useState(() => boldPrompts(splitTypedClips(article.notes ?? "").text));
   const [clips, setClips] = useState<TypedClip[]>(() => splitTypedClips(article.notes ?? "").clips);
   const [saveState, setSaveState] = useState<SaveState>("saved");
   const [saveError, setSaveError] = useState<string | null>(null);
-  const box = useRef<HTMLTextAreaElement>(null);
-  const backdrop = useRef<HTMLDivElement>(null);
+  const box = useRef<RichEditorHandle>(null);
+  const resolve = useCallback((src: string) => pictureUrl(supabase, src), [supabase]);
 
   const aiJobs = useAiJobs();
   const aiKey = `article-ask:${article.id}`;
@@ -136,8 +140,7 @@ export default function ArticleNotes(props: {
       work: async () => {
         const result = await askArticleAi({ url: article.url, title: article.title, kind: word, task: "ask", prompt });
         if (result.error || !result.text) return { error: result.error ?? "The AI didn't answer." };
-        const by = result.model ? ` (${result.model})` : "";
-        return { result: `✨ ${prompt}${by}\n${result.text}\n` };
+        return { result: `${answerHeading(prompt, result.model)}\n${result.text}\n` };
       },
       fallback: async (answer) => {
         const { data } = await supabase.from("articles").select("notes").eq("id", article.id).maybeSingle();
@@ -157,18 +160,11 @@ export default function ArticleNotes(props: {
         if (key !== `article-ask:${article.id}`) return false;
         setNotes(addAnswer(notesRef.current, answer as string));
         setSaveState("unsaved");
-        requestAnimationFrame(() => {
-          if (box.current) box.current.scrollTop = box.current.scrollHeight;
-        });
+        requestAnimationFrame(() => box.current?.scrollToEnd());
         return true;
       }),
     [article.id],
   );
-
-  // Keep the drawn text lined up after the box is resized or text is added.
-  useEffect(() => {
-    if (box.current && backdrop.current) backdrop.current.scrollTop = box.current.scrollTop;
-  });
 
   return (
     <div className="flex flex-col gap-3">
@@ -177,13 +173,6 @@ export default function ArticleNotes(props: {
           <Ico icon={NotebookText} tone="amber" />
           My notes
         </h2>
-        {saveState === "error" ? (
-          <button onClick={save} className="text-xs text-red-600 underline">
-            Not saved. Tap to retry
-          </button>
-        ) : (
-          <span className="text-xs text-slate-500">{saveState === "saved" ? "Saved" : "Saving…"}</span>
-        )}
         <span className="ml-auto flex items-center gap-1">
           <ClipButton what={word} onPicture={addClip} compact />
           {notes.trim() && (
@@ -245,25 +234,25 @@ export default function ArticleNotes(props: {
         </div>
       )}
 
-      <div className="relative rounded-lg bg-white shadow-sm ring-1 ring-slate-200 focus-within:ring-2 focus-within:ring-slate-400">
-        {/* The text is drawn here, behind the (see-through) typing box, so AI prompts can be shown in bold. */}
-        <div ref={backdrop} aria-hidden className="notes-text notes-backdrop">
-          {notes.split("\n").map((line, i) => (
-            <Fragment key={i}>
-              {i > 0 && "\n"}
-              {line.startsWith("✨") ? <span className="notes-prompt">{line}</span> : line}
-            </Fragment>
-          ))}{" "}
-        </div>
-        <textarea
-          ref={box}
-          value={notes}
-          onChange={(e) => change(e.target.value)}
-          onScroll={(e) => {
-            if (backdrop.current) backdrop.current.scrollTop = e.currentTarget.scrollTop;
-          }}
-          placeholder={`Type your notes here…\n\nTip: ask the AI above for a summary or key ideas. The answer lands here, and you can edit it like your own notes.`}
-          className="notes-text notes-input"
+      <div className="flex justify-end">
+        <NotesExport
+          saveState={saveState}
+          onRetry={save}
+          title={article.title || article.site || `Notes on this ${word}`}
+          makeDocument={() => notesDocument(article.title || article.site || `Notes on this ${word}`, article.url, notes, clips)}
+          resolve={resolve}
+          empty={!notes.trim() && !clips.length}
+        />
+      </div>
+      <div className="rounded-lg bg-white shadow-sm">
+        <ReportRichEditor
+          body={notes}
+          onChange={change}
+          resolve={resolve}
+          handle={box}
+          label="My notes"
+          placeholder="Type your notes here. Ask the AI above for a summary or key ideas; the answer lands here, ready to edit."
+          boxClassName="h-[60vh] min-h-48 resize-y overflow-y-auto"
         />
       </div>
     </div>

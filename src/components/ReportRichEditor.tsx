@@ -4,7 +4,7 @@
 // shown already formatted. Underneath, the report is still kept in the simple text format that
 // Copy and Download Word read, so nothing else changes.
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useImperativeHandle, useRef, useState } from "react";
 import { Bold, Italic, Link2, List, ListOrdered, Quote, Redo2, Underline, Undo2, type LucideIcon } from "lucide-react";
 import { parseReport, type Block, type Inline } from "@/lib/report";
 
@@ -160,7 +160,30 @@ export function editorToReport(root: HTMLElement) {
 
 // ---------- The editor ----------
 
-export default function ReportRichEditor({ body, onChange, resolve }: { body: string; onChange: (body: string) => void; resolve: Resolve }) {
+// What a page can do to the editor from outside: put text at the cursor (a video time) or
+// show the end (after an AI answer is added).
+export type RichEditorHandle = { insertAtLineStart: (text: string) => void; scrollToEnd: () => void };
+
+export default function ReportRichEditor({
+  body,
+  onChange,
+  resolve,
+  label = "Report",
+  placeholder = "Build the report above, or start typing here.",
+  boxClassName = "min-h-[28rem]",
+  onKeyDown,
+  handle,
+}: {
+  body: string;
+  onChange: (body: string) => void;
+  resolve: Resolve;
+  label?: string;
+  placeholder?: string;
+  // Sizes the typing area, e.g. a fixed height that scrolls for notes.
+  boxClassName?: string;
+  onKeyDown?: (e: React.KeyboardEvent<HTMLDivElement>) => void;
+  handle?: React.Ref<RichEditorHandle>;
+}) {
   const ref = useRef<HTMLDivElement>(null);
   const lastEmitted = useRef<string | null>(null);
   const savedRange = useRef<Range | null>(null);
@@ -238,6 +261,39 @@ export default function ReportRichEditor({ body, onChange, resolve }: { body: st
     emit();
   };
 
+  useImperativeHandle(handle, () => ({
+    // Starts a new line first when the cursor has text before it on its line.
+    insertAtLineStart(text: string) {
+      const box = ref.current;
+      if (!box) return;
+      const known = document.activeElement === box || (savedRange.current && box.contains(savedRange.current.startContainer));
+      restore();
+      const sel = document.getSelection();
+      if (!known || !sel?.rangeCount || !box.contains(sel.anchorNode)) {
+        // No cursor yet: go to the end of the notes.
+        const r = document.createRange();
+        r.selectNodeContents(box.lastElementChild ?? box);
+        r.collapse(false);
+        sel?.removeAllRanges();
+        sel?.addRange(r);
+      }
+      const here = document.getSelection()!.getRangeAt(0);
+      let block: Node | null = here.startContainer;
+      while (block && block.parentNode !== box) block = block.parentNode;
+      if (block) {
+        const before = document.createRange();
+        before.setStart(block, 0);
+        before.setEnd(here.startContainer, here.startOffset);
+        if (before.toString().trim()) document.execCommand("insertParagraph");
+      }
+      document.execCommand("insertText", false, text);
+      emit();
+    },
+    scrollToEnd() {
+      if (ref.current) ref.current.scrollTop = ref.current.scrollHeight;
+    },
+  }));
+
   const addLink = () => {
     const url = (linking ?? "").trim();
     setLinking(null);
@@ -308,17 +364,18 @@ export default function ReportRichEditor({ body, onChange, resolve }: { body: st
         suppressContentEditableWarning
         role="textbox"
         aria-multiline
-        aria-label="Report"
+        aria-label={label}
         onInput={emit}
         onPaste={paste}
-        data-placeholder="Build the report above, or start typing here."
-        className="report-editor min-h-[28rem] px-4 py-3 text-slate-800 outline-none"
+        onKeyDown={onKeyDown}
+        data-placeholder={placeholder}
+        className={`report-editor ${boxClassName} px-4 py-3 text-slate-800 outline-none`}
       />
     </div>
   );
 }
 
-function ToolButton({ label, Icon, onClick, active }: { label: string; Icon: LucideIcon; onClick: () => void; active?: boolean }) {
+export function ToolButton({ label, Icon, onClick, active }: { label: string; Icon: LucideIcon; onClick: () => void; active?: boolean }) {
   return (
     <button
       type="button"
@@ -333,4 +390,4 @@ function ToolButton({ label, Icon, onClick, active }: { label: string; Icon: Luc
   );
 }
 
-const Divider = () => <span className="mx-0.5 h-5 w-px bg-slate-300" aria-hidden />;
+export const Divider = () => <span className="mx-0.5 h-5 w-px bg-slate-300" aria-hidden />;
