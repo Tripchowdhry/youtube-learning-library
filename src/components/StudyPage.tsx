@@ -78,6 +78,15 @@ function addAnswer(typed: string, answer: string) {
   return `${current ? `${current}\n\n` : ""}${answer}`;
 }
 
+// True when there's no typed text, no clip and nothing written on any page.
+function isEmptyNotes(text: string, clips: TypedClip[], pages: NotePage[]) {
+  return (
+    !text.trim() &&
+    !clips.length &&
+    pages.every((p) => !p.strokes?.length && !p.stamps?.length && !p.images?.length)
+  );
+}
+
 function timesIn(text: string) {
   const seen = new Set<number>();
   for (const m of text.matchAll(TIME_PATTERN)) {
@@ -160,6 +169,8 @@ export default function StudyPage({ videoId }: { videoId: string }) {
       } else setCategoryPath("Uncategorized");
       const saved = (n.data?.pages ?? []) as NotePage[];
       const savedText = (n.data?.text ?? "") as string;
+      // Notes cleared before empty ones were removed: tidy them away now.
+      if (n.data && isEmptyNotes(savedText, [], saved)) supabase.from("notes").delete().eq("video_id", videoId).then(() => {});
       if (saved.length) setPages(saved);
       const { text, clips } = splitTypedClips(savedText);
       setTyped(boldPrompts(text));
@@ -204,6 +215,12 @@ export default function StudyPage({ videoId }: { videoId: string }) {
 
   const save = useCallback(async () => {
     setSaveState("saving");
+    // Nothing left (all cleared): remove the row, so the library shows "Take notes" again.
+    if (isEmptyNotes(typedRef.current, typedClipsRef.current, pagesRef.current)) {
+      const { error } = await supabase.from("notes").delete().eq("video_id", videoId);
+      setSaveState(error ? "error" : "saved");
+      return;
+    }
     const { error } = await supabase.from("notes").upsert(
       {
         video_id: videoId,
