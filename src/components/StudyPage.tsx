@@ -176,7 +176,10 @@ export default function StudyPage({ videoId }: { videoId: string }) {
       const { text, clips } = splitTypedClips(savedText);
       setTyped(boldPrompts(text));
       setTypedClips(clips);
-      setMode(preferredMode());
+      // Open the side that holds the notes, so notes kept only in the other mode aren't hidden.
+      const hasTyped = !!text.trim() || clips.length > 0;
+      const hasWritten = !isEmptyNotes("", [], saved);
+      setMode(hasTyped === hasWritten ? preferredMode() : hasTyped ? "type" : "write");
       setLoaded(true);
     })();
   }, [supabase, videoId]);
