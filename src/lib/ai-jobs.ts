@@ -5,7 +5,8 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 // AI requests that keep running when the person moves to another tab of the app.
 // They live outside the page components, so leaving a page doesn't stop them.
 
-export type AiJob = { key: string; label: string; startedAt: number };
+// note: what the job is doing now, e.g. "Sending the video… 40%".
+export type AiJob = { key: string; label: string; startedAt: number; note?: string };
 type Snapshot = { running: AiJob[]; errors: Map<string, string>; finished: { label: string; at: number } | null };
 // A page that is open when its job finishes can take the result; return true if it did.
 type Taker = (key: string, result: unknown) => boolean;
@@ -40,6 +41,11 @@ export function useSecondsSince(startedAt: number) {
     return () => clearInterval(timer);
   }, []);
   return Math.max(0, Math.floor((now - startedAt) / 1000));
+}
+
+export function setAiJobNote(key: string, note: string) {
+  if (!snapshot.running.some((j) => j.key === key && j.note !== note)) return;
+  update({ running: snapshot.running.map((j) => (j.key === key ? { ...j, note } : j)) });
 }
 
 export function isAiJobRunning(key: string) {

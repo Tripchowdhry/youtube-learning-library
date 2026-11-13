@@ -11,7 +11,7 @@ import { Download, Eye, EyeOff, File as FileIcon, FileText, Film, Image as Image
 import { Ico } from "@/components/Icon";
 import { askConfirm } from "@/components/ConfirmDialog";
 import { editorHtml } from "@/components/ReportRichEditor";
-import { onAiJobDone, runAiJob, useAiJobs, useSecondsSince } from "@/lib/ai-jobs";
+import { onAiJobDone, runAiJob, setAiJobNote, useAiJobs, useSecondsSince } from "@/lib/ai-jobs";
 import {
   BACKUP_MAX_BYTES,
   FILES_BUCKET,
@@ -125,7 +125,8 @@ export default function ScrapFiles(props: {
 
   const aiJobs = useAiJobs();
   const aiKey = `file-ask:${scrapId}`;
-  const aiStartedAt = aiJobs.running.find((j) => j.key === aiKey)?.startedAt ?? null;
+  const aiJob = aiJobs.running.find((j) => j.key === aiKey);
+  const aiStartedAt = aiJob?.startedAt ?? null;
   const aiError = aiJobs.errors.get(aiKey) ?? null;
 
   // An answer that arrives while the page is open goes straight into its text.
@@ -174,7 +175,10 @@ export default function ScrapFiles(props: {
       danger: true,
     });
     if (!ok) return;
-    if (isLocalFile(f)) await forgetLocalFile(f.path);
+    if (isLocalFile(f)) {
+      await forgetLocalFile(f.path);
+      forgetSent(f.path);
+    }
     else await deleteScrapFiles(supabase, [f.path]);
     if (viewing?.path === f.path) setViewing(null);
     props.onChange(files.filter((x) => x.path !== f.path));
@@ -185,8 +189,10 @@ export default function ScrapFiles(props: {
   async function ask(f: ScrapFile, text: string) {
     const clean = text.trim();
     if (!clean || aiStartedAt !== null) return;
-    const video = isLocalFile(f) ? await findLocalFile(f) : null;
-    if (isLocalFile(f) && !video) return props.onNotice(`Choose "${f.name}" on this computer to ask the AI about it.`);
+    // A video sent in the last 48 hours is still with Google, so it isn't sent again.
+    const sentBefore = isLocalFile(f) ? sentVideo(f.path) : null;
+    const video = isLocalFile(f) && !sentBefore ? await findLocalFile(f) : null;
+    if (isLocalFile(f) && !sentBefore && !video) return props.onNotice(`Choose "${f.name}" on this computer to ask the AI about it.`);
     setPrompt("");
     setAsking(null);
     runAiJob<string>({
@@ -195,11 +201,13 @@ export default function ScrapFiles(props: {
       work: async (signal) => {
         let target: { path?: string; geminiFile?: string; parts?: string[]; size?: number } = { path: f.path };
         try {
-          if (video) {
-            const sent = await sendVideo(supabase, video, f.type, signal);
+          if (sentBefore) target = { geminiFile: sentBefore };
+          else if (video) {
+            const sent = await sendVideo(supabase, video, f.type, signal, (note) => setAiJobNote(aiKey, note));
             if (sent.error) return { error: sent.error };
             target = { geminiFile: sent.geminiFile, parts: sent.parts, size: sent.size };
           }
+          if (isLocalFile(f)) setAiJobNote(aiKey, "The AI is watching the video…");
           const res = await fetch("/api/file-ai", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -207,6 +215,11 @@ export default function ScrapFiles(props: {
             signal,
           });
           const data = await res.json().catch(() => ({}));
+          if (sentBefore && res.status === 403) {
+            forgetSent(f.path);
+            return { error: "Google no longer has this video. Ask again and it will be sent again." };
+          }
+          if (isLocalFile(f) && res.ok && data.geminiFile) rememberSent(f.path, data.geminiFile);
           if (!res.ok || !data.text) {
             return { error: res.status === 504 ? "The AI took too long. Try a smaller file." : (data.error ?? `The AI couldn't answer (error ${res.status}).`) };
           }
@@ -324,7 +337,7 @@ export default function ScrapFiles(props: {
           </div>
         );
       })}
-      {aiStartedAt !== null && <Working startedAt={aiStartedAt} jobKey={aiKey} />}
+      {aiStartedAt !== null && <Working startedAt={aiStartedAt} jobKey={aiKey} note={aiJob?.note} />}
       {aiError && (
         <p className="flex items-center gap-1.5 rounded-md bg-red-50 px-2 py-1.5 text-sm text-red-700 ring-1 ring-red-200">
           <Ico icon={TriangleAlert} tone="red" size={15} />
@@ -334,6 +347,62 @@ export default function ScrapFiles(props: {
     </div>
   );
 }
+
+// Videos sent to Google stay there 48 hours. This device remembers them a little less long,
+// so more questions about the same video don't send it again.
+const SENT_HOURS = 46;
+const sentKey = (path: string) => `video-ai:${path}`;
+
+function sentVideo(path: string): string | null {
+  try {
+    const saved = JSON.parse(localStorage.getItem(sentKey(path)) ?? "null") as { name: string; until: number } | null;
+    return saved && saved.until > Date.now() ? saved.name : null;
+  } catch {
+    return null;
+  }
+}
+
+function rememberSent(path: string, name: string) {
+  try {
+    localStorage.setItem(sentKey(path), JSON.stringify({ name, until: Date.now() + SENT_HOURS * 3600_000 }));
+  } catch {
+    // Storage blocked: the video is just sent again next time.
+  }
+}
+
+function forgetSent(path: string) {
+  try {
+    localStorage.removeItem(sentKey(path));
+  } catch {
+    // Nothing to forget.
+  }
+}
+
+// Sends the video in one go, reporting progress (fetch can't report upload progress).
+function postWithProgress(url: string, video: File, signal: AbortSignal, onProgress: (share: number) => void) {
+  return new Promise<{ ok: boolean; json: { file?: { name?: string } } | null }>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", url);
+    xhr.setRequestHeader("X-Goog-Upload-Offset", "0");
+    xhr.setRequestHeader("X-Goog-Upload-Command", "upload, finalize");
+    xhr.upload.onprogress = (e) => e.lengthComputable && onProgress(e.loaded / e.total);
+    xhr.onload = () => {
+      let json = null;
+      try {
+        json = JSON.parse(xhr.responseText);
+      } catch {
+        // Not JSON: treated as a failure.
+      }
+      resolve({ ok: xhr.status >= 200 && xhr.status < 300, json });
+    };
+    xhr.onerror = () => reject(new TypeError("Upload refused"));
+    xhr.onabort = () => reject(new DOMException("Stopped", "AbortError"));
+    signal.addEventListener("abort", () => xhr.abort(), { once: true });
+    xhr.send(video);
+  });
+}
+
+const percent = (share: number) => `Sending the video to the AI… ${Math.min(99, Math.floor(share * 100))}%`;
 
 // Pieces of a video sent through Supabase, under its 25 MB per-file limit.
 const PIECE_BYTES = 20 * 1024 * 1024;
@@ -345,7 +414,9 @@ async function sendVideo(
   video: File,
   type: string,
   signal: AbortSignal,
+  onNote: (note: string) => void,
 ): Promise<{ geminiFile?: string; parts?: string[]; size?: number; error?: string }> {
+  onNote(percent(0));
   const start = await fetch("/api/file-ai/upload", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -355,13 +426,8 @@ async function sendVideo(
   const link = await start.json().catch(() => ({}));
   if (start.ok && link.uploadUrl) {
     try {
-      const res = await fetch(link.uploadUrl, {
-        method: "POST",
-        headers: { "X-Goog-Upload-Offset": "0", "X-Goog-Upload-Command": "upload, finalize" },
-        body: video,
-        signal,
-      });
-      const name = (await res.json().catch(() => null))?.file?.name;
+      const res = await postWithProgress(link.uploadUrl, video, signal, (share) => onNote(percent(share)));
+      const name = res.json?.file?.name;
       if (res.ok && name) return { geminiFile: name };
     } catch (e) {
       if (signal.aborted) throw e;
@@ -391,6 +457,7 @@ async function sendVideo(
       return { error: `The video couldn't be sent to the AI: ${error.message}` };
     }
     parts.push(path);
+    onNote(percent(Math.min(1, (from + PIECE_BYTES) / video.size)));
     if (signal.aborted) {
       await tidy();
       throw new DOMException("Stopped", "AbortError");
@@ -413,15 +480,26 @@ function SmallButton(props: { onClick: () => void; icon: typeof Eye; children: R
   );
 }
 
-function Working({ startedAt, jobKey }: { startedAt: number; jobKey: string }) {
+function Working({ startedAt, jobKey, note }: { startedAt: number; jobKey: string; note?: string }) {
   const s = useSecondsSince(startedAt);
+  const time = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+  const sending = note?.match(/(\d+)%$/);
   return (
     <div className="flex items-start gap-2 rounded-md bg-violet-50 px-2 py-1.5 text-sm text-violet-800 ring-1 ring-violet-200">
-      <p className="min-w-0 flex-1">
-        <span className="mr-2 inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-violet-300 border-t-violet-700 align-[-2px]" />
-        The AI is working on your file ({Math.floor(s / 60)}:{String(s % 60).padStart(2, "0")}). A video is sent first, which
-        can take a minute. You can go to another page; the answer is still added here.
-      </p>
+      <div className="min-w-0 flex-1">
+        <p>
+          <span className="mr-2 inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-violet-300 border-t-violet-700 align-[-2px]" />
+          {note ?? "The AI is reading the file…"} ({time})
+        </p>
+        {sending && (
+          <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-violet-200" role="progressbar" aria-valuenow={Number(sending[1])}>
+            <div className="h-full rounded-full bg-violet-600 transition-[width]" style={{ width: `${sending[1]}%` }} />
+          </div>
+        )}
+        <p className="mt-1 text-xs text-violet-700">
+          {sending ? "Keep this tab open while the video sends. " : ""}You can go to another page; the answer is still added here.
+        </p>
+      </div>
       <StopAiButton jobKey={jobKey} />
     </div>
   );

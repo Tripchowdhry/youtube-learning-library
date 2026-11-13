@@ -49,7 +49,8 @@ export async function POST(request: Request) {
       });
       await supabase.storage.from(FILES_BUCKET).remove(parts);
       const { text, model } = await askAboutUploadedVideo(geminiFile, user.id, instructions, ask);
-      return NextResponse.json({ text, model });
+      // Google keeps the video 48 hours: the browser reuses it for more questions.
+      return NextResponse.json({ text, model, geminiFile });
     } catch (e) {
       await supabase.storage.from(FILES_BUCKET).remove(parts);
       if (e instanceof GeminiError) return NextResponse.json({ error: e.message }, { status: e.status });
@@ -60,7 +61,7 @@ export async function POST(request: Request) {
   if (body.geminiFile) {
     try {
       const { text, model } = await askAboutUploadedVideo(String(body.geminiFile), user.id, instructions, ask);
-      return NextResponse.json({ text, model });
+      return NextResponse.json({ text, model, geminiFile: body.geminiFile });
     } catch (e) {
       if (e instanceof GeminiError) return NextResponse.json({ error: e.message }, { status: e.status });
       return NextResponse.json({ error: "The AI couldn't be reached. Try again." }, { status: 502 });
