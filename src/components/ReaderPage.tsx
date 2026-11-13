@@ -6,7 +6,8 @@ import ArticleNotes from "@/components/ArticleNotes";
 import { ArticleNote, ReadCheck, SECTIONS, formatDate } from "@/components/ReadingLibrary";
 import { fileViewLink } from "@/lib/links";
 import { createClient } from "@/lib/supabase/client";
-import type { Article, ArticleContent } from "@/lib/types";
+import type { Article, ArticleContent, NotePage } from "@/lib/types";
+import { hasWriting } from "@/lib/note-mode";
 import { ExternalLink, FilePen, NotebookText, Pencil } from "lucide-react";
 import { CategoryCrumb } from "@/components/CategoryTag";
 import { treePath, type TreeNode } from "@/lib/category-tree";
@@ -59,7 +60,11 @@ export default function ReaderPage({ articleId }: { articleId: string }) {
     if (new URLSearchParams(window.location.search).get("notes") === "1") setShowNotes(true);
   }, []);
 
-  const saveNotes = useCallback((notes: string) => setArticle((a) => (a ? { ...a, notes } : a)), []);
+  const saveNotes = useCallback(
+    (changes: { notes: string; pages?: NotePage[] }) => setArticle((a) => (a ? { ...a, ...changes } : a)),
+    [],
+  );
+  const hasNotes = Boolean(article?.notes?.trim()) || hasWriting(article?.pages);
 
   useEffect(() => {
     (async () => {
@@ -192,15 +197,15 @@ export default function ReaderPage({ articleId }: { articleId: string }) {
               className={
                 showNotes
                   ? "inline-flex shrink-0 items-center gap-1 rounded-md border border-slate-300 px-2 py-1 text-xs text-slate-700 hover:bg-slate-100"
-                  : article.notes?.trim()
+                  : hasNotes
                     ? "inline-flex shrink-0 items-center gap-1 rounded-md border border-amber-300 bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-900 hover:bg-amber-200"
                     : "inline-flex shrink-0 items-center gap-1 rounded-md border border-slate-300 px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100"
               }
             >
               {!showNotes && (
-                <Ico icon={article.notes?.trim() ? NotebookText : Pencil} tone={article.notes?.trim() ? "amber" : "yellow"} size={14} />
+                <Ico icon={hasNotes ? NotebookText : Pencil} tone={hasNotes ? "amber" : "yellow"} size={14} />
               )}
-              {showNotes ? "Hide notes" : article.notes?.trim() ? "Open notes" : "Take notes"}
+              {showNotes ? "Hide notes" : hasNotes ? "Open notes" : "Take notes"}
             </button>
             <ReadCheck read={Boolean(article.read_at)} onClick={() => setRead(!article.read_at)} />
           </>

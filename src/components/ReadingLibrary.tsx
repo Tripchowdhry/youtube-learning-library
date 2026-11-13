@@ -27,6 +27,7 @@ import { findSavedElsewhere } from "@/lib/find-saved";
 import { linkKey } from "@/lib/links";
 import { createClient } from "@/lib/supabase/client";
 import type { Article, ArticleCategory, SectionKind } from "@/lib/types";
+import { hasWriting } from "@/lib/note-mode";
 import { askArticleAi } from "@/lib/video-ai";
 import { askConfirm } from "./ConfirmDialog";
 import { Ico, type Tone } from "./Icon";
@@ -932,7 +933,7 @@ function ArticleRow(props: {
     },
     rowRef,
   );
-  const hasNotes = Boolean(article.notes?.trim());
+  const hasNotes = Boolean(article.notes?.trim()) || hasWriting(article.pages);
   return (
     <li
       ref={rowRef}

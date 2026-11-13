@@ -62,7 +62,11 @@ export default function ClipsManager() {
         listClips(supabase),
         supabase.from("notes").select("video_id, pages, text"),
         supabase.from("videos").select("id, title"),
-        supabase.from("articles").select("id, title, notes"),
+        // Handwriting in Reading needs supabase/article-pages.sql; without it, read just the typed notes.
+        supabase
+          .from("articles")
+          .select("id, title, notes, pages")
+          .then((r) => (r.error ? supabase.from("articles").select("id, title, notes") : r)),
         supabase.from("scraps").select("id, title, body, pages"),
       ]);
       if (n.error) throw new Error(n.error.message);

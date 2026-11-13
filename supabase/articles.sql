@@ -41,6 +41,9 @@ alter table public.articles add column if not exists kind text not null default 
 -- Study notes taken on the reading page were added later still.
 alter table public.articles add column if not exists notes text not null default '';
 
+-- And handwriting in those notes after that.
+alter table public.articles add column if not exists pages jsonb not null default '[]'::jsonb;
+
 create index if not exists article_categories_user_idx on public.article_categories (user_id);
 create index if not exists articles_user_idx on public.articles (user_id);
 create index if not exists articles_category_idx on public.articles (category_id);

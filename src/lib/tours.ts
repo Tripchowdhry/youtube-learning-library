@@ -72,7 +72,7 @@ export const TOURS = {
     },
     {
       title: "Notes beside what you read",
-      text: "While reading, open My notes to type with headings, bold and lists, Ask AI for a summary, and add clips. Copy or Download Word takes them anywhere.",
+      text: "While reading, open My notes to type with headings, bold and lists, or switch to Handwriting for Apple Pencil. Ask AI for a summary and add clips. Copy or Download Word takes typed notes anywhere.",
     },
     {
       target: "report-writer",
