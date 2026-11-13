@@ -13,6 +13,8 @@ import type { ArticleCategory, NoteImage, NotePage, NoteStroke, Scrap } from "@/
 import { Bold, Highlighter, Italic, Keyboard, List, ListOrdered, PenLine, RemoveFormatting, Trash2, Underline } from "lucide-react";
 import { Divider, ToolButton, editorToReport } from "@/components/ReportRichEditor";
 import NotesExport from "@/components/NotesExport";
+import ScrapFiles, { AttachFileButton, addFiles } from "@/components/ScrapFiles";
+import { FILES_SETUP, deleteScrapFiles, type ScrapFile } from "@/lib/files";
 import { pictureUrl } from "@/lib/report";
 import { Ico } from "@/components/Icon";
 import { CategoryCrumb } from "@/components/CategoryTag";
@@ -107,6 +109,14 @@ export default function ScrapEditor({ scrapId }: { scrapId: string }) {
   const [mode, setMode] = useState<Mode>("type");
   const [saveState, setSaveState] = useState<SaveState>("saved");
   const [notice, setNotice] = useState<string | null>(null);
+  const showNotice = useCallback((text: string) => {
+    setNotice(text);
+    setTimeout(() => setNotice(null), 5000);
+  }, []);
+  // Files on the page. filesReady is false until supabase/files.sql has been run.
+  const [files, setFiles] = useState<ScrapFile[]>([]);
+  const [filesReady, setFilesReady] = useState(false);
+  const [adding, setAdding] = useState(false);
 
   const editor = useRef<HTMLDivElement>(null);
   // The typed text lives in the editor box itself; this copy is what gets saved.
@@ -134,6 +144,8 @@ export default function ScrapEditor({ scrapId }: { scrapId: string }) {
       const loaded = s.data as Scrap;
       bodyRef.current = cleanHtml(loaded.body, clipPrefix);
       setScrap(loaded);
+      setFilesReady("files" in loaded);
+      setFiles(loaded.files ?? []);
       setTitle(loaded.title);
       setCategoryId(loaded.category_id);
       if (loaded.pages?.length) setPages(loaded.pages);
@@ -160,6 +172,10 @@ export default function ScrapEditor({ scrapId }: { scrapId: string }) {
   pagesRef.current = pages;
   const categoryRef = useRef(categoryId);
   categoryRef.current = categoryId;
+  const filesRef = useRef(files);
+  filesRef.current = files;
+  const filesReadyRef = useRef(filesReady);
+  filesReadyRef.current = filesReady;
   const save = useCallback(async () => {
     setSaveState("saving");
     const { error } = await supabase
@@ -168,6 +184,7 @@ export default function ScrapEditor({ scrapId }: { scrapId: string }) {
         title: titleRef.current.trim().slice(0, 200) || "Untitled",
         body: cleanHtml(bodyRef.current, clipPrefix),
         pages: pagesRef.current,
+        ...(filesReadyRef.current ? { files: filesRef.current } : {}),
         category_id: categoryRef.current,
         updated_at: new Date().toISOString(),
       })
@@ -179,7 +196,7 @@ export default function ScrapEditor({ scrapId }: { scrapId: string }) {
     if (saveState !== "unsaved") return;
     const timer = setTimeout(save, 1200);
     return () => clearTimeout(timer);
-  }, [pages, title, categoryId, bodyTick, saveState, save]);
+  }, [pages, title, categoryId, bodyTick, files, saveState, save]);
 
   // Save right away if the person switches apps or closes the tab.
   useEffect(() => {
@@ -330,6 +347,38 @@ export default function ScrapEditor({ scrapId }: { scrapId: string }) {
     );
   }
 
+  // ---------- Files ----------
+
+  async function attach(chosen: File[]) {
+    if (!filesReady) return showNotice(FILES_SETUP);
+    setAdding(true);
+    const { added, problem } = await addFiles(supabase, chosen);
+    setAdding(false);
+    if (added.length) {
+      setFiles((f) => [...f, ...added]);
+      setSaveState("unsaved");
+    }
+    if (problem) showNotice(problem);
+  }
+
+  function changeFiles(next: ScrapFile[]) {
+    setFiles(next);
+    setSaveState("unsaved");
+  }
+
+  // An AI answer about a file goes to the end of the typed text, shown in Typing.
+  const addAnswer = useCallback((html: string) => {
+    bodyRef.current = `${bodyRef.current}${html}`;
+    if (editor.current) {
+      editor.current.insertAdjacentHTML("beforeend", html);
+      setIsEmpty(false);
+    } else {
+      setMode("type");
+    }
+    setSaveState("unsaved");
+    setBodyTick((t) => t + 1);
+  }, []);
+
   function chooseMode(next: Mode) {
     setMode(next);
     try {
@@ -349,6 +398,7 @@ export default function ScrapEditor({ scrapId }: { scrapId: string }) {
       setTimeout(() => setNotice(null), 4000);
       return;
     }
+    await deleteScrapFiles(supabase, files.map((f) => f.path));
     router.push("/scrapbook");
   }
 
@@ -461,6 +511,7 @@ export default function ScrapEditor({ scrapId }: { scrapId: string }) {
                 ))}
               </div>
               <ClipButton what="screen" onPicture={addClip} />
+              <AttachFileButton onFiles={attach} busy={adding} />
               {mode === "type" ? (
                 <>
                   <TypingTools onFormat={format} />
@@ -491,6 +542,8 @@ export default function ScrapEditor({ scrapId }: { scrapId: string }) {
                 />
               )}
             </div>
+
+            <ScrapFiles supabase={supabase} scrapId={scrapId} files={files} onChange={changeFiles} onAnswer={addAnswer} onNotice={showNotice} />
 
             {mode === "type" ? (
               <div className="relative">
