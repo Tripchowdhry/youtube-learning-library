@@ -332,7 +332,6 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
           className="min-w-0 flex-1 rounded-md border border-transparent px-2 py-1 text-lg font-semibold hover:border-slate-300 focus:border-blue-500 focus:outline-none"
         />
       }
-      status={saveState === "saving" ? "Saving…" : saveState === "error" ? "Not saved" : "Saved"}
     >
       {saveError && <p className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{saveError}</p>}
 
@@ -474,6 +473,12 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
       <section className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
         <div className="mb-3 flex flex-wrap items-center gap-2">
           <h2 className="mr-auto font-semibold">3. Edit and export</h2>
+          <span
+            className={`text-xs ${saveState === "error" ? "font-medium text-red-600" : "text-slate-500"}`}
+            title="Your report saves itself as you type"
+          >
+            {saveState === "saving" ? "Saving…" : saveState === "error" ? "Not saved" : "Saved"}
+          </span>
           <button
             onClick={copy}
             disabled={!body.trim()}
@@ -506,7 +511,7 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
 
 // ---------- Pieces ----------
 
-function Shell({ title, status, children }: { title: React.ReactNode; status?: string; children: React.ReactNode }) {
+function Shell({ title, children }: { title: React.ReactNode; children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen flex-col">
       <header className="sticky top-0 z-20 flex items-center gap-2 border-b border-slate-200 bg-white px-4 py-3">
@@ -514,7 +519,6 @@ function Shell({ title, status, children }: { title: React.ReactNode; status?: s
           <ArrowLeft size={16} aria-hidden /> <ReportIcon size={20} /> <span className="font-medium text-slate-800">Report Writer</span>
         </Link>
         {typeof title === "string" ? <span className="text-lg font-semibold">{title}</span> : title}
-        {status && <span className="shrink-0 text-xs text-slate-500">{status}</span>}
       </header>
       <main className="mx-auto w-full max-w-4xl flex-1 px-4 py-6">{children}</main>
     </div>
