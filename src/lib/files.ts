@@ -13,10 +13,13 @@ export const FILES_SETUP =
   "Files can't be added yet. In Supabase, open SQL Editor and run the file supabase/files.sql once, then reload.";
 export const isFilesSetupError = (message: string) => /files|bucket|not found|schema cache|column/i.test(message);
 
-// The kinds of file the AI can read.
+// The kinds of file the AI can read. Videos are those kept on the person's computer.
 export function aiReadable(file: { name: string; type: string }) {
-  return /^(application\/pdf|text\/plain|text\/markdown|image\/(png|jpeg|webp))$/.test(fileType(file));
+  return /^(application\/pdf|text\/plain|text\/markdown|image\/(png|jpeg|webp)|video\/[\w.+-]+)$/.test(fileType(file));
 }
+
+// Videos up to this size can go through Supabase when the browser can't send them to Google directly.
+export const BACKUP_MAX_BYTES = FILE_MAX_BYTES;
 
 // The browser sometimes leaves the type empty; go by the name then.
 export function fileType(file: { name: string; type: string }) {
@@ -31,6 +34,9 @@ export function fileType(file: { name: string; type: string }) {
       jpg: "image/jpeg",
       jpeg: "image/jpeg",
       webp: "image/webp",
+      mp4: "video/mp4",
+      mov: "video/quicktime",
+      webm: "video/webm",
     } as Record<string, string>
   )[ext] ?? "application/octet-stream";
 }
@@ -62,7 +68,9 @@ export async function fileLink(supabase: SupabaseClient, path: string, download 
   return data.signedUrl;
 }
 
+// Videos kept on the computer ("local/…") have nothing stored, so only the rest are removed.
 export async function deleteScrapFiles(supabase: SupabaseClient, paths: string[]) {
-  if (!paths.length) return;
-  await supabase.storage.from(FILES_BUCKET).remove(paths);
+  const stored = paths.filter((p) => !p.startsWith("local/"));
+  if (!stored.length) return;
+  await supabase.storage.from(FILES_BUCKET).remove(stored);
 }

@@ -146,6 +146,56 @@ const INLINE_MAX = 14_000_000;
 
 type StoredFile = { name: string; uri: string; state?: string };
 
+// Opens a one-time upload link so the browser can send a video from the computer straight to
+// Gemini's file store (kept 48 hours) without it passing through BrainShelf. The key stays
+// here: it goes in a header, so the link only carries an upload id. The display name tags
+// the file with its owner, so only they can ask about it.
+export async function startBrowserUpload(size: number, mimeType: string, owner: string) {
+  const start = await fetch("https://generativelanguage.googleapis.com/upload/v1beta/files", {
+    method: "POST",
+    headers: {
+      "x-goog-api-key": process.env.GEMINI_API_KEY ?? "",
+      "X-Goog-Upload-Protocol": "resumable",
+      "X-Goog-Upload-Command": "start",
+      "X-Goog-Upload-Header-Content-Length": String(size),
+      "X-Goog-Upload-Header-Content-Type": mimeType,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ file: { display_name: `brainshelf:${owner}` } }),
+  });
+  const uploadUrl = start.headers.get("x-goog-upload-url");
+  if (!start.ok || !uploadUrl) throw new GeminiError("The AI couldn't take the video right now. Try again.", 502);
+  if (/[?&]key=/.test(uploadUrl)) throw new GeminiError("Direct upload isn't available.", 501);
+  return uploadUrl;
+}
+
+// Asks about a video the browser sent to Gemini's file store, once Gemini has it ready.
+export async function askAboutUploadedVideo(fileName: string, owner: string, instructions: string, request: string) {
+  if (!/^files\/[\w-]+$/.test(fileName)) throw new GeminiError("That video isn't known.", 400);
+  const key = process.env.GEMINI_API_KEY ?? "";
+  const read = async () => {
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/${fileName}`, { headers: { "x-goog-api-key": key } });
+    return res.ok ? ((await res.json().catch(() => null)) as (StoredFile & { displayName?: string; mimeType?: string }) | null) : null;
+  };
+  let file = await read();
+  if (!file || file.displayName !== `brainshelf:${owner}`) throw new GeminiError("That video isn't yours, or it has expired.", 403);
+  for (let i = 0; i < 100 && file?.state === "PROCESSING"; i++) {
+    await new Promise((r) => setTimeout(r, 2000));
+    file = (await read()) ?? file;
+  }
+  if (file?.state === "PROCESSING") throw new GeminiError("The AI is still getting the video ready. Try again in a minute.", 504);
+  if (file?.state === "FAILED") throw new GeminiError("The AI couldn't open this video. It may be damaged or in a format it can't read.", 422);
+  const video = { file_data: { mime_type: file!.mimeType ?? "video/mp4", file_uri: file!.uri } };
+  return generate(
+    (full) => ({
+      systemInstruction: { parts: [{ text: instructions }] },
+      contents: [{ role: "user", parts: [full ? { ...video, video_metadata: { fps: FRAMES_PER_SECOND } } : video, { text: request }] }],
+      generationConfig: { mediaResolution: "MEDIA_RESOLUTION_LOW" },
+    }),
+    "watch this video",
+  );
+}
+
 // Puts a big file in Gemini's file store (kept 48 hours) and waits until it's ready.
 async function uploadFile(bytes: Buffer, mimeType: string) {
   const key = process.env.GEMINI_API_KEY ?? "";

@@ -14,7 +14,7 @@ import { hasWriting, openingMode } from "@/lib/note-mode";
 import { Bold, Highlighter, Italic, Keyboard, List, ListOrdered, PenLine, RemoveFormatting, Trash2, Underline } from "lucide-react";
 import { Divider, ToolButton, editorToReport } from "@/components/ReportRichEditor";
 import NotesExport from "@/components/NotesExport";
-import ScrapFiles, { AttachFileButton, addFiles } from "@/components/ScrapFiles";
+import ScrapFiles, { AttachFileButton, addFiles, type Chosen } from "@/components/ScrapFiles";
 import { FILES_SETUP, deleteScrapFiles, type ScrapFile } from "@/lib/files";
 import { pictureUrl } from "@/lib/report";
 import { Ico } from "@/components/Icon";
@@ -320,7 +320,7 @@ export default function ScrapEditor({ scrapId }: { scrapId: string }) {
 
   // ---------- Files ----------
 
-  async function attach(chosen: File[]) {
+  async function attach(chosen: Chosen[]) {
     if (!filesReady) return showNotice(FILES_SETUP);
     setAdding(true);
     const { added, problem } = await addFiles(supabase, chosen);

@@ -88,7 +88,7 @@ export const TOURS = {
     },
     {
       title: "Type like in Word",
-      text: "When typing on a page, use the toolbar for headings, bold, lists and highlight, add clips, then Copy it or Download Word. Attach file adds PDFs, slides or documents, and Ask AI can read PDFs for you.",
+      text: "When typing on a page, use the toolbar for headings, bold, lists and highlight, add clips, then Copy it or Download Word. Attach file adds PDFs, slides, documents or pictures, and videos that stay on your computer. Ask AI can read PDFs and watch videos for you.",
     },
   ],
   vault: [
