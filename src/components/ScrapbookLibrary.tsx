@@ -1,6 +1,7 @@
 "use client";
 
 import { Tour, TourButton, useSectionTour } from "@/components/Tour";
+import { deleteScrapFiles, type ScrapFile } from "@/lib/files";
 import BrandMark from "@/components/BrandMark";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -245,7 +246,11 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
   async function deleteScrap(scrap: ScrapSummary) {
     if (!window.confirm(`Delete "${scrap.title}" from your ScrapBook?\nThis can't be undone.`)) return;
     setScraps((prev) => prev.filter((s) => s.id !== scrap.id));
+    // Its attached files go too (none before supabase/files.sql is run).
+    const attached = await supabase.from("scraps").select("files").eq("id", scrap.id).maybeSingle();
+    const paths = ((attached.data?.files ?? []) as ScrapFile[]).map((f) => f.path);
     const { error } = await supabase.from("scraps").delete().eq("id", scrap.id);
+    if (!error) await deleteScrapFiles(supabase, paths);
     if (error) {
       notify(error.message, true);
       load();

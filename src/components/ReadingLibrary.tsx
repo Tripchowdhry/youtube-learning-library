@@ -1,5 +1,6 @@
 "use client";
 
+import StopAiButton from "@/components/StopAiButton";
 import ReportWriterLink from "@/components/ReportWriterLink";
 import { Tour, TourButton, useSectionTour } from "@/components/Tour";
 import BrandMark from "@/components/BrandMark";
@@ -302,8 +303,9 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
     runAiJob<AiNote>({
       key: aiNoteKey(article.id),
       label: `AI summary for "${article.title ?? article.site ?? "your link"}"`,
-      work: async () => {
-        const result = await askArticleAi({ url: article.url, title: article.title, kind });
+      work: async (signal) => {
+        const result = await askArticleAi({ url: article.url, title: article.title, kind }, signal);
+        if (signal.aborted) return {};
         if (result.error) return result.code === "no-key" ? {} : { error: result.error };
         if (!result.text) return {};
         // Only fills an empty note, so a note typed while the AI was working stays.
@@ -1035,7 +1037,7 @@ function ArticleRow(props: {
               AI summary
             </SmallButton>
           )}
-          {!article.note && props.aiNoteStartedAt !== null && <AiNoteWorking startedAt={props.aiNoteStartedAt} />}
+          {!article.note && props.aiNoteStartedAt !== null && <AiNoteWorking startedAt={props.aiNoteStartedAt} jobKey={aiNoteKey(article.id)} />}
           <SmallButton onClick={props.onRename}>Edit title</SmallButton>
           {/* Kept apart from the note buttons so it isn't pressed by mistake. */}
           <span className="ml-auto pl-3">
@@ -1078,12 +1080,13 @@ export function ToastBox({ toast, onClose }: { toast: Toast; onClose: () => void
 }
 
 // Shown in place of the AI summary button while the AI writes the note.
-export function AiNoteWorking({ startedAt }: { startedAt: number }) {
+export function AiNoteWorking({ startedAt, jobKey }: { startedAt: number; jobKey: string }) {
   const seconds = useSecondsSince(startedAt);
   return (
-    <span className="flex items-center gap-1.5 rounded-md border border-violet-200 bg-violet-50 px-2 py-1 text-xs text-violet-800">
+    <span className="flex items-center gap-1.5 rounded-md border border-violet-200 bg-violet-50 py-0.5 pl-2 pr-0.5 text-xs text-violet-800">
       <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-violet-300 border-t-violet-700" />
       Writing summary… {Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, "0")}
+      <StopAiButton jobKey={jobKey} />
     </span>
   );
 }

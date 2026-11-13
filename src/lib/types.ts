@@ -127,6 +127,8 @@ export type Scrap = {
   title: string;
   body: string;
   pages: NotePage[];
+  // Attached files (supabase/files.sql). Missing until that SQL has been run.
+  files?: { path: string; name: string; size: number; type: string; added_at: string }[];
   position: number;
   created_at: string;
   updated_at: string;
