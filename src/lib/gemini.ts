@@ -5,8 +5,11 @@
 // When a model is busy (Google's free tier often is) or missing, the next one is tried.
 const MODELS = [
   ...(process.env.GEMINI_MODEL ? [process.env.GEMINI_MODEL] : []),
-  // The newest Flash first. Its free plan allows only about 20 uses a day; after that Google
-  // answers 429 and the next model is used.
+  // Gemini 4 Hydrogen first: Google's newest everyday model (November 2026), smarter than
+  // 3.8 Flash and free on the free plan. When its daily free uses run out, or it turns a
+  // request down, Google answers 429/400 and the next model is used.
+  "gemini-4-hydrogen",
+  // The newest Flash next. Its free plan allows only about 20 uses a day.
   "gemini-3.8-flash",
   // Gemini 3.5 Flash is retired and Google sends it to 3.6 Flash, so that's asked for by name.
   "gemini-3.6-flash",
@@ -16,8 +19,10 @@ const MODELS = [
   "gemini-2.5-flash-lite",
 ].filter((m, i, all) => all.indexOf(m) === i);
 
-// Busy (503), over the limit (429), or not offered to this key (404): worth trying another model.
-const TRY_NEXT = new Set([404, 429, 500, 503]);
+// Busy (503), over the limit (429), not offered to this key (403, 404), or a request this model
+// turns down even in its simple form (400, e.g. a newer model with different options): worth
+// trying another model.
+const TRY_NEXT = new Set([400, 403, 404, 429, 500, 503]);
 
 export class GeminiError extends Error {
   constructor(
