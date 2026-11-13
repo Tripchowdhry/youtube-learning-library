@@ -39,3 +39,4 @@ body {
   pointer-events: none;
 }
 .report-editor { position: relative; }
+.report-editor > :first-child { margin-top: 0; }
