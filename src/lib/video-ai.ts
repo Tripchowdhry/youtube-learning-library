@@ -8,12 +8,13 @@ export async function askVideoAi(body: {
   task: "note" | "ask";
   prompt?: string;
   focusAt?: number;
-}): Promise<VideoAiResult> {
+}, signal?: AbortSignal): Promise<VideoAiResult> {
   try {
     const res = await fetch("/api/video-ai", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
+      signal,
     });
     const data = await res.json().catch(() => ({}));
     if (res.ok) return { text: data.text, model: data.model };
@@ -34,12 +35,13 @@ export async function askArticleAi(body: {
   kind: string;
   task?: "note" | "ask";
   prompt?: string;
-}): Promise<VideoAiResult> {
+}, signal?: AbortSignal): Promise<VideoAiResult> {
   try {
     const res = await fetch("/api/article-ai", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
+      signal,
     });
     const data = await res.json().catch(() => ({}));
     if (res.ok) return { text: data.text, model: data.model };

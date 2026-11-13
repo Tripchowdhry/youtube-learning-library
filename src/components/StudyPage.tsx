@@ -1,5 +1,6 @@
 "use client";
 
+import StopAiButton from "@/components/StopAiButton";
 import { Tour, TourButton, useSectionTour } from "@/components/Tour";
 import Link from "next/link";
 import { CategoryCrumb } from "@/components/CategoryTag";
@@ -517,14 +518,14 @@ export default function StudyPage({ videoId }: { videoId: string }) {
     runAiJob<string>({
       key: aiKey,
       label: `AI answer for "${video.title ?? "your video"}"`,
-      work: async () => {
+      work: async (signal) => {
         const result = await askVideoAi({
           youtubeId: video.youtube_id,
           title: video.title,
           task: "ask",
           prompt,
           focusAt: shotAt ?? undefined,
-        });
+        }, signal);
         if (result.error || !result.text) return { error: result.error ?? "The AI didn't answer." };
         return { result: `${answerHeading(prompt, result.model)}\n${result.text}\n` };
       },
@@ -677,7 +678,7 @@ export default function StudyPage({ videoId }: { videoId: string }) {
         <div className={notesHidden ? "hidden" : "mt-2 flex min-w-0 flex-col gap-4 lg:mt-0"}>
           <div className="sticky top-[76px] z-20 hidden lg:block">{toolbar}</div>
           {loaded && (
-            <AskAi startedAt={aiStartedAt} error={aiError} onAsk={askAi} currentTime={() => player.current?.getCurrentTime?.() ?? 0} />
+            <AskAi jobKey={aiKey} startedAt={aiStartedAt} error={aiError} onAsk={askAi} currentTime={() => player.current?.getCurrentTime?.() ?? 0} />
           )}
           {!loaded ? (
             <p className="text-slate-500">Loading your notes…</p>
@@ -859,6 +860,7 @@ const AI_PRESETS = [
 ] satisfies { label: string; icon: LucideIcon; tone: Tone; prompt: string }[];
 
 function AskAi(props: {
+  jobKey: string;
   startedAt: number | null;
   error: string | null;
   onAsk: (prompt: string) => void;
@@ -931,7 +933,7 @@ function AskAi(props: {
               Ask
             </button>
           </div>
-          {props.startedAt !== null && <AskAiWorking startedAt={props.startedAt} />}
+          {props.startedAt !== null && <AskAiWorking startedAt={props.startedAt} jobKey={props.jobKey} />}
           {props.error && (
             <p className="flex items-center gap-1.5 rounded-md bg-red-50 px-2 py-1.5 text-sm text-red-700 ring-1 ring-red-200">
               <Ico icon={TriangleAlert} tone="red" size={15} />
@@ -949,14 +951,17 @@ function AskAi(props: {
 }
 
 // Counts the seconds while the AI works, so it's clear nothing is stuck.
-function AskAiWorking({ startedAt }: { startedAt: number }) {
+function AskAiWorking({ startedAt, jobKey }: { startedAt: number; jobKey: string }) {
   const elapsed = useSecondsSince(startedAt);
   return (
-    <p className="rounded-md bg-violet-50 px-2 py-1.5 text-sm text-violet-800 ring-1 ring-violet-200">
-      <span className="mr-2 inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-violet-300 border-t-violet-700 align-[-2px]" />
-      The AI is watching the video ({formatTime(elapsed)}). Long videos can take a few minutes. You can leave this
-      page; the answer is still added to your notes.
-    </p>
+    <div className="flex items-start gap-2 rounded-md bg-violet-50 px-2 py-1.5 text-sm text-violet-800 ring-1 ring-violet-200">
+      <p className="min-w-0 flex-1">
+        <span className="mr-2 inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-violet-300 border-t-violet-700 align-[-2px]" />
+        The AI is watching the video ({formatTime(elapsed)}). Long videos can take a few minutes. You can leave this
+        page; the answer is still added to your notes.
+      </p>
+      <StopAiButton jobKey={jobKey} />
+    </div>
   );
 }
 

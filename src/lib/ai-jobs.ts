@@ -13,6 +13,8 @@ type Taker = (key: string, result: unknown) => boolean;
 let snapshot: Snapshot = { running: [], errors: new Map(), finished: null };
 const listeners = new Set<() => void>();
 const takers = new Set<Taker>();
+// Lets Stop cancel a job's request.
+const controllers = new Map<string, AbortController>();
 
 function update(changes: Partial<Snapshot>) {
   snapshot = { ...snapshot, ...changes };
@@ -58,21 +60,35 @@ export function onAiJobDone(taker: Taker) {
   };
 }
 
+// Stop: cancels the request, drops whatever it brings back, and shows no error,
+// so the person can ask again right away.
+export function stopAiJob(key: string) {
+  const controller = controllers.get(key);
+  if (!controller) return;
+  controller.abort();
+  controllers.delete(key);
+  update({ running: snapshot.running.filter((j) => j.key !== key) });
+}
+
 // Runs `work`. Its result goes to an open page that takes it, otherwise to `fallback`
 // (which saves it straight to the database). An error stays until the next try.
+// `work` gets a signal to pass to its requests, so Stop can cancel them.
 export async function runAiJob<T>(options: {
   key: string;
   label: string;
-  work: () => Promise<{ result?: T; error?: string }>;
+  work: (signal: AbortSignal) => Promise<{ result?: T; error?: string }>;
   fallback?: (result: T) => Promise<void>;
 }) {
   const { key, label } = options;
   if (isAiJobRunning(key)) return;
   clearAiError(key);
+  const controller = new AbortController();
+  controllers.set(key, controller);
   update({ running: [...snapshot.running, { key, label, startedAt: Date.now() }] });
   let error: string | undefined;
   try {
-    const outcome = await options.work();
+    const outcome = await options.work(controller.signal);
+    if (controller.signal.aborted) return;
     error = outcome.error;
     if (!error && outcome.result !== undefined) {
       const taken = Array.from(takers).some((take) => take(key, outcome.result));
@@ -82,8 +98,10 @@ export async function runAiJob<T>(options: {
       }
     }
   } catch {
+    if (controller.signal.aborted) return;
     error = "Something went wrong saving the AI's answer. Try again.";
   }
+  controllers.delete(key);
   update({
     running: snapshot.running.filter((j) => j.key !== key),
     errors: error ? new Map(snapshot.errors).set(key, error) : snapshot.errors,

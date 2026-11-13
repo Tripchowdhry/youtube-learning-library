@@ -3,6 +3,7 @@
 // Files on a ScrapBook page: add PDFs, slides, documents or pictures, open them, view PDFs and
 // pictures right on the page, and ask the AI about them (the answer goes into the page's text).
 
+import StopAiButton from "@/components/StopAiButton";
 import { useEffect, useRef, useState } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { Download, Eye, EyeOff, File as FileIcon, FileText, Image as ImageIcon, Paperclip, Sparkles, Trash2, TriangleAlert } from "lucide-react";
@@ -145,12 +146,13 @@ export default function ScrapFiles(props: {
     runAiJob<string>({
       key: aiKey,
       label: `AI answer about "${f.name}"`,
-      work: async () => {
+      work: async (signal) => {
         try {
           const res = await fetch("/api/file-ai", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ path: f.path, name: f.name, type: f.type, prompt: clean }),
+            signal,
           });
           const data = await res.json().catch(() => ({}));
           if (!res.ok || !data.text) {
@@ -253,7 +255,7 @@ export default function ScrapFiles(props: {
           </div>
         );
       })}
-      {aiStartedAt !== null && <Working startedAt={aiStartedAt} />}
+      {aiStartedAt !== null && <Working startedAt={aiStartedAt} jobKey={aiKey} />}
       {aiError && (
         <p className="flex items-center gap-1.5 rounded-md bg-red-50 px-2 py-1.5 text-sm text-red-700 ring-1 ring-red-200">
           <Ico icon={TriangleAlert} tone="red" size={15} />
@@ -278,13 +280,16 @@ function SmallButton(props: { onClick: () => void; icon: typeof Eye; children: R
   );
 }
 
-function Working({ startedAt }: { startedAt: number }) {
+function Working({ startedAt, jobKey }: { startedAt: number; jobKey: string }) {
   const s = useSecondsSince(startedAt);
   return (
-    <p className="rounded-md bg-violet-50 px-2 py-1.5 text-sm text-violet-800 ring-1 ring-violet-200">
-      <span className="mr-2 inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-violet-300 border-t-violet-700 align-[-2px]" />
-      The AI is reading the file ({Math.floor(s / 60)}:{String(s % 60).padStart(2, "0")}). You can leave this page; the answer is
-      still added to it.
-    </p>
+    <div className="flex items-start gap-2 rounded-md bg-violet-50 px-2 py-1.5 text-sm text-violet-800 ring-1 ring-violet-200">
+      <p className="min-w-0 flex-1">
+        <span className="mr-2 inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-violet-300 border-t-violet-700 align-[-2px]" />
+        The AI is reading the file ({Math.floor(s / 60)}:{String(s % 60).padStart(2, "0")}). You can leave this page; the
+        answer is still added to it.
+      </p>
+      <StopAiButton jobKey={jobKey} />
+    </div>
   );
 }

@@ -5,6 +5,7 @@ import { type AiJob, useAiJobs, useSecondsSince } from "@/lib/ai-jobs";
 import { formatTime } from "@/lib/youtube-player";
 import { CircleCheck } from "lucide-react";
 import { Ico } from "@/components/Icon";
+import StopAiButton from "@/components/StopAiButton";
 
 // A small reminder in the corner of every page that the AI is still working, and a
 // note when something it was asked for has been saved.
@@ -36,12 +37,13 @@ export default function AiJobsBadge() {
 function Working({ job, more }: { job: AiJob; more: number }) {
   const seconds = useSecondsSince(job.startedAt);
   return (
-    <p className="flex items-center gap-1.5 truncate rounded-full bg-violet-50 px-3 py-1.5 text-xs text-violet-800 shadow ring-1 ring-violet-200">
+    <p className="pointer-events-auto flex items-center gap-1.5 rounded-full bg-violet-50 py-1 pl-3 pr-1 text-xs text-violet-800 shadow ring-1 ring-violet-200">
       <span className="inline-block h-3 w-3 shrink-0 animate-spin rounded-full border-2 border-violet-300 border-t-violet-700" />
       <span className="truncate">
         Working on {job.label}
         {more > 0 ? ` and ${more} more` : ""}… {formatTime(seconds)}
       </span>
+      <StopAiButton jobKey={job.key} className="rounded-full" />
     </p>
   );
 }

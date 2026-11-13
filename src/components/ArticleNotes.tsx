@@ -1,5 +1,6 @@
 "use client";
 
+import StopAiButton from "@/components/StopAiButton";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { askConfirm } from "@/components/ConfirmDialog";
 import { onAiJobDone, runAiJob, useAiJobs, useSecondsSince } from "@/lib/ai-jobs";
@@ -137,8 +138,8 @@ export default function ArticleNotes(props: {
     runAiJob<string>({
       key: aiKey,
       label: `AI answer for "${article.title ?? article.site ?? `your ${word}`}"`,
-      work: async () => {
-        const result = await askArticleAi({ url: article.url, title: article.title, kind: word, task: "ask", prompt });
+      work: async (signal) => {
+        const result = await askArticleAi({ url: article.url, title: article.title, kind: word, task: "ask", prompt }, signal);
         if (result.error || !result.text) return { error: result.error ?? "The AI didn't answer." };
         return { result: `${answerHeading(prompt, result.model)}\n${result.text}\n` };
       },
@@ -208,7 +209,7 @@ export default function ArticleNotes(props: {
         </p>
       )}
 
-      <AskAi word={word} startedAt={aiStartedAt} error={aiError} onAsk={askAi} />
+      <AskAi jobKey={aiKey} word={word} startedAt={aiStartedAt} error={aiError} onAsk={askAi} />
 
       {clips.length > 0 && (
         <div className="flex flex-wrap gap-2">
@@ -259,7 +260,7 @@ export default function ArticleNotes(props: {
   );
 }
 
-function AskAi(props: { word: string; startedAt: number | null; error: string | null; onAsk: (prompt: string) => void }) {
+function AskAi(props: { jobKey: string; word: string; startedAt: number | null; error: string | null; onAsk: (prompt: string) => void }) {
   const [prompt, setPrompt] = useState("");
   const busy = props.startedAt !== null;
   function ask(text: string) {
@@ -311,7 +312,7 @@ function AskAi(props: { word: string; startedAt: number | null; error: string | 
             Ask
           </button>
         </div>
-        {props.startedAt !== null && <Working startedAt={props.startedAt} word={props.word} />}
+        {props.startedAt !== null && <Working startedAt={props.startedAt} word={props.word} jobKey={props.jobKey} />}
         {props.error && (
           <p className="flex items-center gap-1.5 rounded-md bg-red-50 px-2 py-1.5 text-sm text-red-700 ring-1 ring-red-200">
             <Ico icon={TriangleAlert} tone="red" size={15} />
@@ -324,13 +325,16 @@ function AskAi(props: { word: string; startedAt: number | null; error: string | 
 }
 
 // Counts the seconds while the AI works, so it's clear nothing is stuck.
-function Working({ startedAt, word }: { startedAt: number; word: string }) {
+function Working({ startedAt, word, jobKey }: { startedAt: number; word: string; jobKey: string }) {
   const s = useSecondsSince(startedAt);
   return (
-    <p className="rounded-md bg-violet-50 px-2 py-1.5 text-sm text-violet-800 ring-1 ring-violet-200">
-      <span className="mr-2 inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-violet-300 border-t-violet-700 align-[-2px]" />
-      The AI is reading the {word} ({Math.floor(s / 60)}:{String(s % 60).padStart(2, "0")}). You can leave this page; the
-      answer is still added to your notes.
-    </p>
+    <div className="flex items-start gap-2 rounded-md bg-violet-50 px-2 py-1.5 text-sm text-violet-800 ring-1 ring-violet-200">
+      <p className="min-w-0 flex-1">
+        <span className="mr-2 inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-violet-300 border-t-violet-700 align-[-2px]" />
+        The AI is reading the {word} ({Math.floor(s / 60)}:{String(s % 60).padStart(2, "0")}). You can leave this page;
+        the answer is still added to your notes.
+      </p>
+      <StopAiButton jobKey={jobKey} />
+    </div>
   );
 }

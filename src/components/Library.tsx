@@ -264,8 +264,9 @@ export default function Library({ userEmail }: { userEmail: string }) {
     runAiJob<AiNote>({
       key: aiNoteKey(video.id),
       label: `AI summary for "${video.title ?? "your video"}"`,
-      work: async () => {
-        const result = await askVideoAi({ youtubeId: video.youtube_id, title: video.title, task: "note" });
+      work: async (signal) => {
+        const result = await askVideoAi({ youtubeId: video.youtube_id, title: video.title, task: "note" }, signal);
+        if (signal.aborted) return {};
         if (result.error) return result.code === "no-key" ? {} : { error: result.error };
         if (!result.text) return {};
         // Only fills an empty note, so a note typed while the AI was working stays.
@@ -1152,7 +1153,7 @@ function VideoCard(props: {
               AI summary
             </SmallButton>
           )}
-          {!video.note && props.aiNoteStartedAt !== null && <AiNoteWorking startedAt={props.aiNoteStartedAt} />}
+          {!video.note && props.aiNoteStartedAt !== null && <AiNoteWorking startedAt={props.aiNoteStartedAt} jobKey={aiNoteKey(video.id)} />}
           <SmallButton onClick={props.onRename}>Edit title</SmallButton>
           <SmallButton onClick={props.onEditTags}>Tags</SmallButton>
           {/* Kept apart from the note buttons so it isn't pressed by mistake. */}
