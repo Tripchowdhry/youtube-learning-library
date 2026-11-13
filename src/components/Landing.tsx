@@ -48,7 +48,7 @@ export default function Landing({ error }: { error?: string }) {
         <div className="mx-auto max-w-3xl px-4">
           <h2 className="text-center text-3xl font-bold">Tour and questions</h2>
           <div className="mt-8 flex flex-col gap-3">
-            <Faq q="What does BrainShelf look like?" open a={<>A quick picture tour of the main screens: videos, notes, reading, the ScrapBook and the Vault.<br /><LandingTour /></>} />
+            <Faq q="What does BrainShelf look like?" open a={<>A quick picture tour of the main screens: videos, notes, reading, Report Writer, the ScrapBook and the Vault.<br /><LandingTour /></>} />
             <Faq q="What do I sign in with?" a="Your Google account. There's no new password to remember." />
             <Faq q="What can I save?" a="YouTube videos, articles, X posts, tutorials and course pages, plus your own ScrapBook pages and Vault entries." />
             <Faq q="Does it work on my phone?" a="Yes. It runs in your phone's browser, and you can draw notes with your finger or a pen." />
