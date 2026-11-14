@@ -519,7 +519,7 @@ export default function VaultLibrary({ userEmail }: { userEmail: string }) {
             setMenu({ x: e.clientX, y: e.clientY, items: [{ label: "New category", icon: Tag, tone: "amber" as const, onClick: () => createCategory(null) }] });
           }}
         >
-          <NavItem icon={LockKeyhole} tone="slate" label="All entries" count={entries.length} active={view.kind === "all" && !searching} onClick={() => openView({ kind: "all" })} />
+          <NavItem icon={LockKeyhole} tone="navy" label="All entries" count={entries.length} active={view.kind === "all" && !searching} onClick={() => openView({ kind: "all" })} />
           <NavItem
             icon={Inbox}
             tone="blue"

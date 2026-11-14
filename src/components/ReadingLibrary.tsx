@@ -866,7 +866,7 @@ export function SectionSwitch({ active }: { active: "videos" | SectionKind | "sc
     { key: "reading", href: "/reading", name: "Reading", Icon: FileText, tone: "blue" },
     { key: "tutorial", href: "/tutorials", name: "Tutorials", Icon: GraduationCap, tone: "green" },
     { key: "scrap", href: "/scrapbook", name: "ScrapBook", Icon: NotebookPen, tone: "amber" },
-    { key: "vault", href: "/vault", name: "Vault", Icon: LockKeyhole, tone: "slate" },
+    { key: "vault", href: "/vault", name: "Vault", Icon: LockKeyhole, tone: "navy" },
   ];
   return (
     <nav className="flex shrink-0 rounded-lg bg-slate-100 p-0.5">

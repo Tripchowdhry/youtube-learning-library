@@ -1,7 +1,7 @@
 import type { LucideIcon } from "lucide-react";
 
 // Coloured icons in place of emoji: a darker outline over a light fill. The colours are the four
-// from the BrainShelf logo (blue, green, red and amber books) plus a quiet grey, so every icon
+// from the BrainShelf logo (blue, green, red and amber books) plus a quiet grey and a navy for Vault, so every icon
 // in the app matches the logo.
 export const TONES = {
   blue: { stroke: "#2563eb", fill: "#dbeafe" },
@@ -9,6 +9,8 @@ export const TONES = {
   red: { stroke: "#dc2626", fill: "#fee2e2" },
   amber: { stroke: "#d97706", fill: "#fef3c7" },
   slate: { stroke: "#475569", fill: "#f1f5f9" },
+  // Navy from Report Writer, for Vault.
+  navy: { stroke: "#2b3b5e", fill: "#ece6ff" },
 } as const;
 
 export type Tone = keyof typeof TONES;
