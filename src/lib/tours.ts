@@ -20,22 +20,42 @@ export const TOURS = {
       title: "Find it again",
       text: "Search everything you've saved, including your notes. Open any video to take notes beside it and Ask AI.",
     },
+    {
+      target: "report-writer",
+      title: "Turn notes into a report",
+      text: "Report Writer pulls your notes from videos, readings and tutorials into one report you can edit, copy or download for Word.",
+    },
+    {
+      target: "clips",
+      title: "Your clips in one place",
+      text: "See every screenshot you've clipped into your notes, and delete the ones you don't need to free up space.",
+    },
   ],
   study: [
     {
       target: "note-mode",
       title: "Write or type",
-      text: "Write with an Apple Pencil, a mouse or your finger, or switch to Typing. Your notes save on their own.",
+      text: "Write with an Apple Pencil, a mouse or your finger, or switch to Typing for a Word-style editor with headings, bold, lists and links. Your notes save on their own.",
     },
     {
       target: "stamp",
       title: "Stamp the moment",
-      text: "Tap Stamp time to pin where the video is right now. Tap that time in your notes later to jump straight back.",
+      text: "Tap Stamp time (or Ctrl+Shift+S while typing) to pin where the video is right now. Tap that time later to jump straight back.",
+    },
+    {
+      target: "clip",
+      title: "Clip a picture",
+      text: "Tap Clip to put a screenshot of the video into your notes.",
     },
     {
       target: "ask-ai",
       title: "Ask AI about the video",
-      text: "Get a summary, a bullet report, or an explanation of any moment. Answers land in your typed notes.",
+      text: "Get a summary, a bullet report, or an explanation of any moment. Answers land in your typed notes, ready to edit.",
+    },
+    {
+      target: "notes-export",
+      title: "Copy or download your notes",
+      text: "In Typing, Copy puts your notes, with their formatting and clips, into Word, Google Docs or an email. Download Word saves them as a file.",
     },
   ],
   // Reading and Tutorials work the same way, so seeing it in one counts for both.
@@ -50,12 +70,25 @@ export const TOURS = {
       title: "Know what you've finished",
       text: "Open an item to read it here. Scrolling to the end ticks it ✓ Read, or tap the ✓ yourself. Pick Unread to see what's left.",
     },
+    {
+      title: "Notes beside what you read",
+      text: "While reading, open My notes to type with headings, bold and lists, or switch to Handwriting for Apple Pencil. Ask AI for a summary and add clips. Copy or Download Word takes typed notes anywhere.",
+    },
+    {
+      target: "report-writer",
+      title: "Turn notes into a report",
+      text: "Report Writer pulls your notes from readings, tutorials and videos into one report you can edit, copy or download for Word.",
+    },
   ],
   scrapbook: [
     {
       target: "new-page",
       title: "Pages of your own",
       text: "Give a page a title and tap + New page to write, type or draw freely, and sort pages into categories.",
+    },
+    {
+      title: "Type like in Word",
+      text: "When typing on a page, use the toolbar for headings, bold, lists and highlight, add clips, then Copy it or Download Word. Add file puts PDFs, slides, documents, pictures and videos on the page. They stay on your computer, and Ask AI can read or watch them for you.",
     },
   ],
   vault: [

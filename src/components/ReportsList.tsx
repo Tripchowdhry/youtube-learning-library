@@ -106,8 +106,7 @@ export default function ReportsList({ userEmail }: { userEmail: string }) {
               </button>
             </div>
             <p className="mb-5 text-sm text-slate-600">
-              Pick videos, readings and tutorials, and turn their notes into one report: put together as they are, or
-              drafted by AI. Edit it, then copy it or download it for Word. Your notes themselves are never changed.
+              Turn notes from your videos, readings and tutorials into one report. Your notes stay as they are.
             </p>
 
             {error && <p className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}

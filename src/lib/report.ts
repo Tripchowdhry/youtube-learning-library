@@ -153,27 +153,33 @@ export function sourcesSection(list: { n: number; title: string; url: string }[]
 
 // ---------- Reading the report text ----------
 // Reports are plain text with a little markdown: # headings, - bullets, 1. steps,
-// **bold**, [links](https://…), and ![caption](picture) on a line of its own.
+// **bold**, _italic_ (or *italic*), ++underline++, [links](https://…), and ![caption](picture) on a line of its own.
 
-export type Inline = { text: string; bold?: boolean; href?: string };
+export type Inline = { text: string; bold?: boolean; italic?: boolean; underline?: boolean; href?: string };
 export type Block =
   | { type: "h1" | "h2" | "h3" | "p" | "li" | "quote"; inline: Inline[] }
   | { type: "ol"; num: string; inline: Inline[] }
   | { type: "img"; src: string; caption: string };
 
-const INLINE = /\*\*(.+?)\*\*|\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)|(https?:\/\/[^\s)]+)/g;
+// Marks can sit inside each other, like a bold word in a link or bold italic text.
+const INLINE =
+  /\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)|\*\*(.+?)\*\*|\+\+(.+?)\+\+|\*(?=\S)(.+?)(?<=\S)\*(?!\*)|(?<![\w/])_(?=\S)(.+?)(?<=\S)_(?!\w)|(https?:\/\/[^\s)]+)/g;
 
-export function parseInline(text: string): Inline[] {
+type Marks = Omit<Inline, "text">;
+
+export function parseInline(text: string, marks: Marks = {}): Inline[] {
   const out: Inline[] = [];
   let last = 0;
   for (const m of text.matchAll(INLINE)) {
-    if (m.index > last) out.push({ text: text.slice(last, m.index) });
-    if (m[1] !== undefined) out.push({ text: m[1], bold: true });
-    else if (m[2] !== undefined) out.push({ text: m[2], href: m[3] });
-    else out.push({ text: m[4], href: m[4] });
+    if (m.index > last) out.push({ text: text.slice(last, m.index), ...marks });
+    if (m[1] !== undefined) out.push(...parseInline(m[1], { ...marks, href: m[2] }));
+    else if (m[3] !== undefined) out.push(...parseInline(m[3], { ...marks, bold: true }));
+    else if (m[4] !== undefined) out.push(...parseInline(m[4], { ...marks, underline: true }));
+    else if (m[5] !== undefined || m[6] !== undefined) out.push(...parseInline(m[5] ?? m[6], { ...marks, italic: true }));
+    else out.push({ text: m[7], ...marks, href: m[7] });
     last = m.index + m[0].length;
   }
-  if (last < text.length) out.push({ text: text.slice(last) });
+  if (last < text.length) out.push({ text: text.slice(last), ...marks });
   return out;
 }
 

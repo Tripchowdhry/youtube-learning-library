@@ -1,5 +1,7 @@
 "use client";
 
+import { revealById } from "@/lib/reveal";
+import StopAiButton from "@/components/StopAiButton";
 import ReportWriterLink from "@/components/ReportWriterLink";
 import { Tour, TourButton, useSectionTour } from "@/components/Tour";
 import BrandMark from "@/components/BrandMark";
@@ -26,6 +28,7 @@ import { findSavedElsewhere } from "@/lib/find-saved";
 import { linkKey } from "@/lib/links";
 import { createClient } from "@/lib/supabase/client";
 import type { Article, ArticleCategory, SectionKind } from "@/lib/types";
+import { hasWriting } from "@/lib/note-mode";
 import { askArticleAi } from "@/lib/video-ai";
 import { askConfirm } from "./ConfirmDialog";
 import { Ico, type Tone } from "./Icon";
@@ -302,8 +305,9 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
     runAiJob<AiNote>({
       key: aiNoteKey(article.id),
       label: `AI summary for "${article.title ?? article.site ?? "your link"}"`,
-      work: async () => {
-        const result = await askArticleAi({ url: article.url, title: article.title, kind });
+      work: async (signal) => {
+        const result = await askArticleAi({ url: article.url, title: article.title, kind }, signal);
+        if (signal.aborted) return {};
         if (result.error) return result.code === "no-key" ? {} : { error: result.error };
         if (!result.text) return {};
         // Only fills an empty note, so a note typed while the AI was working stays.
@@ -327,6 +331,7 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
         const { articleId, note, model } = result as AiNote;
         setArticles((prev) => prev.map((a) => (a.id === articleId ? { ...a, note } : a)));
         if (model) notify(`Note written by ${model}`);
+        revealById(`ai-note-${articleId}`);
         return true;
       }),
     [notify],
@@ -634,6 +639,7 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
           className="ml-auto w-full max-w-xs rounded-md border border-slate-300 px-3 py-1.5 text-sm"
         />
         <Link
+          data-tour="clips"
           href="/clips"
           className="flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1 text-sm text-slate-600 hover:bg-slate-100"
           title="See and delete your clips to free up space"
@@ -929,7 +935,7 @@ function ArticleRow(props: {
     },
     rowRef,
   );
-  const hasNotes = Boolean(article.notes?.trim());
+  const hasNotes = Boolean(article.notes?.trim()) || hasWriting(article.pages);
   return (
     <li
       ref={rowRef}
@@ -953,12 +959,14 @@ function ArticleRow(props: {
           {" · "}Added {formatDate(article.created_at)}
           {article.read_at && <span className="text-green-700"> · Read {formatDate(article.read_at)}</span>}
         </p>
-        <ArticleNote
-          note={article.note}
-          editing={editingNote}
-          setEditing={setEditingNote}
-          onSave={props.onSaveNote}
-        />
+        <div id={`ai-note-${article.id}`} className="rounded-md">
+          <ArticleNote
+            note={article.note}
+            editing={editingNote}
+            setEditing={setEditingNote}
+            onSave={props.onSaveNote}
+          />
+        </div>
         {props.aiNoteError && !article.note && (
           <p className="flex items-center gap-1 rounded-md bg-red-50 px-2 py-1 text-xs text-red-700 ring-1 ring-red-200">
             <Ico icon={TriangleAlert} tone="red" size={14} />
@@ -1034,7 +1042,7 @@ function ArticleRow(props: {
               AI summary
             </SmallButton>
           )}
-          {!article.note && props.aiNoteStartedAt !== null && <AiNoteWorking startedAt={props.aiNoteStartedAt} />}
+          {!article.note && props.aiNoteStartedAt !== null && <AiNoteWorking startedAt={props.aiNoteStartedAt} jobKey={aiNoteKey(article.id)} />}
           <SmallButton onClick={props.onRename}>Edit title</SmallButton>
           {/* Kept apart from the note buttons so it isn't pressed by mistake. */}
           <span className="ml-auto pl-3">
@@ -1077,12 +1085,13 @@ export function ToastBox({ toast, onClose }: { toast: Toast; onClose: () => void
 }
 
 // Shown in place of the AI summary button while the AI writes the note.
-export function AiNoteWorking({ startedAt }: { startedAt: number }) {
+export function AiNoteWorking({ startedAt, jobKey }: { startedAt: number; jobKey: string }) {
   const seconds = useSecondsSince(startedAt);
   return (
-    <span className="flex items-center gap-1.5 rounded-md border border-violet-200 bg-violet-50 px-2 py-1 text-xs text-violet-800">
+    <span className="flex items-center gap-1.5 rounded-md border border-violet-200 bg-violet-50 py-0.5 pl-2 pr-0.5 text-xs text-violet-800">
       <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-violet-300 border-t-violet-700" />
       Writing summary… {Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, "0")}
+      <StopAiButton jobKey={jobKey} />
     </span>
   );
 }

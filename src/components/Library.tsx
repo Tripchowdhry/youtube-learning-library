@@ -1,5 +1,6 @@
 "use client";
 
+import { revealById } from "@/lib/reveal";
 import ReportWriterLink from "@/components/ReportWriterLink";
 import BrandMark from "@/components/BrandMark";
 import { WelcomePanel } from "@/components/GettingStarted";
@@ -264,8 +265,9 @@ export default function Library({ userEmail }: { userEmail: string }) {
     runAiJob<AiNote>({
       key: aiNoteKey(video.id),
       label: `AI summary for "${video.title ?? "your video"}"`,
-      work: async () => {
-        const result = await askVideoAi({ youtubeId: video.youtube_id, title: video.title, task: "note" });
+      work: async (signal) => {
+        const result = await askVideoAi({ youtubeId: video.youtube_id, title: video.title, task: "note" }, signal);
+        if (signal.aborted) return {};
         if (result.error) return result.code === "no-key" ? {} : { error: result.error };
         if (!result.text) return {};
         // Only fills an empty note, so a note typed while the AI was working stays.
@@ -289,6 +291,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
         const { videoId, note, model } = result as AiNote;
         setVideos((prev) => prev.map((v) => (v.id === videoId ? { ...v, note } : v)));
         if (model) notify(`Note written by ${model}`);
+        revealById(`ai-note-${videoId}`);
         return true;
       }),
     [notify],
@@ -612,6 +615,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
           className="ml-auto w-full max-w-xs rounded-md border border-slate-300 px-3 py-1.5 text-sm"
         />
         <Link
+          data-tour="clips"
           href="/clips"
           className="flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1 text-sm text-slate-600 hover:bg-slate-100"
           title="See and delete your clips to free up space"
@@ -1061,7 +1065,9 @@ function VideoCard(props: {
           {video.channel && `${video.channel} · `}Added {formatDate(video.created_at)}
           {video.watched_at && <span className="text-green-700"> · Watched {formatDate(video.watched_at)}</span>}
         </p>
-        <ArticleNote note={video.note} editing={editingNote} setEditing={setEditingNote} onSave={props.onSaveNote} />
+        <div id={`ai-note-${video.id}`} className="rounded-md">
+          <ArticleNote note={video.note} editing={editingNote} setEditing={setEditingNote} onSave={props.onSaveNote} />
+        </div>
         {props.aiNoteError && !video.note && (
           <p className="flex items-center gap-1 rounded-md bg-red-50 px-2 py-1 text-xs text-red-700 ring-1 ring-red-200">
             <Ico icon={TriangleAlert} tone="red" size={14} />
@@ -1151,7 +1157,7 @@ function VideoCard(props: {
               AI summary
             </SmallButton>
           )}
-          {!video.note && props.aiNoteStartedAt !== null && <AiNoteWorking startedAt={props.aiNoteStartedAt} />}
+          {!video.note && props.aiNoteStartedAt !== null && <AiNoteWorking startedAt={props.aiNoteStartedAt} jobKey={aiNoteKey(video.id)} />}
           <SmallButton onClick={props.onRename}>Edit title</SmallButton>
           <SmallButton onClick={props.onEditTags}>Tags</SmallButton>
           {/* Kept apart from the note buttons so it isn't pressed by mistake. */}

@@ -1,28 +1,29 @@
 "use client";
 
+import { markAiQuestions } from "@/lib/notes-format";
+import { revealAdded } from "@/lib/reveal";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { compareFolders, useFolderSort } from "@/components/FolderSort";
-import NotePageCanvas, { PAGE_HEIGHT, type Tool } from "@/components/NotePageCanvas";
+import NotePageCanvas, { type Tool } from "@/components/NotePageCanvas";
 import { ClipButton } from "@/components/ClipButtons";
 import { clipUrl, type ClipImage } from "@/lib/clips";
 import { formatDate } from "@/components/ReadingLibrary";
 import { createClient } from "@/lib/supabase/client";
-import type { ArticleCategory, NoteImage, NotePage, NoteStroke, Scrap } from "@/lib/types";
-import { Keyboard, PenLine, Trash2 } from "lucide-react";
+import type { ArticleCategory, NotePage, NoteStroke, Scrap } from "@/lib/types";
+import { hasWriting, openingMode } from "@/lib/note-mode";
+import { Bold, Eraser, Highlighter, Italic, Keyboard, List, ListOrdered, PenLine, RemoveFormatting, Trash2, Underline } from "lucide-react";
+import { Divider, ToolButton, editorToReport } from "@/components/ReportRichEditor";
+import NotesExport from "@/components/NotesExport";
+import ScrapFiles, { AttachFileButton, addFiles, type Chosen } from "@/components/ScrapFiles";
+import { FILES_SETUP, deleteScrapFiles, type ScrapFile } from "@/lib/files";
+import { pictureUrl } from "@/lib/report";
 import { Ico } from "@/components/Icon";
+import { HIGHLIGHT_COLORS, InkTools, PEN_COLORS, SIZES, emptyPage, withPicture } from "@/components/Handwriting";
 import { CategoryCrumb } from "@/components/CategoryTag";
 import { treePath } from "@/lib/category-tree";
 
-const PEN_COLORS = ["#111827", "#2563eb", "#dc2626", "#16a34a"];
-const HIGHLIGHT_COLORS = ["#facc15", "#4ade80", "#f472b6", "#60a5fa"];
-const SIZES = [
-  { label: "Fine", value: 2 },
-  { label: "Medium", value: 4 },
-  { label: "Bold", value: 7 },
-];
-const emptyPage = (): NotePage => ({ strokes: [], stamps: [] });
 
 type SaveState = "saved" | "saving" | "unsaved" | "error";
 type Mode = "write" | "type";
@@ -33,6 +34,14 @@ const MODE_KEY = "scrap-mode";
 const ALLOWED_TAGS = new Set(["P", "DIV", "BR", "B", "STRONG", "I", "EM", "U", "H1", "H2", "H3", "UL", "OL", "LI", "MARK", "SPAN"]);
 
 // Clips (screenshots) in the text are kept only when they come from your own clips storage.
+// Scrolls to the newly added answer and lights it up.
+function revealAnswerIn(box: HTMLElement | null, start: { current: number | null }) {
+  const from = start.current;
+  if (!box || from === null) return;
+  start.current = null;
+  revealAdded(Array.from(box.children).slice(from));
+}
+
 function cleanHtml(html: string, clipPrefix: string) {
   const doc = new DOMParser().parseFromString(`<div>${html}</div>`, "text/html");
   const walk = (el: Element) => {
@@ -60,16 +69,25 @@ function cleanHtml(html: string, clipPrefix: string) {
   return root.innerHTML;
 }
 
-// The mode last picked on this device; otherwise typing with a mouse or trackpad, handwriting on an iPad.
-function preferredMode(): Mode {
-  try {
-    const stored = localStorage.getItem(MODE_KEY);
-    if (stored === "write" || stored === "type") return stored;
-  } catch {
-    // Fall through to the device default.
+// The page as one document for Copy and Download Word. Clips sit inside the text here, so each
+// is moved to its own line after the paragraph it was in.
+export function scrapDocument(title: string, html: string) {
+  const box = document.createElement("div");
+  box.innerHTML = html;
+  const after = new Map<Node, Node>();
+  for (const img of Array.from(box.querySelectorAll("img"))) {
+    let top: Node = img;
+    while (top.parentNode && top.parentNode !== box) top = top.parentNode;
+    const figure = document.createElement("figure");
+    figure.dataset.src = img.getAttribute("src") ?? "";
+    box.insertBefore(figure, (after.get(top) ?? top).nextSibling);
+    after.set(top, figure);
+    if (top !== img) img.remove();
   }
-  return window.matchMedia("(any-pointer: fine)").matches ? "type" : "write";
+  for (const img of Array.from(box.querySelectorAll("img"))) img.remove();
+  return `# ${title}\n\n${editorToReport(box)}`;
 }
+
 
 export default function ScrapEditor({ scrapId }: { scrapId: string }) {
   const supabase = useMemo(() => createClient(), []);
@@ -84,9 +102,19 @@ export default function ScrapEditor({ scrapId }: { scrapId: string }) {
   const [pages, setPages] = useState<NotePage[]>([emptyPage()]);
   const [mode, setMode] = useState<Mode>("type");
   const [saveState, setSaveState] = useState<SaveState>("saved");
-  const [notice, setNotice] = useState<string | null>(null);
+  const [notice, setNotice] = useState<{ text: string; ok?: boolean } | null>(null);
+  const showNotice = useCallback((text: string, ok?: boolean) => {
+    setNotice({ text, ok });
+    setTimeout(() => setNotice(null), 5000);
+  }, []);
+  // Files on the page. filesReady is false until supabase/files.sql has been run.
+  const [files, setFiles] = useState<ScrapFile[]>([]);
+  const [filesReady, setFilesReady] = useState(false);
+  const [adding, setAdding] = useState(false);
 
   const editor = useRef<HTMLDivElement>(null);
+  // Where a newly added AI answer starts in the typed text, until it has been shown.
+  const answerStart = useRef<number | null>(null);
   // The typed text lives in the editor box itself; this copy is what gets saved.
   const bodyRef = useRef("");
   const [bodyTick, setBodyTick] = useState(0);
@@ -112,14 +140,16 @@ export default function ScrapEditor({ scrapId }: { scrapId: string }) {
       const loaded = s.data as Scrap;
       bodyRef.current = cleanHtml(loaded.body, clipPrefix);
       setScrap(loaded);
+      setFilesReady("files" in loaded);
+      setFiles(loaded.files ?? []);
       setTitle(loaded.title);
       setCategoryId(loaded.category_id);
       if (loaded.pages?.length) setPages(loaded.pages);
       setCategories((c.data ?? []) as ArticleCategory[]);
       // Open in whichever kind of writing the page already has.
-      const hasText = loaded.body.replace(/<[^>]+>/g, "").trim().length > 0;
-      const hasInk = (loaded.pages ?? []).some((p) => p.strokes.length);
-      setMode(hasInk && !hasText ? "write" : hasText && !hasInk ? "type" : preferredMode());
+      // Typed text or pictures count as typed notes; ink, stamps or pictures on a page as handwriting.
+      const hasTyped = /<img\b/i.test(loaded.body) || loaded.body.replace(/<[^>]+>|&nbsp;/g, "").trim().length > 0;
+      setMode(openingMode(MODE_KEY, hasTyped, hasWriting(loaded.pages)));
     })();
   }, [supabase, scrapId, clipPrefix]);
 
@@ -127,7 +157,9 @@ export default function ScrapEditor({ scrapId }: { scrapId: string }) {
   useEffect(() => {
     if (!scrap || mode !== "type" || !editor.current) return;
     editor.current.innerHTML = bodyRef.current;
+    markAiQuestions(editor.current);
     setIsEmpty(!editor.current.textContent?.trim() && !editor.current.querySelector("img"));
+    revealAnswerIn(editor.current, answerStart);
   }, [scrap, mode]);
 
   // ---------- Saving ----------
@@ -138,6 +170,10 @@ export default function ScrapEditor({ scrapId }: { scrapId: string }) {
   pagesRef.current = pages;
   const categoryRef = useRef(categoryId);
   categoryRef.current = categoryId;
+  const filesRef = useRef(files);
+  filesRef.current = files;
+  const filesReadyRef = useRef(filesReady);
+  filesReadyRef.current = filesReady;
   const save = useCallback(async () => {
     setSaveState("saving");
     const { error } = await supabase
@@ -146,6 +182,7 @@ export default function ScrapEditor({ scrapId }: { scrapId: string }) {
         title: titleRef.current.trim().slice(0, 200) || "Untitled",
         body: cleanHtml(bodyRef.current, clipPrefix),
         pages: pagesRef.current,
+        ...(filesReadyRef.current ? { files: filesRef.current } : {}),
         category_id: categoryRef.current,
         updated_at: new Date().toISOString(),
       })
@@ -157,7 +194,7 @@ export default function ScrapEditor({ scrapId }: { scrapId: string }) {
     if (saveState !== "unsaved") return;
     const timer = setTimeout(save, 1200);
     return () => clearTimeout(timer);
-  }, [pages, title, categoryId, bodyTick, saveState, save]);
+  }, [pages, title, categoryId, bodyTick, files, saveState, save]);
 
   // Save right away if the person switches apps or closes the tab.
   useEffect(() => {
@@ -170,6 +207,7 @@ export default function ScrapEditor({ scrapId }: { scrapId: string }) {
 
   function onTyped() {
     if (!editor.current) return;
+    markAiQuestions(editor.current);
     bodyRef.current = editor.current.innerHTML;
     setIsEmpty(!editor.current.textContent?.trim() && !editor.current.querySelector("img"));
     setSaveState("unsaved");
@@ -179,9 +217,30 @@ export default function ScrapEditor({ scrapId }: { scrapId: string }) {
   // ---------- Typing ----------
 
   function format(command: string, value?: string) {
-    editor.current?.focus();
+    // The style menu takes the focus; put the typing spot back first.
+    if (document.activeElement !== editor.current) {
+      editor.current?.focus();
+      const r = lastRange.current;
+      if (r && editor.current?.contains(r.startContainer)) {
+        const sel = window.getSelection();
+        sel?.removeAllRanges();
+        sel?.addRange(r);
+      }
+    }
     document.execCommand("styleWithCSS", false, command === "hiliteColor" ? "true" : "false");
     document.execCommand(command, false, value);
+    onTyped();
+  }
+
+  // Empties the typed page. Done as one edit, so Ctrl/Cmd+Z brings it back.
+  function clearTyped() {
+    const el = editor.current;
+    if (!el || isEmpty) return;
+    if (!window.confirm("Erase everything typed on this page?\nCtrl/Cmd+Z right after brings it back.")) return;
+    el.focus();
+    document.execCommand("selectAll");
+    document.execCommand("delete");
+    if (el.textContent?.trim() || el.querySelector("img")) el.innerHTML = "";
     onTyped();
   }
 
@@ -240,20 +299,7 @@ export default function ScrapEditor({ scrapId }: { scrapId: string }) {
 
   // On a handwriting sheet the picture goes under the last one, or onto a new sheet when there's no room.
   function placeImage(image: ClipImage, path: string) {
-    const current = pagesRef.current;
-    const w = 640;
-    const h = Math.round((w * image.height) / image.width);
-    let page = current.length - 1;
-    const bottom = Math.max(60, ...(current[page].images ?? []).map((im) => im.y + im.h + 30));
-    let y = bottom;
-    let next = current;
-    if (y + h > PAGE_HEIGHT - 20) {
-      page += 1;
-      y = 60;
-      next = [...current, emptyPage()];
-    }
-    const im: NoteImage = { id: crypto.randomUUID(), path, x: 100, y, w, h, t: 0 };
-    change(next.map((p, i) => (i === page ? { ...p, images: [...(p.images ?? []), im] } : p)));
+    change(withPicture(pagesRef.current, image, path));
   }
 
   function deleteImage(pageIndex: number, imageId: string) {
@@ -299,6 +345,48 @@ export default function ScrapEditor({ scrapId }: { scrapId: string }) {
     );
   }
 
+  // ---------- Files ----------
+
+  async function attach(chosen: Chosen[]) {
+    if (!filesReady) return showNotice(FILES_SETUP);
+    setAdding(true);
+    const { added, problem } = await addFiles(chosen);
+    setAdding(false);
+    if (added.length) {
+      setFiles((f) => [...f, ...added]);
+      setSaveState("unsaved");
+    }
+    if (problem) showNotice(problem);
+  }
+
+  function changeFiles(next: ScrapFile[]) {
+    setFiles(next);
+    setSaveState("unsaved");
+  }
+
+  // An AI answer about a file goes to the end of the typed text, shown in Typing.
+  // The page then scrolls to it and lights it up for a moment, so it's clear where it went.
+  const addAnswer = useCallback(
+    (html: string) => {
+      const before = document.createElement("div");
+      before.innerHTML = bodyRef.current;
+      answerStart.current = before.children.length;
+      bodyRef.current = `${bodyRef.current}${html}`;
+      if (editor.current) {
+        editor.current.insertAdjacentHTML("beforeend", html);
+        markAiQuestions(editor.current);
+        setIsEmpty(false);
+        revealAnswerIn(editor.current, answerStart);
+      } else {
+        setMode("type");
+      }
+      setSaveState("unsaved");
+      setBodyTick((t) => t + 1);
+      showNotice("✨ The AI's answer was added to your page.", true);
+    },
+    [showNotice],
+  );
+
   function chooseMode(next: Mode) {
     setMode(next);
     try {
@@ -314,10 +402,10 @@ export default function ScrapEditor({ scrapId }: { scrapId: string }) {
     if (!window.confirm(`Delete "${title || "Untitled"}" from your ScrapBook?\nThis can't be undone.`)) return;
     const { error } = await supabase.from("scraps").delete().eq("id", scrapId);
     if (error) {
-      setNotice(error.message);
-      setTimeout(() => setNotice(null), 4000);
+      showNotice(error.message);
       return;
     }
+    await deleteScrapFiles(supabase, files.map((f) => f.path));
     router.push("/scrapbook");
   }
 
@@ -362,7 +450,8 @@ export default function ScrapEditor({ scrapId }: { scrapId: string }) {
             />
           )}
         </div>
-        <SaveBadge state={saveState} onRetry={save} />
+        {/* In typing mode it shows next to Copy instead. */}
+        {mode !== "type" && <SaveBadge state={saveState} onRetry={save} />}
         <button
           onClick={deleteScrap}
           className="inline-flex shrink-0 items-center gap-1 rounded-md border border-red-200 px-2 py-1 text-xs text-red-600 hover:bg-red-50"
@@ -429,8 +518,21 @@ export default function ScrapEditor({ scrapId }: { scrapId: string }) {
                 ))}
               </div>
               <ClipButton what="screen" onPicture={addClip} />
+              <AttachFileButton onFiles={attach} busy={adding} />
               {mode === "type" ? (
-                <TypingTools onFormat={format} />
+                <>
+                  <TypingTools onFormat={format} onClear={clearTyped} canClear={!isEmpty} />
+                  <div className="ml-auto">
+                    <NotesExport
+                      saveState={saveState}
+                      onRetry={save}
+                      title={title.trim() || "Untitled"}
+                      makeDocument={() => scrapDocument(title.trim() || "Untitled", cleanHtml(bodyRef.current, clipPrefix))}
+                      resolve={(src) => pictureUrl(supabase, src)}
+                      empty={isEmpty}
+                    />
+                  </div>
+                </>
               ) : (
                 <InkTools
                   tool={tool}
@@ -447,6 +549,8 @@ export default function ScrapEditor({ scrapId }: { scrapId: string }) {
                 />
               )}
             </div>
+
+            <ScrapFiles supabase={supabase} scrapId={scrapId} files={files} onChange={changeFiles} onAnswer={addAnswer} onNotice={showNotice} />
 
             {mode === "type" ? (
               <div className="relative">
@@ -510,115 +614,57 @@ export default function ScrapEditor({ scrapId }: { scrapId: string }) {
       </main>
 
       {notice && (
-        <div className="fixed bottom-4 left-1/2 z-40 -translate-x-1/2 rounded-lg bg-red-600 px-4 py-2 text-sm text-white shadow-lg">
-          {notice}
+        <div
+          className={`fixed bottom-4 left-1/2 z-40 -translate-x-1/2 rounded-lg px-4 py-2 text-sm text-white shadow-lg ${notice.ok ? "bg-violet-700" : "bg-red-600"}`}
+        >
+          {notice.text}
         </div>
       )}
     </div>
   );
 }
 
-function TypingTools({ onFormat }: { onFormat: (command: string, value?: string) => void }) {
-  const tools: { label: React.ReactNode; title: string; command: string; value?: string }[] = [
-    { label: <b>B</b>, title: "Bold (Ctrl/Cmd+B)", command: "bold" },
-    { label: <i>I</i>, title: "Italic (Ctrl/Cmd+I)", command: "italic" },
-    { label: <u>U</u>, title: "Underline (Ctrl/Cmd+U)", command: "underline" },
-    { label: "Heading", title: "Big heading", command: "formatBlock", value: "<h1>" },
-    { label: "Subheading", title: "Smaller heading", command: "formatBlock", value: "<h2>" },
-    { label: "Normal", title: "Normal text", command: "formatBlock", value: "<p>" },
-    { label: "• List", title: "Bulleted list", command: "insertUnorderedList" },
-    { label: "1. List", title: "Numbered list", command: "insertOrderedList" },
-    { label: <span className="bg-yellow-200 px-0.5">Highlight</span>, title: "Highlight", command: "hiliteColor", value: "#fef08a" },
-    { label: "Clear", title: "Remove bold, italic, highlight…", command: "removeFormat" },
-  ];
+// The same kind of toolbar as Report Writer, plus Highlight.
+function TypingTools(props: { onFormat: (command: string, value?: string) => void; onClear: () => void; canClear: boolean }) {
+  const { onFormat } = props;
   return (
-    <div className="flex flex-wrap items-center gap-1">
-      {tools.map((t) => (
-        <button
-          key={t.title}
-          title={t.title}
-          aria-label={t.title}
-          // Keep the text selection when a button is pressed.
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={() => onFormat(t.command, t.value)}
-          className="min-w-8 rounded-md px-2 py-1.5 text-sm ring-1 ring-slate-300 hover:bg-slate-100"
-        >
-          {t.label}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-function InkTools(props: {
-  tool: Tool;
-  setTool: (t: Tool) => void;
-  color: string;
-  setColor: (c: string) => void;
-  colors: string[];
-  size: number;
-  setSize: (s: number) => void;
-  canUndo: boolean;
-  onUndo: () => void;
-  fingerDraws: boolean;
-  setFingerDraws: (v: boolean) => void;
-}) {
-  const tools: { id: Tool; label: string }[] = [
-    { id: "pen", label: "Pen" },
-    { id: "highlighter", label: "Highlighter" },
-    { id: "eraser", label: "Eraser" },
-  ];
-  return (
-    <>
-      <div className="flex overflow-hidden rounded-lg ring-1 ring-slate-300">
-        {tools.map((t) => (
-          <button
-            key={t.id}
-            onClick={() => props.setTool(t.id)}
-            className={`px-3 py-1.5 text-sm ${props.tool === t.id ? "bg-slate-900 text-white" : "hover:bg-slate-100"}`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
-      {props.tool !== "eraser" && (
-        <>
-          <div className="flex items-center gap-1.5">
-            {props.colors.map((c) => (
-              <button
-                key={c}
-                onClick={() => props.setColor(c)}
-                aria-label={`Color ${c}`}
-                className={`h-7 w-7 rounded-full ring-offset-2 ${props.color === c ? "ring-2 ring-slate-900" : ""}`}
-                style={{ background: c }}
-              />
-            ))}
-          </div>
-          <div className="flex overflow-hidden rounded-lg ring-1 ring-slate-300">
-            {SIZES.map((s) => (
-              <button
-                key={s.value}
-                onClick={() => props.setSize(s.value)}
-                className={`px-2.5 py-1.5 text-xs ${props.size === s.value ? "bg-slate-200 font-semibold" : "hover:bg-slate-100"}`}
-              >
-                {s.label}
-              </button>
-            ))}
-          </div>
-        </>
-      )}
-      <button
-        onClick={props.onUndo}
-        disabled={!props.canUndo}
-        className="rounded-lg px-3 py-1.5 text-sm ring-1 ring-slate-300 hover:bg-slate-100 disabled:opacity-40"
+    <div
+      className="flex flex-wrap items-center gap-1"
+      // Keep the text selection when a button is pressed.
+      onMouseDown={(e) => e.target instanceof HTMLSelectElement || e.preventDefault()}
+    >
+      <select
+        value=""
+        onChange={(e) => e.target.value && onFormat("formatBlock", `<${e.target.value}>`)}
+        aria-label="Text style"
+        className="rounded-md border border-slate-300 bg-white px-1.5 py-1 text-sm"
       >
-        Undo
+        <option value="" disabled>
+          Style
+        </option>
+        <option value="p">Normal text</option>
+        <option value="h1">Heading</option>
+        <option value="h2">Subheading</option>
+      </select>
+      <Divider />
+      <ToolButton label="Bold (Ctrl/Cmd+B)" Icon={Bold} onClick={() => onFormat("bold")} />
+      <ToolButton label="Italic (Ctrl/Cmd+I)" Icon={Italic} onClick={() => onFormat("italic")} />
+      <ToolButton label="Underline (Ctrl/Cmd+U)" Icon={Underline} onClick={() => onFormat("underline")} />
+      <ToolButton label="Bullet list" Icon={List} onClick={() => onFormat("insertUnorderedList")} />
+      <ToolButton label="Numbered list" Icon={ListOrdered} onClick={() => onFormat("insertOrderedList")} />
+      <ToolButton label="Highlight" Icon={Highlighter} onClick={() => onFormat("hiliteColor", "#fef08a")} />
+      <ToolButton label="Clear formatting" Icon={RemoveFormatting} onClick={() => onFormat("removeFormat")} />
+      <Divider />
+      <button
+        onClick={props.onClear}
+        disabled={!props.canClear}
+        title="Erase everything typed on this page"
+        className="flex items-center gap-1 rounded-md px-2 py-1 text-sm text-slate-700 hover:bg-red-50 hover:text-red-700 disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-slate-700"
+      >
+        <Eraser size={15} aria-hidden />
+        Clear sheet
       </button>
-      <label className="ml-auto flex items-center gap-1.5 text-xs text-slate-600">
-        <input type="checkbox" checked={props.fingerDraws} onChange={(e) => props.setFingerDraws(e.target.checked)} />
-        Draw with finger
-      </label>
-    </>
+    </div>
   );
 }
 

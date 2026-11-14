@@ -5,7 +5,8 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 // AI requests that keep running when the person moves to another tab of the app.
 // They live outside the page components, so leaving a page doesn't stop them.
 
-export type AiJob = { key: string; label: string; startedAt: number };
+// note: what the job is doing now, e.g. "Sending the video… 40%".
+export type AiJob = { key: string; label: string; startedAt: number; note?: string };
 type Snapshot = { running: AiJob[]; errors: Map<string, string>; finished: { label: string; at: number } | null };
 // A page that is open when its job finishes can take the result; return true if it did.
 type Taker = (key: string, result: unknown) => boolean;
@@ -13,6 +14,8 @@ type Taker = (key: string, result: unknown) => boolean;
 let snapshot: Snapshot = { running: [], errors: new Map(), finished: null };
 const listeners = new Set<() => void>();
 const takers = new Set<Taker>();
+// Lets Stop cancel a job's request.
+const controllers = new Map<string, AbortController>();
 
 function update(changes: Partial<Snapshot>) {
   snapshot = { ...snapshot, ...changes };
@@ -40,6 +43,11 @@ export function useSecondsSince(startedAt: number) {
   return Math.max(0, Math.floor((now - startedAt) / 1000));
 }
 
+export function setAiJobNote(key: string, note: string) {
+  if (!snapshot.running.some((j) => j.key === key && j.note !== note)) return;
+  update({ running: snapshot.running.map((j) => (j.key === key ? { ...j, note } : j)) });
+}
+
 export function isAiJobRunning(key: string) {
   return snapshot.running.some((j) => j.key === key);
 }
@@ -58,21 +66,41 @@ export function onAiJobDone(taker: Taker) {
   };
 }
 
+// Stop: cancels the request, drops whatever it brings back, and shows no error,
+// so the person can ask again right away.
+// Jobs the person stopped, until they ask again, so a question box can keep the question.
+const stopped = new Set<string>();
+export const wasStopped = (key: string) => stopped.has(key);
+
+export function stopAiJob(key: string) {
+  const controller = controllers.get(key);
+  if (!controller) return;
+  stopped.add(key);
+  controller.abort();
+  controllers.delete(key);
+  update({ running: snapshot.running.filter((j) => j.key !== key) });
+}
+
 // Runs `work`. Its result goes to an open page that takes it, otherwise to `fallback`
 // (which saves it straight to the database). An error stays until the next try.
+// `work` gets a signal to pass to its requests, so Stop can cancel them.
 export async function runAiJob<T>(options: {
   key: string;
   label: string;
-  work: () => Promise<{ result?: T; error?: string }>;
+  work: (signal: AbortSignal) => Promise<{ result?: T; error?: string }>;
   fallback?: (result: T) => Promise<void>;
 }) {
   const { key, label } = options;
   if (isAiJobRunning(key)) return;
   clearAiError(key);
+  stopped.delete(key);
+  const controller = new AbortController();
+  controllers.set(key, controller);
   update({ running: [...snapshot.running, { key, label, startedAt: Date.now() }] });
   let error: string | undefined;
   try {
-    const outcome = await options.work();
+    const outcome = await options.work(controller.signal);
+    if (controller.signal.aborted) return;
     error = outcome.error;
     if (!error && outcome.result !== undefined) {
       const taken = Array.from(takers).some((take) => take(key, outcome.result));
@@ -82,8 +110,10 @@ export async function runAiJob<T>(options: {
       }
     }
   } catch {
+    if (controller.signal.aborted) return;
     error = "Something went wrong saving the AI's answer. Try again.";
   }
+  controllers.delete(key);
   update({
     running: snapshot.running.filter((j) => j.key !== key),
     errors: error ? new Map(snapshot.errors).set(key, error) : snapshot.errors,

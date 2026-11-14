@@ -1,7 +1,7 @@
 import { ChevronRight } from "lucide-react";
 import Link from "next/link";
 
-// Report Writer's own icon: a report with charts and a pen. Its navy (#2b3b5e) is used
+// Report Writer's own icon: a page of notes with a sparkle. Its navy (#2b3b5e) is used
 // for Report Writer's text; its buttons have a soft lavender background.
 export function ReportIcon({ size = 16, className }: { size?: number; className?: string }) {
   return (
@@ -22,6 +22,7 @@ export default function ReportWriterLink() {
   return (
     <div className="mb-3">
       <Link
+        data-tour="report-writer"
         href="/reports"
         className="group inline-flex items-center gap-2 rounded-lg bg-[#f6f3ff] py-1 pr-3 pl-1.5 text-sm shadow-sm ring-1 ring-[#e2d9fb] hover:bg-[#efeaff] hover:ring-[#cfc3f5]"
         title="Turn your notes from videos, readings and tutorials into one report"

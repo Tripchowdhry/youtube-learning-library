@@ -1,9 +1,10 @@
 "use client";
 
+import StopAiButton from "@/components/StopAiButton";
 import { Tour, TourButton, useSectionTour } from "@/components/Tour";
 import Link from "next/link";
 import { CategoryCrumb } from "@/components/CategoryTag";
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import NotePageCanvas, { PAGE_HEIGHT, type Tool } from "@/components/NotePageCanvas";
 import { DeleteClipButton } from "@/components/ClipButtons";
 import {
@@ -18,9 +19,14 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { formatTime, loadYouTubeApi, type YouTubePlayer } from "@/lib/youtube-player";
 import type { NoteImage, NotePage, NoteStroke, Video } from "@/lib/types";
-import { onAiJobDone, runAiJob, useAiJobs, useSecondsSince } from "@/lib/ai-jobs";
+import { hasWriting, openingMode } from "@/lib/note-mode";
+import { onAiJobDone, runAiJob, useAiJobs, useSecondsSince, wasStopped } from "@/lib/ai-jobs";
 import { askVideoAi } from "@/lib/video-ai";
 import { askConfirm } from "./ConfirmDialog";
+import ReportRichEditor, { type RichEditorHandle } from "@/components/ReportRichEditor";
+import NotesExport from "@/components/NotesExport";
+import { answerHeading, boldPrompts, notesDocument } from "@/lib/notes-format";
+import { pictureUrl } from "@/lib/report";
 import { Brush, Camera, ClipboardPaste, FileText, Footprints, Keyboard, Lightbulb, List, PenLine, Sparkles, Timer, Trash2, TriangleAlert, type LucideIcon } from "lucide-react";
 import { Ico, type Tone } from "@/components/Icon";
 
@@ -41,17 +47,6 @@ const MODE_KEY = "notes-mode";
 // The Mac shortcut (in Apple's Shortcuts app) that Clip runs to start a screenshot.
 const MAC_SHORTCUT = "Clip Video";
 
-// The mode last picked on this device; otherwise typing when there's a mouse or
-// trackpad, and handwriting on touch-only devices like an iPad.
-function preferredMode(): Mode {
-  try {
-    const stored = localStorage.getItem(MODE_KEY);
-    if (stored === "write" || stored === "type") return stored;
-  } catch {
-    // Fall through to the device default.
-  }
-  return window.matchMedia("(any-pointer: fine)").matches ? "type" : "write";
-}
 
 // Typed notes mark video times as [m:ss] or [h:mm:ss].
 const TIME_PATTERN = /\[(\d+):(\d{2})(?::(\d{2}))?\]/g;
@@ -74,6 +69,15 @@ function addAnswer(typed: string, answer: string) {
   return `${current ? `${current}\n\n` : ""}${answer}`;
 }
 
+// True when there's no typed text, no clip and nothing written on any page.
+function isEmptyNotes(text: string, clips: TypedClip[], pages: NotePage[]) {
+  return (
+    !text.trim() &&
+    !clips.length &&
+    !hasWriting(pages)
+  );
+}
+
 function timesIn(text: string) {
   const seen = new Set<number>();
   for (const m of text.matchAll(TIME_PATTERN)) {
@@ -93,7 +97,7 @@ export default function StudyPage({ videoId }: { videoId: string }) {
   const [typed, setTyped] = useState("");
   const [typedClips, setTypedClips] = useState<TypedClip[]>([]);
   const [mode, setMode] = useState<Mode>("write");
-  const typedBox = useRef<HTMLTextAreaElement>(null);
+  const typedBox = useRef<RichEditorHandle>(null);
   const [loaded, setLoaded] = useState(false);
   const tour = useSectionTour("study", loaded);
   const [saveState, setSaveState] = useState<SaveState>("saved");
@@ -156,11 +160,13 @@ export default function StudyPage({ videoId }: { videoId: string }) {
       } else setCategoryPath("Uncategorized");
       const saved = (n.data?.pages ?? []) as NotePage[];
       const savedText = (n.data?.text ?? "") as string;
+      // Notes cleared before empty ones were removed: tidy them away now.
+      if (n.data && isEmptyNotes(savedText, [], saved)) supabase.from("notes").delete().eq("video_id", videoId).then(() => {});
       if (saved.length) setPages(saved);
       const { text, clips } = splitTypedClips(savedText);
-      setTyped(text);
+      setTyped(boldPrompts(text));
       setTypedClips(clips);
-      setMode(preferredMode());
+      setMode(openingMode(MODE_KEY, !!text.trim() || clips.length > 0, hasWriting(saved)));
       setLoaded(true);
     })();
   }, [supabase, videoId]);
@@ -200,6 +206,12 @@ export default function StudyPage({ videoId }: { videoId: string }) {
 
   const save = useCallback(async () => {
     setSaveState("saving");
+    // Nothing left (all cleared): remove the row, so the library shows "Take notes" again.
+    if (isEmptyNotes(typedRef.current, typedClipsRef.current, pagesRef.current)) {
+      const { error } = await supabase.from("notes").delete().eq("video_id", videoId);
+      setSaveState(error ? "error" : "saved");
+      return;
+    }
     const { error } = await supabase.from("notes").upsert(
       {
         video_id: videoId,
@@ -292,20 +304,12 @@ export default function StudyPage({ videoId }: { videoId: string }) {
     if (ok) changeTyped("");
   }
 
-  // Typing mode: put [m:ss] at the cursor, on its own line.
+  // Typing mode: put [m:ss] at the cursor, at the start of a line.
   function stampTyped() {
-    const box = typedBox.current;
     const seconds = player.current?.getCurrentTime?.() ?? 0;
-    const at = box ? box.selectionStart : typed.length;
-    const before = typed.slice(0, at);
-    const after = typed.slice(at);
-    const insert = `${before && !before.endsWith("\n") ? "\n" : ""}[${formatTime(seconds)}] `;
-    changeTyped(before + insert + after);
-    requestAnimationFrame(() => {
-      if (!box) return;
-      box.focus();
-      box.selectionStart = box.selectionEnd = at + insert.length;
-    });
+    const stamp = `[${formatTime(seconds)}] `;
+    if (typedBox.current) typedBox.current.insertAtLineStart(stamp);
+    else changeTyped(`${typed.trimEnd()}${typed.trim() ? "\n\n" : ""}${stamp}`);
   }
 
   function jumpTo(seconds: number) {
@@ -504,17 +508,16 @@ export default function StudyPage({ videoId }: { videoId: string }) {
     runAiJob<string>({
       key: aiKey,
       label: `AI answer for "${video.title ?? "your video"}"`,
-      work: async () => {
+      work: async (signal) => {
         const result = await askVideoAi({
           youtubeId: video.youtube_id,
           title: video.title,
           task: "ask",
           prompt,
           focusAt: shotAt ?? undefined,
-        });
+        }, signal);
         if (result.error || !result.text) return { error: result.error ?? "The AI didn't answer." };
-        const by = result.model ? ` (${result.model})` : "";
-        return { result: `✨ ${prompt}${by}\n${result.text}\n` };
+        return { result: `${answerHeading(prompt, result.model)}\n${result.text}\n` };
       },
       // This page was left: add the answer to the saved notes instead.
       fallback: async (answer) => {
@@ -541,15 +544,13 @@ export default function StudyPage({ videoId }: { videoId: string }) {
       if (key !== `ask:${videoId}`) return false;
       setTyped(addAnswer(typedRef.current, answer as string));
       setSaveState("unsaved");
-      requestAnimationFrame(() => {
-        const box = typedBox.current;
-        if (box) box.scrollTop = box.scrollHeight;
-      });
+      requestAnimationFrame(() => typedBox.current?.revealFrom(answer as string));
       return true;
     });
   }, [loaded, videoId]);
 
   const imageUrl = useCallback((path: string) => clipUrl(supabase, path), [supabase]);
+  const resolvePicture = useCallback((src: string) => pictureUrl(supabase, src), [supabase]);
 
   function addPage() {
     change([...pages, emptyPage()]);
@@ -624,7 +625,8 @@ export default function StudyPage({ videoId }: { videoId: string }) {
             <CategoryCrumb section="Videos" path={categoryPath} href={`/?show=${videoId}&find=1`} />
           )}
         </div>
-        <SaveBadge state={saveState} onRetry={save} />
+        {/* In typing mode it shows next to Copy instead. */}
+        {mode !== "type" && <SaveBadge state={saveState} onRetry={save} />}
         <TourButton onClick={tour.start} />
         <button
           onClick={() => setNotesHidden((h) => !h)}
@@ -666,7 +668,7 @@ export default function StudyPage({ videoId }: { videoId: string }) {
         <div className={notesHidden ? "hidden" : "mt-2 flex min-w-0 flex-col gap-4 lg:mt-0"}>
           <div className="sticky top-[76px] z-20 hidden lg:block">{toolbar}</div>
           {loaded && (
-            <AskAi startedAt={aiStartedAt} error={aiError} onAsk={askAi} currentTime={() => player.current?.getCurrentTime?.() ?? 0} />
+            <AskAi jobKey={aiKey} startedAt={aiStartedAt} error={aiError} onAsk={askAi} currentTime={() => player.current?.getCurrentTime?.() ?? 0} />
           )}
           {!loaded ? (
             <p className="text-slate-500">Loading your notes…</p>
@@ -680,6 +682,11 @@ export default function StudyPage({ videoId }: { videoId: string }) {
               imageUrl={imageUrl}
               clips={typedClips}
               onClipsChange={changeTypedClips}
+              saveState={saveState}
+              onRetry={save}
+              title={video?.title || "Video notes"}
+              url={video?.url ?? null}
+              resolve={resolvePicture}
             />
           ) : (
             <>
@@ -741,19 +748,18 @@ function TypedNotes(props: {
   onChange: (text: string) => void;
   onJump: (seconds: number) => void;
   onStamp: () => void;
-  boxRef: React.RefObject<HTMLTextAreaElement | null>;
+  boxRef: React.RefObject<RichEditorHandle | null>;
   imageUrl: (path: string) => string;
   clips: TypedClip[];
   onClipsChange: (clips: TypedClip[]) => void;
+  saveState: SaveState;
+  onRetry: () => void;
+  title: string;
+  url: string | null;
+  resolve: (src: string) => string;
 }) {
   const times = timesIn(props.text);
   const clips = props.clips;
-  const backdrop = useRef<HTMLDivElement>(null);
-  // Keep the drawn text lined up after the box is resized or text is added.
-  useEffect(() => {
-    const box = props.boxRef.current;
-    if (box && backdrop.current) backdrop.current.scrollTop = box.scrollTop;
-  });
   const remove = (index: number) => props.onClipsChange(clips.filter((_, i) => i !== index));
   return (
     <div className="flex flex-col gap-2">
@@ -783,40 +789,41 @@ function TypedNotes(props: {
           ))}
         </div>
       )}
-      {times.length > 0 && (
-        <div className="flex flex-wrap items-center gap-1.5 text-xs text-slate-500">
-          Jump to:
-          {times.map((t) => (
-            <button
-              key={t}
-              onClick={() => props.onJump(t)}
-              className="rounded-full bg-red-600 px-2 py-0.5 font-mono font-semibold text-white hover:bg-red-700"
-            >
-              ▶ {formatTime(t)}
-            </button>
-          ))}
+      <div className="flex flex-wrap items-center gap-2">
+        {times.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5 text-xs text-slate-500">
+            Jump to:
+            {times.map((t) => (
+              <button
+                key={t}
+                onClick={() => props.onJump(t)}
+                className="rounded-full bg-red-600 px-2 py-0.5 font-mono font-semibold text-white hover:bg-red-700"
+              >
+                ▶ {formatTime(t)}
+              </button>
+            ))}
+          </div>
+        )}
+        <div data-tour="notes-export" className="ml-auto">
+          <NotesExport
+            saveState={props.saveState}
+            onRetry={props.onRetry}
+            title={props.title}
+            makeDocument={() => notesDocument(props.title, props.url, props.text, clips)}
+            resolve={props.resolve}
+            empty={!props.text.trim() && !clips.length}
+          />
         </div>
-      )}
-      <div className="relative rounded-lg bg-white shadow-sm ring-1 ring-slate-200 focus-within:ring-2 focus-within:ring-slate-400">
-        {/* The text is drawn here, behind the (see-through) typing box, so AI prompts can be shown in bold. */}
-        <div ref={backdrop} aria-hidden className="notes-text notes-backdrop">
-          {props.text.split("\n").map((line, i) => (
-            <Fragment key={i}>
-              {i > 0 && "\n"}
-              {line.startsWith("✨") ? <span className="notes-prompt">{line}</span> : line}
-            </Fragment>
-          ))}
-          {/* Keeps a last empty line as tall as in the typing box. */}
-          {" "}
-        </div>
-        <textarea
-          id="typed-notes"
-          ref={props.boxRef}
-          value={props.text}
-          onChange={(e) => props.onChange(e.target.value)}
-          onScroll={(e) => {
-            if (backdrop.current) backdrop.current.scrollTop = e.currentTarget.scrollTop;
-          }}
+      </div>
+      <div id="typed-notes" className="rounded-lg bg-white shadow-sm">
+        <ReportRichEditor
+          body={props.text}
+          onChange={props.onChange}
+          resolve={props.resolve}
+          handle={props.boxRef}
+          label="Typed notes"
+          placeholder="Type your notes here. Press Stamp time (or Ctrl+Shift+S) to add the video's time, like [12:34]."
+          boxClassName="h-[60vh] min-h-48 resize-y overflow-y-auto"
           onKeyDown={(e) => {
             // Ctrl/Cmd + Shift + S stamps the current video time while typing.
             if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === "s") {
@@ -824,10 +831,6 @@ function TypedNotes(props: {
               props.onStamp();
             }
           }}
-          placeholder={
-            "Type your notes here…\n\nTip: press Stamp time (or Ctrl+Shift+S) to add the video's current time, like [12:34]. Click a time above to jump back to it. Press Clip to add a picture of the video."
-          }
-          className="notes-text notes-input"
         />
       </div>
     </div>
@@ -847,6 +850,7 @@ const AI_PRESETS = [
 ] satisfies { label: string; icon: LucideIcon; tone: Tone; prompt: string }[];
 
 function AskAi(props: {
+  jobKey: string;
   startedAt: number | null;
   error: string | null;
   onAsk: (prompt: string) => void;
@@ -855,6 +859,14 @@ function AskAi(props: {
   const [prompt, setPrompt] = useState("");
   const [open, setOpen] = useState(true);
   const busy = props.startedAt !== null;
+
+  // Once the answer is in, the question box is emptied; after a failure or Stop the question
+  // stays so it can be asked again.
+  const wasBusy = useRef(busy);
+  useEffect(() => {
+    if (wasBusy.current && !busy && !props.error && !wasStopped(props.jobKey)) setPrompt("");
+    wasBusy.current = busy;
+  }, [busy, props.error, props.jobKey]);
 
   function ask(text: string) {
     const clean = text.trim();
@@ -919,7 +931,7 @@ function AskAi(props: {
               Ask
             </button>
           </div>
-          {props.startedAt !== null && <AskAiWorking startedAt={props.startedAt} />}
+          {props.startedAt !== null && <AskAiWorking startedAt={props.startedAt} jobKey={props.jobKey} />}
           {props.error && (
             <p className="flex items-center gap-1.5 rounded-md bg-red-50 px-2 py-1.5 text-sm text-red-700 ring-1 ring-red-200">
               <Ico icon={TriangleAlert} tone="red" size={15} />
@@ -937,14 +949,17 @@ function AskAi(props: {
 }
 
 // Counts the seconds while the AI works, so it's clear nothing is stuck.
-function AskAiWorking({ startedAt }: { startedAt: number }) {
+function AskAiWorking({ startedAt, jobKey }: { startedAt: number; jobKey: string }) {
   const elapsed = useSecondsSince(startedAt);
   return (
-    <p className="rounded-md bg-violet-50 px-2 py-1.5 text-sm text-violet-800 ring-1 ring-violet-200">
-      <span className="mr-2 inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-violet-300 border-t-violet-700 align-[-2px]" />
-      The AI is watching the video ({formatTime(elapsed)}). Long videos can take a few minutes. You can leave this
-      page; the answer is still added to your notes.
-    </p>
+    <div className="flex items-start gap-2 rounded-md bg-violet-50 px-2 py-1.5 text-sm text-violet-800 ring-1 ring-violet-200">
+      <p className="min-w-0 flex-1">
+        <span className="mr-2 inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-violet-300 border-t-violet-700 align-[-2px]" />
+        The AI is watching the video ({formatTime(elapsed)}). Long videos can take a few minutes. You can leave this
+        page; the answer is still added to your notes.
+      </p>
+      <StopAiButton jobKey={jobKey} />
+    </div>
   );
 }
 
@@ -1055,6 +1070,7 @@ function Toolbar(props: {
         Stamp time
       </button>
       <button
+        data-tour="clip"
         onClick={props.onClip}
         disabled={props.clipBusy}
         className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold ring-1 ring-slate-300 hover:bg-slate-100 disabled:opacity-50"
