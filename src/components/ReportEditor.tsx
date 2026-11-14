@@ -28,10 +28,12 @@ import {
   Check,
   Clapperboard,
   Copy,
+  Eye,
   FileDown,
   FileText,
   GraduationCap,
   Layers,
+  Link2,
   Loader2,
   PenLine,
   Sparkles,
@@ -102,6 +104,11 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
   const [handReading, setHandReading] = useState<{ key: string; page: number; total: number } | null>(null);
   const [handReview, setHandReview] = useState<{ key: string; text: string; model: string | null; fresh: boolean } | null>(null);
   const [handError, setHandError] = useState<{ key: string; text: string } | null>(null);
+  // The read-only share link; the column exists once supabase/report-share.sql is run.
+  const [shareToken, setShareToken] = useState<string | null>(null);
+  const [shareReady, setShareReady] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
+  const [shareBusy, setShareBusy] = useState(false);
   const [toast, setToast] = useState<{ text: string; isError?: boolean } | null>(null);
 
   const mounted = useRef(true);
@@ -142,6 +149,8 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
       setBody(row.body ?? "");
       // The handwriting column exists once supabase/report-handwriting.sql is run.
       setHandReady("handwriting" in row);
+      setShareReady("share_token" in row);
+      setShareToken(row.share_token ?? null);
       setHandwriting(row.handwriting && typeof row.handwriting === "object" ? row.handwriting : {});
       const list = (rs.data ?? []).map((x) => ({ kind: x.source_kind as SourceKind, id: x.source_id as string }));
       setChosen(list);
@@ -409,6 +418,50 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
       notify("Couldn't make the Word file. Try again.", true);
     } finally {
       setExporting(false);
+    }
+  }
+
+  // ---------- Sharing ----------
+
+  const shareLink = shareToken ? `${typeof window === "undefined" ? "" : window.location.origin}/r/${shareToken}` : "";
+
+  // Turns the read-only link on. It shows the latest version of the report, until sharing is stopped.
+  async function startSharing() {
+    if (shareToken) return setShareOpen((o) => !o);
+    if (!shareReady) {
+      return notify("Sharing needs one setup step: in Supabase, run supabase/report-share.sql once, then reload.", true);
+    }
+    setShareBusy(true);
+    const token = crypto.randomUUID();
+    const { error } = await supabase.from("reports").update({ share_token: token }).eq("id", reportId);
+    if (!mounted.current) return;
+    setShareBusy(false);
+    if (error) return notify(`Couldn't turn on the link: ${error.message}`, true);
+    setShareToken(token);
+    setShareOpen(true);
+  }
+
+  async function stopSharing() {
+    const ok = await askConfirm({
+      title: "Stop sharing this report?",
+      message: "The link stops working, so people who have it can't read the report anymore. You can share it again later with a new link.",
+      confirmLabel: "Stop sharing",
+    });
+    if (!ok) return;
+    const { error } = await supabase.from("reports").update({ share_token: null }).eq("id", reportId);
+    if (!mounted.current) return;
+    if (error) return notify(`Couldn't stop sharing: ${error.message}`, true);
+    setShareToken(null);
+    setShareOpen(false);
+    notify("Stopped sharing. The old link no longer works.");
+  }
+
+  async function copyShareLink() {
+    try {
+      await navigator.clipboard.writeText(shareLink);
+      notify("Link copied. Anyone with it can read this report.");
+    } catch {
+      notify("Couldn't copy. Select the link and copy it instead.", true);
     }
   }
 
@@ -710,6 +763,15 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
             <Copy size={14} aria-hidden /> Copy
           </button>
           <button
+            onClick={startSharing}
+            disabled={shareBusy}
+            aria-expanded={shareOpen}
+            title={shareToken ? "Show the share link" : "Share a read-only link to this report"}
+            className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-sm disabled:opacity-50 ${shareToken ? "bg-blue-50 font-medium text-blue-700 ring-1 ring-blue-200 hover:bg-blue-100" : "border border-slate-300 hover:bg-slate-50"}`}
+          >
+            <Ico icon={Link2} tone="blue" size={14} /> {shareToken ? "Shared" : "Share"}
+          </button>
+          <button
             onClick={word}
             disabled={!body.trim() || exporting}
             className="flex items-center gap-1.5 rounded-md bg-blue-600 px-2.5 py-1 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
@@ -717,6 +779,35 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
             <FileDown size={14} aria-hidden /> {exporting ? "Making file…" : "Download Word"}
           </button>
         </div>
+
+        {shareToken && shareOpen && (
+          <div className="mb-3 rounded-lg bg-blue-50/60 p-3 ring-1 ring-blue-100">
+            <p className="text-sm font-medium text-[#2b3b5e]">Anyone with this link can read this report. They can&apos;t change it.</p>
+            <div className="mt-2 flex gap-2">
+              <input
+                readOnly
+                value={shareLink}
+                onFocus={(e) => e.currentTarget.select()}
+                aria-label="Share link"
+                className="min-w-0 flex-1 rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm text-slate-600"
+              />
+              <button onClick={copyShareLink} className="shrink-0 rounded-md bg-[#2b3b5e] px-3 py-1.5 text-sm font-medium text-white hover:bg-[#22304d]">
+                Copy link
+              </button>
+            </div>
+            <div className="mt-2 flex items-center gap-3 text-sm">
+              <a href={`/r/${shareToken}?preview=${reportId}`} className="flex items-center gap-1 text-blue-700 underline">
+                <Eye size={14} aria-hidden /> Preview what they see
+              </a>
+              <button onClick={stopSharing} className="ml-auto text-slate-600 underline hover:text-slate-900">
+                Stop sharing
+              </button>
+            </div>
+            <p className="mt-2 text-xs text-slate-500">
+              It always shows the latest version, so edits you make here appear for them too. Your notes and the rest of your library stay private.
+            </p>
+          </div>
+        )}
 
         <ReportRichEditor body={body} onChange={setBody} resolve={resolve} />
       </section>
