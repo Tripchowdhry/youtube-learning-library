@@ -1,9 +1,10 @@
-// Report Writer: brings your notes from Videos, Reading and Tutorials together into one report.
-// It only reads the videos, notes and articles tables; reports live in their own tables
+// Report Writer: brings your notes from Videos, Reading, Tutorials and ScrapBook together into one report.
+// It only reads the videos, notes, articles and scraps tables; reports live in their own tables
 // (supabase/reports.sql), so nothing here can change the other sections.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { clipUrl, splitTypedClips, type TypedClip } from "@/lib/clips";
+import { htmlToText } from "@/lib/html-text";
 import type { NotePage } from "@/lib/types";
 import { formatTime } from "@/lib/youtube-player";
 
@@ -20,13 +21,14 @@ export type Report = {
   updated_at: string;
 };
 
-export type SourceKind = "video" | "article";
-export type SourceSection = "videos" | "reading" | "tutorial";
+export type SourceKind = "video" | "article" | "scrap";
+export type SourceSection = "videos" | "reading" | "tutorial" | "scrap";
 
 export const SECTION_NAMES: Record<SourceSection, string> = {
   videos: "Video",
   reading: "Reading",
   tutorial: "Tutorial",
+  scrap: "ScrapBook page",
 };
 
 // One video, reading or tutorial that a report can draw on.
@@ -37,6 +39,7 @@ export type ReportSource = {
   title: string;
   // The channel (videos) or website (reading and tutorials).
   sub: string | null;
+  // The link to the video or article; empty for a ScrapBook page, which has none outside BrainShelf.
   url: string;
   category: string | null;
   // Typed notes and AI answers, without the clips.
@@ -68,6 +71,7 @@ type ArticleRow = {
   pages?: NotePage[] | null;
   created_at: string;
 };
+type ScrapRow = { id: string; title: string | null; body: string | null; pages: NotePage[] | null; category_id: string | null; created_at: string };
 type CategoryRow = { id: string; name: string };
 
 const usedPages = (pages: NotePage[] | null | undefined) =>
@@ -80,13 +84,14 @@ function handwriting(pages: NotePage[] | null | undefined) {
 
 // Every video, reading and tutorial, with its notes. Read-only.
 export async function loadSources(supabase: SupabaseClient): Promise<ReportSource[]> {
-  const [v, n, vc, a, ac] = await Promise.all([
+  const [v, n, vc, a, ac, sc] = await Promise.all([
     supabase.from("videos").select("id, title, channel, url, category_id, created_at"),
     supabase.from("notes").select("video_id, text, pages"),
     supabase.from("video_categories").select("id, name"),
     // "*" so this still works before the article notes column exists.
     supabase.from("articles").select("*"),
     supabase.from("article_categories").select("id, name"),
+    supabase.from("scraps").select("id, title, body, pages, category_id, created_at"),
   ]);
   if (v.error) throw new Error(v.error.message);
 
@@ -133,7 +138,22 @@ export async function loadSources(supabase: SupabaseClient): Promise<ReportSourc
       };
     });
 
-  return [...videos, ...articles].sort((x, y) => y.createdAt.localeCompare(x.createdAt));
+  // ScrapBook may not be set up yet; then there are none. A page's text is kept as HTML.
+  const scraps: ReportSource[] = ((sc.error ? [] : (sc.data ?? [])) as ScrapRow[]).map((row) => ({
+    kind: "scrap",
+    id: row.id,
+    section: "scrap",
+    title: row.title || "Untitled page",
+    sub: null,
+    url: "",
+    category: row.category_id ? (categoryName.get(row.category_id) ?? null) : null,
+    notes: htmlToText(row.body ?? ""),
+    clips: [],
+    ...handwriting(row.pages),
+    createdAt: row.created_at,
+  }));
+
+  return [...videos, ...articles, ...scraps].sort((x, y) => y.createdAt.localeCompare(x.createdAt));
 }
 
 // ---------- Building a report without AI ----------
@@ -162,7 +182,12 @@ export function compileReport(title: string, sources: ReportSource[], handwritin
 // The list of sources added after an AI draft, numbered like the [1], [2] marks in it.
 export function sourcesSection(list: { n: number; title: string; url: string }[]) {
   if (!list.length) return "";
-  return "\n\n## Sources\n" + list.map((s) => `${s.n}. [${s.title.replace(/[[\]]/g, "")}](${s.url})`).join("\n");
+  const name = (s: { title: string; url: string }) => {
+    const title = s.title.replace(/[[\]]/g, "");
+    // A ScrapBook page has no link, so just its name.
+    return /^https?:\/\//.test(s.url) ? `[${title}](${s.url})` : `${title} (ScrapBook)`;
+  };
+  return "\n\n## Sources\n" + list.map((s) => `${s.n}. ${name(s)}`).join("\n");
 }
 
 // ---------- Reading the report text ----------

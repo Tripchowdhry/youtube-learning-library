@@ -36,6 +36,7 @@ import {
   Layers,
   Link2,
   Loader2,
+  NotebookPen,
   PenLine,
   Sparkles,
   X,
@@ -54,6 +55,7 @@ const TABS: { key: SourceSection; name: string; Icon: LucideIcon; tone: Tone }[]
   { key: "videos", name: "Videos", Icon: Clapperboard, tone: "red" },
   { key: "reading", name: "Reading", Icon: FileText, tone: "blue" },
   { key: "tutorial", name: "Tutorials", Icon: GraduationCap, tone: "green" },
+  { key: "scrap", name: "ScrapBook", Icon: NotebookPen, tone: "amber" },
 ];
 const TAB = Object.fromEntries(TABS.map((t) => [t.key, t])) as Record<SourceSection, (typeof TABS)[number]>;
 
@@ -218,7 +220,15 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
             )
           : { error: null };
         const error = del.error ?? ins.error;
-        if (error && mounted.current) notify(`Couldn't save the chosen items: ${error.message}`, true);
+        if (error && mounted.current) {
+          // ScrapBook pages need supabase/report-scrapbook.sql before they can be saved as chosen items.
+          notify(
+            /source_kind/.test(error.message)
+              ? "ScrapBook pages need one setup step: in Supabase, run supabase/report-scrapbook.sql once, then reload."
+              : `Couldn't save the chosen items: ${error.message}`,
+            true,
+          );
+        }
       });
     },
     [supabase, reportId, notify],
@@ -324,13 +334,13 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
   }
 
   async function compile() {
-    if (!chosenSources.length) return notify("Choose at least one video, reading or tutorial first.", true);
+    if (!chosenSources.length) return notify("Choose at least one video, reading, tutorial or ScrapBook page first.", true);
     if (!(await okToReplace())) return;
     setBody(compileReport(title.trim() || UNTITLED, chosenSources, handwriting));
   }
 
   async function draftWithAi() {
-    if (!chosenSources.length) return notify("Choose at least one video, reading or tutorial first.", true);
+    if (!chosenSources.length) return notify("Choose at least one video, reading, tutorial or ScrapBook page first.", true);
     if (!(await okToReplace())) return;
     setAiBusy(true);
     setAiError(null);

@@ -25,7 +25,7 @@ export default function ReportWriterLink() {
         data-tour="report-writer"
         href="/reports"
         className="group inline-flex items-center gap-2 rounded-lg bg-[#f6f3ff] py-1 pr-3 pl-1.5 text-sm shadow-sm ring-1 ring-[#e2d9fb] hover:bg-[#efeaff] hover:ring-[#cfc3f5]"
-        title="Turn your notes from videos, readings and tutorials into one report"
+        title="Turn your notes from videos, readings, tutorials and ScrapBook into one report"
       >
         <ReportIcon size={26} />
         <span className="font-semibold text-[#2b3b5e]">Report Writer</span>
