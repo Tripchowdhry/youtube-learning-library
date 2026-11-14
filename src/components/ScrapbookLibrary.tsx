@@ -343,18 +343,18 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
       x: e.clientX,
       y: e.clientY,
       items: [
-        { label: "Rename", icon: Pencil, tone: "yellow" as const, onClick: () => renameCategory(category) },
-        { label: "New subcategory", icon: Tag, tone: "orange" as const, onClick: () => createCategory(category.id) },
+        { label: "Rename", icon: Pencil, tone: "amber" as const, onClick: () => renameCategory(category) },
+        { label: "New subcategory", icon: Tag, tone: "amber" as const, onClick: () => createCategory(category.id) },
         ...(category.parent_id
-          ? [{ label: "Move up a level", icon: ArrowUp, tone: "violet" as const, onClick: () => moveCategoryUp(category) }]
+          ? [{ label: "Move up a level", icon: ArrowUp, tone: "blue" as const, onClick: () => moveCategoryUp(category) }]
           : []),
         ...(category.share_token
           ? [
-              { label: "Preview what others see", icon: Eye, tone: "violet" as const, onClick: () => previewShare(category.share_token!) },
-              { label: "Copy share link", icon: Copy, tone: "sky" as const, onClick: () => copyShareLink(category.share_token!) },
+              { label: "Preview what others see", icon: Eye, tone: "blue" as const, onClick: () => previewShare(category.share_token!) },
+              { label: "Copy share link", icon: Copy, tone: "blue" as const, onClick: () => copyShareLink(category.share_token!) },
               { label: "Stop sharing", icon: Link2Off, tone: "slate" as const, onClick: () => toggleShare(category) },
             ]
-          : [{ label: "Share", icon: Link2, tone: "sky" as const, onClick: () => toggleShare(category) }]),
+          : [{ label: "Share", icon: Link2, tone: "blue" as const, onClick: () => toggleShare(category) }]),
         { label: "Delete", icon: Trash2, tone: "red" as const, onClick: () => deleteCategory(category), danger: true },
       ],
     });
@@ -501,7 +501,7 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
           className="flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1 text-sm text-slate-600 hover:bg-slate-100"
           title="See and delete your clips to free up space"
         >
-          <Ico icon={Images} tone="sky" />
+          <Ico icon={Images} tone="violet" />
           Clips
         </Link>
         <div className="hidden items-center gap-2 text-sm text-slate-500 sm:flex">
@@ -520,7 +520,7 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
           onContextMenu={(e) => {
             if (e.defaultPrevented) return;
             e.preventDefault();
-            setMenu({ x: e.clientX, y: e.clientY, items: [{ label: "New category", icon: Tag, tone: "orange" as const, onClick: () => createCategory(null) }] });
+            setMenu({ x: e.clientX, y: e.clientY, items: [{ label: "New category", icon: Tag, tone: "amber" as const, onClick: () => createCategory(null) }] });
           }}
         >
           <NavItem icon={NotebookPen} tone="amber" label="All pages" count={scraps.length} active={view.kind === "all" && !searching} onClick={() => openView({ kind: "all" })} />
@@ -581,7 +581,7 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
                     <SmallButton
                       onClick={() => toggleShare(currentCategory)}
                       icon={currentCategory.share_token ? Link2Off : Link2}
-                      tone={currentCategory.share_token ? "slate" : "sky"}
+                      tone={currentCategory.share_token ? "slate" : "blue"}
                     >
                       {currentCategory.share_token ? "Stop sharing" : "Share"}
                     </SmallButton>
@@ -590,12 +590,12 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
                         <SmallButton
                           onClick={() => previewShare(currentCategory.share_token!)}
                           icon={Eye}
-                          tone="violet"
+                          tone="blue"
                           title="See this category the way people with the link see it"
                         >
                           Preview
                         </SmallButton>
-                        <SmallButton onClick={() => copyShareLink(currentCategory.share_token!)} icon={Copy} tone="sky">
+                        <SmallButton onClick={() => copyShareLink(currentCategory.share_token!)} icon={Copy} tone="blue">
                           Copy link
                         </SmallButton>
                       </>
@@ -739,7 +739,7 @@ function ScrapRow(props: {
       {...handlers}
       className={`flex cursor-grab items-start gap-3 rounded-xl border bg-white p-3 shadow-sm transition ${props.dragging ? "opacity-40" : ""} ${over ? "border-blue-500 ring-2 ring-blue-500" : props.flash ? "border-green-500 ring-4 ring-green-400" : "border-slate-200"}`}
     >
-      <Ico icon={FileText} tone="sky" size={22} className="mt-0.5" />
+      <Ico icon={FileText} tone="blue" size={22} className="mt-0.5" />
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <Link href={`/scrap/${scrap.id}`} className="line-clamp-2 font-medium hover:underline">
           {scrap.title}

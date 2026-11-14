@@ -405,10 +405,10 @@ export default function VaultLibrary({ userEmail }: { userEmail: string }) {
       x: e.clientX,
       y: e.clientY,
       items: [
-        { label: "Rename", icon: Pencil, tone: "yellow" as const, onClick: () => renameCategory(category) },
-        { label: "New subcategory", icon: Tag, tone: "orange" as const, onClick: () => createCategory(category.id) },
+        { label: "Rename", icon: Pencil, tone: "amber" as const, onClick: () => renameCategory(category) },
+        { label: "New subcategory", icon: Tag, tone: "amber" as const, onClick: () => createCategory(category.id) },
         ...(category.parent_id
-          ? [{ label: "Move up a level", icon: ArrowUp, tone: "violet" as const, onClick: () => moveCategoryUp(category) }]
+          ? [{ label: "Move up a level", icon: ArrowUp, tone: "blue" as const, onClick: () => moveCategoryUp(category) }]
           : []),
         { label: "Delete", icon: Trash2, tone: "red" as const, onClick: () => deleteCategory(category), danger: true },
       ],
@@ -516,10 +516,10 @@ export default function VaultLibrary({ userEmail }: { userEmail: string }) {
           onContextMenu={(e) => {
             if (e.defaultPrevented) return;
             e.preventDefault();
-            setMenu({ x: e.clientX, y: e.clientY, items: [{ label: "New category", icon: Tag, tone: "orange" as const, onClick: () => createCategory(null) }] });
+            setMenu({ x: e.clientX, y: e.clientY, items: [{ label: "New category", icon: Tag, tone: "amber" as const, onClick: () => createCategory(null) }] });
           }}
         >
-          <NavItem icon={LockKeyhole} tone="yellow" label="All entries" count={entries.length} active={view.kind === "all" && !searching} onClick={() => openView({ kind: "all" })} />
+          <NavItem icon={LockKeyhole} tone="navy" label="All entries" count={entries.length} active={view.kind === "all" && !searching} onClick={() => openView({ kind: "all" })} />
           <NavItem
             icon={Inbox}
             tone="blue"
@@ -578,7 +578,7 @@ export default function VaultLibrary({ userEmail }: { userEmail: string }) {
           ) : !vaultKey ? (
             <div className="max-w-xl rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
               <h1 className="mb-2 flex items-center gap-2 text-2xl font-bold">
-                <Ico icon={LockKeyhole} tone="yellow" size={24} />
+                <Ico icon={LockKeyhole} tone="amber" size={24} />
                 Set up your vault
               </h1>
               <p className="mb-4 text-sm text-slate-600">
@@ -618,7 +618,7 @@ export default function VaultLibrary({ userEmail }: { userEmail: string }) {
                     <Ico icon={LockKeyholeOpen} tone="green" size={15} />
                     Unlocked. It locks itself after 5 idle minutes.
                   </span>
-                  <SmallButton onClick={lock} icon={Lock} tone="yellow">
+                  <SmallButton onClick={lock} icon={Lock} tone="amber">
                     Lock now
                   </SmallButton>
                 </div>
@@ -730,7 +730,7 @@ function EntryRow(props: {
       {...handlers}
       className={`flex cursor-grab items-start gap-3 rounded-xl border bg-white p-3 shadow-sm transition ${props.dragging ? "opacity-40" : ""} ${props.flash ? "border-green-500 ring-4 ring-green-400" : "border-slate-200"}`}
     >
-      <Ico icon={KeyRound} tone="yellow" size={22} className="mt-0.5" />
+      <Ico icon={KeyRound} tone="amber" size={22} className="mt-0.5" />
       <div className="flex min-w-0 flex-1 flex-col gap-1.5">
         <p className="font-medium">{entry.name}</p>
         {props.showCategory && <CategoryTag path={props.categoryLabel} onClick={props.onShowCategory} />}
@@ -828,7 +828,7 @@ function UnlockForm(props: {
   return (
     <NoSaveForm onSubmit={submit} className="mb-4 rounded-xl border border-amber-300 bg-amber-50 p-4">
       <p className="mb-2 flex items-start gap-1.5 text-sm text-slate-700">
-        <Ico icon={Lock} tone="yellow" size={16} className="mt-0.5" />
+        <Ico icon={Lock} tone="amber" size={16} className="mt-0.5" />
         Your vault is locked. Enter your passphrase to see, copy or change passwords and API keys.
       </p>
       <div className="flex flex-col gap-2 sm:flex-row">
@@ -1115,7 +1115,7 @@ function Field({
     <div className="flex flex-col gap-1">
       <span className="flex items-center gap-1 text-sm font-medium">
         {label}
-        {locked && <Ico icon={Lock} tone="yellow" size={13} />}
+        {locked && <Ico icon={Lock} tone="amber" size={13} />}
         {hint && <span className="ml-2 text-xs font-normal text-slate-500">{hint}</span>}
       </span>
       {children}

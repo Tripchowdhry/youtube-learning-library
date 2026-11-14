@@ -30,7 +30,7 @@ type Slide = {
 const SLIDES: Slide[] = [
   {
     icon: Link2,
-    tone: "sky",
+    tone: "blue",
     title: "Paste a link",
     text: "A YouTube video, an article, an X post or a tutorial. BrainShelf fills in the title and keeps it on your shelf, sorted into categories.",
     src: "/landing/videos.webp",
@@ -38,7 +38,7 @@ const SLIDES: Slide[] = [
   },
   {
     icon: Pencil,
-    tone: "yellow",
+    tone: "amber",
     title: "Take notes beside the video",
     text: "Watch on the left, take notes on the right with headings, bold and lists, or handwrite with a pen. Stamp the time, clip a picture, ask AI for a summary, then copy or download your notes for Word.",
     src: "/landing/study.webp",
@@ -46,7 +46,7 @@ const SLIDES: Slide[] = [
   },
   {
     icon: FileText,
-    tone: "sky",
+    tone: "blue",
     title: "Articles and tutorials too",
     text: "Save posts, articles and how-to guides in their own tabs. Read them here with your notes beside them, and tick them off when you're done.",
     src: "/landing/reading.webp",
@@ -54,7 +54,7 @@ const SLIDES: Slide[] = [
   },
   {
     icon: ScrollText,
-    tone: "violet",
+    tone: "blue",
     title: "Turn your notes into a report",
     text: "Report Writer pulls your notes from videos, readings and tutorials into one report. Put them together as they are or draft with AI, edit it like in Word, then copy it or download it.",
     src: "/landing/report.webp",
@@ -62,7 +62,7 @@ const SLIDES: Slide[] = [
   },
   {
     icon: NotebookPen,
-    tone: "orange",
+    tone: "amber",
     title: "A ScrapBook for your own ideas",
     text: "Pages of your own for plans, ideas and sketches. Type with headings, lists and highlights, or draw, and sort pages into categories.",
     src: "/landing/scrapbook.webp",
@@ -70,7 +70,7 @@ const SLIDES: Slide[] = [
   },
   {
     icon: LockKeyhole,
-    tone: "yellow",
+    tone: "amber",
     title: "Securely save your API keys",
     text: "The Vault keeps your API keys and logins locked with your own passphrase, in your browser, so nobody else can read them, not even BrainShelf.",
     src: "/landing/vault.webp",

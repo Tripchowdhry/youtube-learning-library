@@ -54,13 +54,13 @@ const presets = (word: string): { label: string; icon: LucideIcon; tone: Tone; p
   {
     label: "Summary in 100 words",
     icon: FileText,
-    tone: "sky",
+    tone: "blue",
     prompt: `Summarize this ${word} in 100 words.`,
   },
   {
     label: "Key ideas",
     icon: Lightbulb,
-    tone: "yellow",
+    tone: "amber",
     prompt: `List the key ideas in this ${word}, one line each.`,
   },
   {
@@ -289,7 +289,7 @@ export default function ArticleNotes(props: {
               }}
               className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-2 py-1 text-xs text-slate-700 hover:bg-slate-100"
             >
-              <Ico icon={Brush} tone="orange" size={14} />
+              <Ico icon={Brush} tone="amber" size={14} />
               Clear my notes
             </button>
           )}
@@ -323,7 +323,7 @@ export default function ArticleNotes(props: {
               onClick={() => chooseMode(id)}
               className={`flex items-center gap-1.5 rounded-md px-3 py-1 text-sm ${mode === id ? "bg-white font-semibold shadow-sm" : "text-slate-600"}`}
             >
-              <Ico icon={icon} tone={id === "write" ? "indigo" : "slate"} size={15} />
+              <Ico icon={icon} tone={id === "write" ? "blue" : "slate"} size={15} />
               {label}
             </button>
           ))}
@@ -416,7 +416,7 @@ function AskAi(props: { jobKey: string; word: string; startedAt: number | null; 
   return (
     <div className="rounded-xl bg-white p-3 shadow-sm ring-1 ring-violet-200">
       <p className="flex items-center gap-1.5 text-sm font-semibold">
-        <Ico icon={Sparkles} tone="yellow" />
+        <Ico icon={Sparkles} tone="amber" />
         Ask AI about this {props.word}
       </p>
       <div className="mt-2 flex flex-col gap-2">

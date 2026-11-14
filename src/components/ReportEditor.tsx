@@ -41,9 +41,9 @@ type Chosen = { kind: SourceKind; id: string };
 type SaveState = "saved" | "saving" | "error";
 
 const TABS: { key: SourceSection; name: string; Icon: LucideIcon; tone: Tone }[] = [
-  { key: "videos", name: "Videos", Icon: Clapperboard, tone: "violet" },
-  { key: "reading", name: "Reading", Icon: FileText, tone: "sky" },
-  { key: "tutorial", name: "Tutorials", Icon: GraduationCap, tone: "indigo" },
+  { key: "videos", name: "Videos", Icon: Clapperboard, tone: "red" },
+  { key: "reading", name: "Reading", Icon: FileText, tone: "blue" },
+  { key: "tutorial", name: "Tutorials", Icon: GraduationCap, tone: "green" },
 ];
 const TAB = Object.fromEntries(TABS.map((t) => [t.key, t])) as Record<SourceSection, (typeof TABS)[number]>;
 
@@ -445,7 +445,7 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
           </div>
           <div className="rounded-lg border border-violet-200 bg-violet-50/40 p-3">
             <p className="mb-1 flex items-center gap-1.5 font-medium">
-              <Ico icon={Sparkles} tone="violet" /> Draft with AI
+              <Ico icon={Sparkles} tone="blue" /> Draft with AI
             </p>
             <p className="mb-2 text-sm text-slate-600">AI writes one report from your notes.</p>
             <input

@@ -502,18 +502,18 @@ export default function Library({ userEmail }: { userEmail: string }) {
       x: e.clientX,
       y: e.clientY,
       items: [
-        { label: "Rename", icon: Pencil, tone: "yellow", onClick: () => renameFolder(folder) },
+        { label: "Rename", icon: Pencil, tone: "amber", onClick: () => renameFolder(folder) },
         { label: "New subcategory", icon: FolderPlus, tone: "amber", onClick: () => createFolder(folder.id) },
         ...(folder.parent_id
-          ? [{ label: "Move up a level", icon: ArrowUp, tone: "violet" as const, onClick: () => moveFolderUp(folder) }]
+          ? [{ label: "Move up a level", icon: ArrowUp, tone: "blue" as const, onClick: () => moveFolderUp(folder) }]
           : []),
         ...(folder.share_token
           ? [
-              { label: "Preview what others see", icon: Eye, tone: "violet" as const, onClick: () => previewShare(folder.share_token!) },
-              { label: "Copy share link", icon: Copy, tone: "sky" as const, onClick: () => copyShareLink(folder.share_token!) },
+              { label: "Preview what others see", icon: Eye, tone: "blue" as const, onClick: () => previewShare(folder.share_token!) },
+              { label: "Copy share link", icon: Copy, tone: "blue" as const, onClick: () => copyShareLink(folder.share_token!) },
               { label: "Stop sharing", icon: Link2Off, tone: "slate" as const, onClick: () => toggleShare(folder) },
             ]
-          : [{ label: "Share", icon: Link2, tone: "sky" as const, onClick: () => toggleShare(folder) }]),
+          : [{ label: "Share", icon: Link2, tone: "blue" as const, onClick: () => toggleShare(folder) }]),
         { label: "Delete", icon: Trash2, tone: "red", onClick: () => deleteFolder(folder), danger: true },
       ],
     });
@@ -620,7 +620,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
           className="flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1 text-sm text-slate-600 hover:bg-slate-100"
           title="See and delete your clips to free up space"
         >
-          <Ico icon={Images} tone="sky" />
+          <Ico icon={Images} tone="violet" />
           Clips
         </Link>
         <div className="hidden items-center gap-2 text-sm text-slate-500 sm:flex">
@@ -641,7 +641,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
             setMenu({ x: e.clientX, y: e.clientY, items: [{ label: "New category", icon: FolderPlus, tone: "amber" as const, onClick: () => createFolder(null) }] });
           }}
         >
-          <NavItem icon={Clapperboard} tone="violet" label="All videos" count={videos.length} active={view.kind === "all" && !searching} onClick={() => openView({ kind: "all" })} />
+          <NavItem icon={Clapperboard} tone="red" label="All videos" count={videos.length} active={view.kind === "all" && !searching} onClick={() => openView({ kind: "all" })} />
           <NavItem
             icon={Inbox}
             tone="blue"
@@ -706,7 +706,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
                 <SmallButton
                   onClick={() => toggleShare(currentFolder)}
                   icon={currentFolder.share_token ? Link2Off : Link2}
-                  tone={currentFolder.share_token ? "slate" : "sky"}
+                  tone={currentFolder.share_token ? "slate" : "blue"}
                 >
                   {currentFolder.share_token ? "Stop sharing" : "Share"}
                 </SmallButton>
@@ -715,12 +715,12 @@ export default function Library({ userEmail }: { userEmail: string }) {
                     <SmallButton
                       onClick={() => previewShare(currentFolder.share_token!)}
                       icon={Eye}
-                      tone="violet"
+                      tone="blue"
                       title="See this category the way people with the link see it"
                     >
                       Preview
                     </SmallButton>
-                    <SmallButton onClick={() => copyShareLink(currentFolder.share_token!)} icon={Copy} tone="sky">
+                    <SmallButton onClick={() => copyShareLink(currentFolder.share_token!)} icon={Copy} tone="blue">
                       Copy link
                     </SmallButton>
                   </>
@@ -924,7 +924,7 @@ function FolderTree(props: {
           <div key={folder.id}>
             <NavItem
               icon={folder.share_token ? Link2 : FolderIcon}
-              tone={folder.share_token ? "sky" : "amber"}
+              tone={folder.share_token ? "blue" : "amber"}
               label={folder.name}
               // A top-level folder counts the videos in all its subfolders too; a subfolder counts only its own.
               count={props.videos.filter((v) => (props.depth === 0 ? inTree(v.category_id, folder.id) : v.category_id === folder.id)).length}
@@ -1097,7 +1097,7 @@ function VideoCard(props: {
             }
             draggable={false}
           >
-            <Ico icon={props.hasNotes ? NotebookText : Pencil} tone={props.hasNotes ? "amber" : "yellow"} size={14} />
+            <Ico icon={props.hasNotes ? NotebookText : Pencil} tone={props.hasNotes ? "amber" : "amber"} size={14} />
             {props.hasNotes ? "Open notes" : "Take notes"}
           </a>
           <a
@@ -1133,7 +1133,7 @@ function VideoCard(props: {
               </SmallButton>
             </>
           )}
-          {!video.note && !editingNote && <SmallButton onClick={() => setEditingNote(true)} icon={FilePen} tone="sky">Add summary</SmallButton>}
+          {!video.note && !editingNote && <SmallButton onClick={() => setEditingNote(true)} icon={FilePen} tone="blue">Add summary</SmallButton>}
           {video.note && !editingNote && (
             <SmallButton
               onClick={async () => {
@@ -1147,13 +1147,13 @@ function VideoCard(props: {
                 if (ok) props.onSaveNote("");
               }}
               icon={Brush}
-              tone="orange"
+              tone="amber"
             >
               Clear summary
             </SmallButton>
           )}
           {!video.note && !editingNote && props.aiNoteStartedAt === null && (
-            <SmallButton onClick={props.onAiNote} title="Let AI watch the video and write the summary" icon={Sparkles} tone="yellow">
+            <SmallButton onClick={props.onAiNote} title="Let AI watch the video and write the summary" icon={Sparkles} tone="amber">
               AI summary
             </SmallButton>
           )}

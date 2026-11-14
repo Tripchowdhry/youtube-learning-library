@@ -506,18 +506,18 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
       x: e.clientX,
       y: e.clientY,
       items: [
-        { label: "Rename", icon: Pencil, tone: "yellow" as const, onClick: () => renameCategory(category) },
-        { label: "New subcategory", icon: Tag, tone: "orange" as const, onClick: () => createCategory(category.id) },
+        { label: "Rename", icon: Pencil, tone: "amber" as const, onClick: () => renameCategory(category) },
+        { label: "New subcategory", icon: Tag, tone: "amber" as const, onClick: () => createCategory(category.id) },
         ...(category.parent_id
-          ? [{ label: "Move up a level", icon: ArrowUp, tone: "violet" as const, onClick: () => moveCategoryUp(category) }]
+          ? [{ label: "Move up a level", icon: ArrowUp, tone: "blue" as const, onClick: () => moveCategoryUp(category) }]
           : []),
         ...(category.share_token
           ? [
-              { label: "Preview what others see", icon: Eye, tone: "violet" as const, onClick: () => previewShare(category.share_token!) },
-              { label: "Copy share link", icon: Copy, tone: "sky" as const, onClick: () => copyShareLink(category.share_token!) },
+              { label: "Preview what others see", icon: Eye, tone: "blue" as const, onClick: () => previewShare(category.share_token!) },
+              { label: "Copy share link", icon: Copy, tone: "blue" as const, onClick: () => copyShareLink(category.share_token!) },
               { label: "Stop sharing", icon: Link2Off, tone: "slate" as const, onClick: () => toggleShare(category) },
             ]
-          : [{ label: "Share", icon: Link2, tone: "sky" as const, onClick: () => toggleShare(category) }]),
+          : [{ label: "Share", icon: Link2, tone: "blue" as const, onClick: () => toggleShare(category) }]),
         { label: "Delete", icon: Trash2, tone: "red" as const, onClick: () => deleteCategory(category), danger: true },
       ],
     });
@@ -644,7 +644,7 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
           className="flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1 text-sm text-slate-600 hover:bg-slate-100"
           title="See and delete your clips to free up space"
         >
-          <Ico icon={Images} tone="sky" />
+          <Ico icon={Images} tone="violet" />
           Clips
         </Link>
         <div className="hidden items-center gap-2 text-sm text-slate-500 sm:flex">
@@ -662,10 +662,10 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
           onContextMenu={(e) => {
             if (e.defaultPrevented) return;
             e.preventDefault();
-            setMenu({ x: e.clientX, y: e.clientY, items: [{ label: "New category", icon: Tag, tone: "orange" as const, onClick: () => createCategory(null) }] });
+            setMenu({ x: e.clientX, y: e.clientY, items: [{ label: "New category", icon: Tag, tone: "amber" as const, onClick: () => createCategory(null) }] });
           }}
         >
-          <NavItem icon={kind === "tutorial" ? GraduationCap : FileText} tone={kind === "tutorial" ? "indigo" : "sky"} label={section.all} count={articles.length} active={view.kind === "all" && !searching} onClick={() => openView({ kind: "all" })} />
+          <NavItem icon={kind === "tutorial" ? GraduationCap : FileText} tone={kind === "tutorial" ? "green" : "blue"} label={section.all} count={articles.length} active={view.kind === "all" && !searching} onClick={() => openView({ kind: "all" })} />
           <NavItem
             icon={Inbox}
             tone="blue"
@@ -723,7 +723,7 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
                     <SmallButton
                       onClick={() => toggleShare(currentCategory)}
                       icon={currentCategory.share_token ? Link2Off : Link2}
-                      tone={currentCategory.share_token ? "slate" : "sky"}
+                      tone={currentCategory.share_token ? "slate" : "blue"}
                     >
                       {currentCategory.share_token ? "Stop sharing" : "Share"}
                     </SmallButton>
@@ -732,12 +732,12 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
                         <SmallButton
                           onClick={() => previewShare(currentCategory.share_token!)}
                           icon={Eye}
-                          tone="violet"
+                          tone="blue"
                           title="See this category the way people with the link see it"
                         >
                           Preview
                         </SmallButton>
-                        <SmallButton onClick={() => copyShareLink(currentCategory.share_token!)} icon={Copy} tone="sky">
+                        <SmallButton onClick={() => copyShareLink(currentCategory.share_token!)} icon={Copy} tone="blue">
                           Copy link
                         </SmallButton>
                       </>
@@ -862,11 +862,11 @@ export function SectionSwitch({ active }: { active: "videos" | SectionKind | "sc
   const tab = (on: boolean) =>
     `flex items-center gap-1.5 rounded-md px-2.5 py-1 text-sm font-medium ${on ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:text-slate-900"}`;
   const items: { key: string; href: string; name: string; Icon: LucideIcon; tone: Tone }[] = [
-    { key: "videos", href: "/", name: "Videos", Icon: Clapperboard, tone: "violet" },
-    { key: "reading", href: "/reading", name: "Reading", Icon: FileText, tone: "sky" },
-    { key: "tutorial", href: "/tutorials", name: "Tutorials", Icon: GraduationCap, tone: "indigo" },
+    { key: "videos", href: "/", name: "Videos", Icon: Clapperboard, tone: "red" },
+    { key: "reading", href: "/reading", name: "Reading", Icon: FileText, tone: "blue" },
+    { key: "tutorial", href: "/tutorials", name: "Tutorials", Icon: GraduationCap, tone: "green" },
     { key: "scrap", href: "/scrapbook", name: "ScrapBook", Icon: NotebookPen, tone: "amber" },
-    { key: "vault", href: "/vault", name: "Vault", Icon: LockKeyhole, tone: "yellow" },
+    { key: "vault", href: "/vault", name: "Vault", Icon: LockKeyhole, tone: "navy" },
   ];
   return (
     <nav className="flex shrink-0 rounded-lg bg-slate-100 p-0.5">
@@ -982,7 +982,7 @@ function ArticleRow(props: {
                 : "inline-flex items-center gap-1 rounded-md border border-slate-300 px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100"
             }
           >
-            <Ico icon={hasNotes ? NotebookText : Pencil} tone={hasNotes ? "amber" : "yellow"} size={14} />
+            <Ico icon={hasNotes ? NotebookText : Pencil} tone={hasNotes ? "amber" : "amber"} size={14} />
             {hasNotes ? "Open notes" : "Take notes"}
           </Link>
           <select
@@ -1005,7 +1005,7 @@ function ArticleRow(props: {
             rel="noreferrer"
             className="inline-flex items-center gap-1 rounded-md border border-slate-300 px-2 py-1 text-xs text-slate-700 hover:bg-slate-100"
           >
-            <Ico icon={ExternalLink} tone="sky" size={14} />
+            <Ico icon={ExternalLink} tone="blue" size={14} />
             Original
           </a>
           {props.onShift && (
@@ -1018,7 +1018,7 @@ function ArticleRow(props: {
               </SmallButton>
             </>
           )}
-          {!article.note && !editingNote && <SmallButton onClick={() => setEditingNote(true)} icon={FilePen} tone="sky">Add summary</SmallButton>}
+          {!article.note && !editingNote && <SmallButton onClick={() => setEditingNote(true)} icon={FilePen} tone="blue">Add summary</SmallButton>}
           {article.note && !editingNote && (
             <SmallButton
               onClick={async () => {
@@ -1032,13 +1032,13 @@ function ArticleRow(props: {
                 if (ok) props.onSaveNote("");
               }}
               icon={Brush}
-              tone="orange"
+              tone="amber"
             >
               Clear summary
             </SmallButton>
           )}
           {!article.note && !editingNote && props.aiNoteStartedAt === null && (
-            <SmallButton onClick={props.onAiNote} title="Let AI read the page and write the summary" icon={Sparkles} tone="yellow">
+            <SmallButton onClick={props.onAiNote} title="Let AI read the page and write the summary" icon={Sparkles} tone="amber">
               AI summary
             </SmallButton>
           )}
@@ -1156,7 +1156,7 @@ export function ArticleNote(props: {
                 props.setEditing(false);
               }}
               icon={Brush}
-              tone="orange"
+              tone="amber"
             >
               Clear summary
             </SmallButton>

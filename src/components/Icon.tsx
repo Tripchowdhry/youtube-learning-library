@@ -1,18 +1,18 @@
 import type { LucideIcon } from "lucide-react";
 
-// Coloured icons in place of emoji: a darker outline over a light fill, in the emoji's own colour,
-// so they keep the warmth of the emoji but look the same on every device.
+// Coloured icons in place of emoji: a darker outline over a light fill. The colours are the four
+// from the BrainShelf logo (blue, green, red and amber books) plus a quiet grey, a navy for Vault and a purple for Clips, so every icon
+// in the app matches the logo.
 export const TONES = {
-  red: { stroke: "#dc2626", fill: "#fee2e2" },
-  orange: { stroke: "#ea580c", fill: "#ffedd5" },
-  amber: { stroke: "#d97706", fill: "#fef3c7" },
-  yellow: { stroke: "#ca8a04", fill: "#fef08a" },
-  green: { stroke: "#16a34a", fill: "#dcfce7" },
-  sky: { stroke: "#0284c7", fill: "#e0f2fe" },
   blue: { stroke: "#2563eb", fill: "#dbeafe" },
-  indigo: { stroke: "#4f46e5", fill: "#e0e7ff" },
-  violet: { stroke: "#7c3aed", fill: "#ede9fe" },
+  green: { stroke: "#16a34a", fill: "#dcfce7" },
+  red: { stroke: "#dc2626", fill: "#fee2e2" },
+  amber: { stroke: "#d97706", fill: "#fef3c7" },
   slate: { stroke: "#475569", fill: "#f1f5f9" },
+  // Purple, close to Report Writer's lavender, for Clips.
+  violet: { stroke: "#7c3aed", fill: "#ede9fe" },
+  // Navy from Report Writer, for Vault.
+  navy: { stroke: "#2b3b5e", fill: "#ece6ff" },
 } as const;
 
 export type Tone = keyof typeof TONES;
