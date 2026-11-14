@@ -264,6 +264,12 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
 
   // Three AI title ideas to pick from. Nothing changes until one is picked.
   async function suggestTitles() {
+    // Always clickable; if there's nothing to go on yet, say so instead of greying the button out.
+    if (!chosen.length && !body.trim()) {
+      setTitleIdeas(null);
+      setTitleError("Choose some notes below first, and the AI will suggest titles from them.");
+      return;
+    }
     setTitleBusy(true);
     setTitleError(null);
     setTitleIdeas(null);
@@ -372,10 +378,10 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
           </label>
           <button
             onClick={suggestTitles}
-            disabled={titleBusy || (!chosen.length && !body.trim())}
+            disabled={titleBusy}
             aria-busy={titleBusy}
-            title={chosen.length || body.trim() ? "Let AI suggest titles from your chosen notes" : "Choose some notes first"}
-            className={`flex items-center gap-1.5 rounded-md bg-[#f6f3ff] px-2.5 py-1 text-sm font-medium text-[#2b3b5e] ring-1 ring-[#e2d9fb] hover:bg-[#efeaff] ${titleBusy ? "cursor-wait" : "disabled:opacity-50"}`}
+            title="Let AI suggest titles from your chosen notes"
+            className={`flex items-center gap-1.5 rounded-md bg-[#f6f3ff] px-2.5 py-1 text-sm font-medium text-[#2b3b5e] ring-1 ring-[#e2d9fb] hover:bg-[#efeaff] ${titleBusy ? "cursor-wait" : ""}`}
           >
             {titleBusy ? <Loader2 size={15} className="animate-spin text-[#7c3aed]" aria-hidden /> : <Ico icon={Sparkles} tone="violet" size={15} />}
             {titleBusy ? "Thinking…" : "Suggest with AI"}
@@ -384,7 +390,10 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
         <input
           id="report-title"
           value={title}
-          onChange={(e) => setTitle(e.target.value)}
+          onChange={(e) => {
+            setTitle(e.target.value);
+            setTitleError(null);
+          }}
           onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
           autoFocus={!title}
           maxLength={200}
