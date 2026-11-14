@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { splitTypedClips } from "@/lib/clips";
 import { GeminiError, askAboutFile, geminiConfigured } from "@/lib/gemini";
+import { draftStyle } from "@/lib/report-styles";
 import { createClient } from "@/lib/supabase/server";
 
 export const maxDuration = 300;
@@ -95,8 +96,10 @@ export async function POST(request: Request) {
     "Format: '## ' for section headings, '### ' for smaller ones, '- ' for bullet points, '1. ' for steps, **bold** for key terms.",
     "No tables. Don't write the report's title or a list of sources at the end; both are added for you.",
   ].join("\n");
+  // The chosen style (Summary, Study guide, Key takeaways or Quiz me), plus anything extra the person typed.
   const ask =
-    (focus || "Write a clear, well-organised report that brings these notes together. Start with a short summary, then group the main ideas by theme.") +
+    draftStyle(body.style).ask +
+    (focus ? `\n\nAlso, as the person asked: ${focus}` : "") +
     `\n\nThe report is titled "${title}". The notes are in the file, one item after another, each with its number.`;
 
   try {
