@@ -1,6 +1,7 @@
 "use client";
 
 import StopAiButton from "@/components/StopAiButton";
+import MoreMenu from "@/components/MoreMenu";
 import { Tour, TourButton, useSectionTour } from "@/components/Tour";
 import Link from "next/link";
 import { CategoryCrumb } from "@/components/CategoryTag";
@@ -1091,26 +1092,6 @@ function Toolbar(props: {
           Cancel
         </button>
       )}
-      {props.mode === "type" && props.onClearTyped && (
-        <button
-          onClick={props.onClearTyped}
-          className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm text-slate-700 ring-1 ring-slate-300 hover:bg-slate-100"
-          title="Remove all the text you typed for this video"
-        >
-          <Ico icon={Brush} tone="amber" size={15} />
-          Clear typed notes
-        </button>
-      )}
-      {props.clipCount > 0 && (
-        <button
-          onClick={props.onDeleteAllClips}
-          className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm text-red-700 ring-1 ring-slate-300 hover:bg-red-50"
-          title="Delete every clip in this video's notes"
-        >
-          <Ico icon={Trash2} tone="red" size={15} />
-          Delete all clips
-        </button>
-      )}
       {props.mode === "write" && (
         <label className="ml-auto flex items-center gap-1.5 text-xs text-slate-600">
           <input
@@ -1121,6 +1102,22 @@ function Toolbar(props: {
           />
           Draw with finger
         </label>
+      )}
+      {/* Rarely needed and hard to undo, so they're tucked away from the everyday buttons. */}
+      {((props.mode === "type" && props.onClearTyped) || props.clipCount > 0) && (
+        <span className={props.mode === "write" ? "" : "ml-auto"}>
+          <MoreMenu
+            size="md"
+            items={[
+              ...(props.mode === "type" && props.onClearTyped
+                ? [{ label: "Clear typed notes", icon: Brush, tone: "amber" as const, title: "Remove all the text you typed for this video", onClick: props.onClearTyped }]
+                : []),
+              ...(props.clipCount > 0
+                ? [{ label: "Delete all clips", icon: Trash2, danger: true, title: "Delete every clip in this video's notes", onClick: props.onDeleteAllClips }]
+                : []),
+            ]}
+          />
+        </span>
       )}
     </div>
   );

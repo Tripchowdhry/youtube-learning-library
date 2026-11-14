@@ -36,7 +36,8 @@ import {
 import { SectionWelcome } from "@/components/GettingStarted";
 import { createClient } from "@/lib/supabase/client";
 import type { ArticleCategory, Scrap } from "@/lib/types";
-import { Images, ArrowUp, Copy, Eye, FileText, Link2, Link2Off, Inbox, NotebookPen, Pencil, Tag, Trash2 } from "lucide-react";
+import { Images, ArrowUp, Copy, Eye, FileText, Link2, Link2Off, Inbox, NotebookPen, Pencil, PencilLine, Tag, Trash2 } from "lucide-react";
+import MoreMenu from "@/components/MoreMenu";
 import { Ico } from "@/components/Icon";
 
 type View = { kind: "all" } | { kind: "uncategorized" } | { kind: "category"; id: string };
@@ -746,20 +747,6 @@ function ScrapRow(props: {
         </p>
         {preview && <p className="line-clamp-2 text-sm text-slate-600">{preview}</p>}
         <div className="mt-1 flex flex-wrap items-center gap-1">
-          <select
-            value={scrap.category_id ?? ""}
-            onChange={(e) => props.onMove(e.target.value || null)}
-            className="max-w-48 min-w-0 rounded-md border border-slate-300 bg-white px-1 py-1 text-xs"
-            aria-label="Category"
-            title={props.categoryLabel}
-          >
-            <option value="">Uncategorized</option>
-            {props.categoryOptions.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.label}
-              </option>
-            ))}
-          </select>
           <Link
             href={`/scrap/${scrap.id}`}
             className="rounded-md border border-slate-300 px-2 py-1 text-xs text-slate-700 hover:bg-slate-100"
@@ -776,10 +763,16 @@ function ScrapRow(props: {
               </SmallButton>
             </>
           )}
-          <SmallButton onClick={props.onRename}>Edit title</SmallButton>
-          <SmallButton onClick={props.onDelete} danger title="Delete" icon={Trash2}>
-            Delete
-          </SmallButton>
+          {/* The less-used actions, Delete last, so the card stays tidy. */}
+          <span className="ml-auto pl-2">
+            <MoreMenu
+              items={[
+                { label: "Edit title", icon: PencilLine, onClick: props.onRename },
+                { label: "Delete page", icon: Trash2, danger: true, onClick: props.onDelete },
+              ]}
+              move={{ value: scrap.category_id, options: props.categoryOptions, onMove: props.onMove }}
+            />
+          </span>
         </div>
       </div>
     </li>

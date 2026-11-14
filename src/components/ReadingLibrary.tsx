@@ -33,7 +33,8 @@ import { hasWriting } from "@/lib/note-mode";
 import { askArticleAi } from "@/lib/video-ai";
 import { askConfirm } from "./ConfirmDialog";
 import { Ico, type Tone } from "./Icon";
-import { Images, Brush, FilePen, ExternalLink, FileText, GraduationCap, Inbox, LockKeyhole, NotebookPen, NotebookText, Pencil, Clapperboard, Sparkles, Tag, Trash2, TriangleAlert, type LucideIcon, ArrowUp, Copy, Eye, Link2, Link2Off } from "lucide-react";
+import { Images, Brush, FilePen, ExternalLink, FileText, GraduationCap, Inbox, LockKeyhole, NotebookPen, NotebookText, Pencil, PencilLine, Clapperboard, Sparkles, Tag, Trash2, TriangleAlert, type LucideIcon, ArrowUp, Copy, Eye, Link2, Link2Off } from "lucide-react";
+import MoreMenu from "@/components/MoreMenu";
 import { SectionWelcome } from "./GettingStarted";
 
 type AiNote = { articleId: string; note: string; model?: string };
@@ -980,20 +981,6 @@ function ArticleRow(props: {
             <Ico icon={hasNotes ? NotebookText : Pencil} tone={hasNotes ? "amber" : "amber"} size={14} />
             {hasNotes ? "Open notes" : "Take notes"}
           </Link>
-          <select
-            value={article.category_id ?? ""}
-            onChange={(e) => props.onMove(e.target.value || null)}
-            className="max-w-48 min-w-0 rounded-md border border-slate-300 bg-white px-1 py-1 text-xs"
-            aria-label="Category"
-            title={props.categoryLabel}
-          >
-            <option value="">Uncategorized</option>
-            {props.categoryOptions.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.label}
-              </option>
-            ))}
-          </select>
           <a
             href={article.url}
             target="_blank"
@@ -1038,12 +1025,15 @@ function ArticleRow(props: {
             </SmallButton>
           )}
           {!article.note && props.aiNoteStartedAt !== null && <AiNoteWorking startedAt={props.aiNoteStartedAt} jobKey={aiNoteKey(article.id)} />}
-          <SmallButton onClick={props.onRename}>Edit title</SmallButton>
-          {/* Kept apart from the note buttons so it isn't pressed by mistake. */}
-          <span className="ml-auto pl-3">
-            <SmallButton onClick={props.onDelete} danger title="Delete" icon={Trash2}>
-              Delete
-            </SmallButton>
+          {/* The less-used actions, Delete last, so the card stays tidy. */}
+          <span className="ml-auto pl-2">
+            <MoreMenu
+              items={[
+                { label: "Edit title", icon: PencilLine, onClick: props.onRename },
+                { label: "Delete", icon: Trash2, danger: true, onClick: props.onDelete },
+              ]}
+              move={{ value: article.category_id, options: props.categoryOptions, onMove: props.onMove }}
+            />
           </span>
         </div>
       </div>
