@@ -644,7 +644,7 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
           className="flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1 text-sm text-slate-600 hover:bg-slate-100"
           title="See and delete your clips to free up space"
         >
-          <Ico icon={Images} tone="blue" />
+          <Ico icon={Images} tone="violet" />
           Clips
         </Link>
         <div className="hidden items-center gap-2 text-sm text-slate-500 sm:flex">
