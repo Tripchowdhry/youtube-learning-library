@@ -106,7 +106,7 @@ export default function ReportsList({ userEmail }: { userEmail: string }) {
               </button>
             </div>
             <p className="mb-5 text-sm text-slate-600">
-              Turn notes from your videos, readings and tutorials into one report. Your notes stay as they are.
+              Turn notes from your videos, readings, tutorials and ScrapBook into one report. Your notes stay as they are.
             </p>
 
             {error && <p className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}

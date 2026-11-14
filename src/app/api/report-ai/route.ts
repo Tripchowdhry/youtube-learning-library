@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { splitTypedClips } from "@/lib/clips";
 import { GeminiError, askAboutFile, geminiConfigured } from "@/lib/gemini";
+import { htmlToText } from "@/lib/html-text";
 import { draftStyle } from "@/lib/report-styles";
 import { createClient } from "@/lib/supabase/server";
 
@@ -16,7 +17,7 @@ const MAX_SOURCES = 60;
 const NOTES_MAX = 40_000;
 const TOTAL_MAX = 600_000;
 
-type Wanted = { kind: "video" | "article"; id: string };
+type Wanted = { kind: "video" | "article" | "scrap"; id: string };
 
 export async function POST(request: Request) {
   const supabase = await createClient();
@@ -35,36 +36,40 @@ export async function POST(request: Request) {
   // The report text so far, used only for title ideas.
   const reportText = titleMode ? String(body.body ?? "").trim().slice(0, 30_000) : "";
   const wanted: Wanted[] = (Array.isArray(body.sources) ? body.sources : [])
-    .filter((s: Wanted) => (s?.kind === "video" || s?.kind === "article") && typeof s.id === "string")
+    .filter((s: Wanted) => (s?.kind === "video" || s?.kind === "article" || s?.kind === "scrap") && typeof s.id === "string")
     .slice(0, MAX_SOURCES);
   // Text read from handwritten pages, checked by the person and kept with the report, by "kind:id".
   const handwriting: Record<string, string> =
     body.handwriting && typeof body.handwriting === "object" && !Array.isArray(body.handwriting) ? body.handwriting : {};
   if (!wanted.length && !reportText) {
-    return NextResponse.json({ error: "Choose at least one video, reading or tutorial first." }, { status: 400 });
+    return NextResponse.json({ error: "Choose at least one video, reading, tutorial or ScrapBook page first." }, { status: 400 });
   }
 
   const videoIds = wanted.filter((s) => s.kind === "video").map((s) => s.id);
   const articleIds = wanted.filter((s) => s.kind === "article").map((s) => s.id);
+  const scrapIds = wanted.filter((s) => s.kind === "scrap").map((s) => s.id);
   const none = { data: [], error: null };
-  const [v, n, a] = await Promise.all([
+  const [v, n, a, sc] = await Promise.all([
     videoIds.length ? supabase.from("videos").select("id, title, channel, url").in("id", videoIds) : none,
     videoIds.length ? supabase.from("notes").select("video_id, text").in("video_id", videoIds) : none,
     articleIds.length ? supabase.from("articles").select("*").in("id", articleIds) : none,
+    scrapIds.length ? supabase.from("scraps").select("id, title, body").in("id", scrapIds) : none,
   ]);
-  const failed = v.error ?? n.error ?? a.error;
+  const failed = v.error ?? n.error ?? a.error ?? sc.error;
   if (failed) return NextResponse.json({ error: failed.message }, { status: 500 });
 
   const videos = new Map((v.data ?? []).map((r) => [r.id as string, r]));
   const notes = new Map((n.data ?? []).map((r) => [r.video_id as string, (r.text as string) ?? ""]));
   const articles = new Map((a.data ?? []).map((r) => [r.id as string, r]));
+  // A ScrapBook page has no link; its text is kept as HTML.
+  const scraps = new Map((sc.data ?? []).map((r) => [r.id as string, { ...r, url: "", notes: htmlToText((r.body as string) ?? "") }]));
 
   // The notes, numbered in the order the person chose. Items with no typed or handwritten notes are left out.
   const used: { n: number; title: string; url: string }[] = [];
   const parts: string[] = [];
   let total = 0;
   for (const s of wanted) {
-    const row = s.kind === "video" ? videos.get(s.id) : articles.get(s.id);
+    const row = s.kind === "video" ? videos.get(s.id) : s.kind === "scrap" ? scraps.get(s.id) : articles.get(s.id);
     if (!row) continue;
     const saved = s.kind === "video" ? (notes.get(s.id) ?? "") : ((row.notes as string | null) ?? "");
     const typed = splitTypedClips(saved).text.trim();
@@ -73,13 +78,15 @@ export async function POST(request: Request) {
     if (!text || total + text.length > TOTAL_MAX) continue;
     total += text.length;
     const num = used.length + 1;
-    const itemTitle = (row.title as string | null) || (row.url as string);
+    const itemTitle = (row.title as string | null) || (row.url as string) || "Untitled page";
     const type =
       s.kind === "video"
         ? `Video${row.channel ? ` by ${row.channel}` : ""}`
-        : `${row.kind === "tutorial" ? "Tutorial" : "Reading"}${row.site ? ` from ${row.site}` : ""}`;
+        : s.kind === "scrap"
+          ? "ScrapBook page (the person's own notes)"
+          : `${row.kind === "tutorial" ? "Tutorial" : "Reading"}${row.site ? ` from ${row.site}` : ""}`;
     used.push({ n: num, title: itemTitle, url: row.url as string });
-    parts.push(`[${num}] ${itemTitle}\n${type}\nLink: ${row.url}\nNotes:\n${text}`);
+    parts.push(`[${num}] ${itemTitle}\n${type}${row.url ? `\nLink: ${row.url}` : ""}\nNotes:\n${text}`);
   }
   if (titleMode) return suggestTitles(parts, reportText);
   if (!used.length) {

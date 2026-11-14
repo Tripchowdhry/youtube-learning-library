@@ -56,7 +56,7 @@ const SLIDES: Slide[] = [
     icon: ScrollText,
     tone: "blue",
     title: "Turn your notes into a report",
-    text: "Report Writer pulls your notes from videos, readings and tutorials into one report. Put them together as they are or draft with AI, edit it like in Word, then copy it or download it.",
+    text: "Report Writer pulls your notes from videos, readings, tutorials and ScrapBook into one report. Put them together as they are or draft with AI, edit it like in Word, then copy it or download it.",
     src: "/landing/report.webp",
     alt: "Report Writer: a report built from your notes, ready to copy or download for Word",
   },
