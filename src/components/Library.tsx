@@ -7,8 +7,9 @@ import BrandMark from "@/components/BrandMark";
 import { WelcomePanel } from "@/components/GettingStarted";
 import { Tour, TourButton, useSectionTour } from "@/components/Tour";
 import { SAMPLE_VIDEO } from "@/lib/onboarding";
-import { Brush, Clapperboard, ExternalLink, FilePen, Folder as FolderIcon, ArrowUp, Copy, Eye, FolderPlus, Images, Inbox, Link2, Link2Off, NotebookText, Pencil, Sparkles, Trash2, TriangleAlert, type LucideIcon } from "lucide-react";
+import { Brush, Clapperboard, ExternalLink, FilePen, Folder as FolderIcon, ArrowUp, Copy, Eye, FolderPlus, Images, Inbox, Link2, Link2Off, NotebookText, Pencil, PencilLine, Sparkles, Tag, Trash2, TriangleAlert, type LucideIcon } from "lucide-react";
 import { Ico, type Tone } from "@/components/Icon";
+import MoreMenu from "@/components/MoreMenu";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePointerDrag } from "@/lib/pointer-drag";
@@ -1104,19 +1105,6 @@ function VideoCard(props: {
             <Ico icon={ExternalLink} tone="red" size={14} />
             YouTube
           </a>
-          <select
-            value={video.category_id ?? ""}
-            onChange={(e) => props.onMove(e.target.value || null)}
-            className="max-w-48 min-w-0 rounded-md border border-slate-300 bg-white px-1 py-1 text-xs"
-            aria-label="Move to category"
-          >
-            <option value="">Uncategorized</option>
-            {props.folderOptions.map((f) => (
-              <option key={f.id} value={f.id}>
-                {f.label}
-              </option>
-            ))}
-          </select>
           {props.onShift && (
             <>
               <SmallButton onClick={() => props.onShift!(-1)} disabled={props.isFirst} title="Move up">
@@ -1152,13 +1140,16 @@ function VideoCard(props: {
             </SmallButton>
           )}
           {!video.note && props.aiNoteStartedAt !== null && <AiNoteWorking startedAt={props.aiNoteStartedAt} jobKey={aiNoteKey(video.id)} />}
-          <SmallButton onClick={props.onRename}>Edit title</SmallButton>
-          <SmallButton onClick={props.onEditTags}>Tags</SmallButton>
-          {/* Kept apart from the note buttons so it isn't pressed by mistake. */}
-          <span className="ml-auto pl-3">
-            <SmallButton onClick={props.onDelete} danger icon={Trash2}>
-              Delete
-            </SmallButton>
+          {/* The less-used actions, Delete last, so the card stays tidy. */}
+          <span className="ml-auto pl-2">
+            <MoreMenu
+              items={[
+                { label: "Edit title", icon: PencilLine, onClick: props.onRename },
+                { label: "Tags", icon: Tag, tone: "amber", onClick: props.onEditTags },
+                { label: "Delete video", icon: Trash2, danger: true, onClick: props.onDelete },
+              ]}
+              move={{ value: video.category_id, options: props.folderOptions, onMove: props.onMove }}
+            />
           </span>
         </div>
       </div>
