@@ -1,5 +1,6 @@
 "use client";
 
+import SearchBox from "@/components/SearchBox";
 import { revealById } from "@/lib/reveal";
 import StopAiButton from "@/components/StopAiButton";
 import ReportWriterLink from "@/components/ReportWriterLink";
@@ -631,13 +632,7 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
         </button>
         <BrandMark />
         <SectionSwitch active={kind} />
-        <input
-          type="search"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search titles, sites, notes…"
-          className="ml-auto w-full max-w-xs rounded-md border border-slate-300 px-3 py-1.5 text-sm"
-        />
+        <SearchBox value={query} onChange={setQuery} placeholder="Search titles, sites, notes…" className="ml-auto w-full max-w-xs" />
         <Link
           data-tour="clips"
           href="/clips"
