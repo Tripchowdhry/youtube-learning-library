@@ -877,7 +877,7 @@ function AskAi(props: {
   return (
     <div data-tour="ask-ai" className="rounded-xl bg-white p-3 shadow-sm ring-1 ring-violet-200">
       <button onClick={() => setOpen((o) => !o)} className="flex w-full items-center gap-2 text-left text-sm font-semibold">
-        <Ico icon={Sparkles} tone="amber" />
+        <Ico icon={Sparkles} tone="violet" />
         Ask AI about this video
         {busy && <span className="font-normal text-violet-700">Watching the video… this can take a minute</span>}
         <span className="ml-auto text-xs font-normal text-slate-500">{open ? "Hide" : "Show"}</span>

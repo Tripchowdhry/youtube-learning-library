@@ -1147,7 +1147,7 @@ function VideoCard(props: {
             </SmallButton>
           )}
           {!video.note && !editingNote && props.aiNoteStartedAt === null && (
-            <SmallButton onClick={props.onAiNote} title="Let AI watch the video and write the summary" icon={Sparkles} tone="amber">
+            <SmallButton onClick={props.onAiNote} title="Let AI watch the video and write the summary" icon={Sparkles} tone="violet">
               AI summary
             </SmallButton>
           )}
