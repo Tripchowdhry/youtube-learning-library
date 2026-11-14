@@ -1,10 +1,11 @@
 "use client";
 
-// Saved, Copy and Download Word for typed notes, the same as in Report Writer.
+// Saved, Copy and Download (Word or PDF) for typed notes, the same as in Report Writer.
 
 import { useState } from "react";
-import { Copy, FileDown } from "lucide-react";
-import { copyReport, downloadWord } from "@/lib/report-export";
+import { Copy } from "lucide-react";
+import DownloadMenu from "@/components/DownloadMenu";
+import { copyReport } from "@/lib/report-export";
 
 type SaveState = "saved" | "saving" | "unsaved" | "error";
 
@@ -24,7 +25,6 @@ export default function NotesExport({
   resolve: (src: string) => string;
   empty: boolean;
 }) {
-  const [exporting, setExporting] = useState(false);
   const [toast, setToast] = useState<{ text: string; isError?: boolean } | null>(null);
 
   function notify(text: string, isError = false) {
@@ -41,16 +41,6 @@ export default function NotesExport({
     }
   }
 
-  async function word() {
-    setExporting(true);
-    try {
-      await downloadWord(title, makeDocument(), resolve);
-    } catch {
-      notify("Couldn't make the Word file. Try again.", true);
-    } finally {
-      setExporting(false);
-    }
-  }
 
   return (
     <div className="flex items-center gap-2">
@@ -70,13 +60,7 @@ export default function NotesExport({
       >
         <Copy size={14} aria-hidden /> Copy
       </button>
-      <button
-        onClick={word}
-        disabled={empty || exporting}
-        className="flex items-center gap-1.5 rounded-md bg-blue-600 px-2.5 py-1 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-      >
-        <FileDown size={14} aria-hidden /> {exporting ? "Making file…" : "Download Word"}
-      </button>
+      <DownloadMenu title={title} makeDocument={makeDocument} resolve={resolve} disabled={empty} onError={(m) => notify(m, true)} />
       {toast && (
         <div
           className={`fixed bottom-4 left-1/2 z-40 -translate-x-1/2 rounded-lg px-4 py-2 text-sm text-white shadow-lg ${toast.isError ? "bg-red-600" : "bg-slate-900"}`}
