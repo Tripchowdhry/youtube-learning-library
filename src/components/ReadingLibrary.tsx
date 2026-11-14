@@ -32,6 +32,7 @@ import type { Article, ArticleCategory, SectionKind } from "@/lib/types";
 import { hasWriting } from "@/lib/note-mode";
 import { askArticleAi } from "@/lib/video-ai";
 import { askConfirm } from "./ConfirmDialog";
+import FilterMenu from "@/components/FilterMenu";
 import { Ico, type Tone } from "./Icon";
 import { Images, Brush, FilePen, ExternalLink, FileText, GraduationCap, Inbox, LockKeyhole, NotebookPen, NotebookText, Pencil, PencilLine, Clapperboard, Sparkles, Tag, Trash2, TriangleAlert, type LucideIcon, ArrowUp, Copy, Eye, Link2, Link2Off } from "lucide-react";
 import MoreMenu from "@/components/MoreMenu";
@@ -743,6 +744,22 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
                     </SmallButton>
                   </>
                 )}
+                <FilterMenu
+                  tour="read-filter"
+                  groups={[
+                    { label: "Added", value: period, options: PERIODS.map((p) => ({ value: p.value, label: p.label })), onChange: (v) => setPeriod(v as Period) },
+                    {
+                      label: "Show",
+                      value: readFilter,
+                      options: [
+                        { value: "all", label: "All" },
+                        { value: "unread", label: "Unread" },
+                        { value: "read", label: "✓ Read" },
+                      ],
+                      onChange: (v) => setReadFilter(v as ReadFilter),
+                    },
+                  ]}
+                />
                 <ItemSortSelect sort={itemSort} onChange={setItemSort} />
               </div>
 
@@ -756,25 +773,6 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
                   placeholder={section.placeholder}
                 />
               )}
-
-              <div data-tour="read-filter" className="mb-4 flex flex-wrap items-center gap-2 text-sm">
-                <Pills
-                  value={period}
-                  onChange={setPeriod}
-                  options={PERIODS.map((p) => ({ value: p.value, label: p.label }))}
-                  label="Added"
-                />
-                <Pills
-                  value={readFilter}
-                  onChange={setReadFilter}
-                  options={[
-                    { value: "all", label: "All" },
-                    { value: "unread", label: "Unread" },
-                    { value: "read", label: "✓ Read" },
-                  ]}
-                  label="Show"
-                />
-              </div>
 
               {loading ? (
                 <p className="text-slate-500">Loading your {section.list}…</p>
@@ -1216,28 +1214,6 @@ function AddArticleForm(props: {
         {busy ? "Adding…" : "Add"}
       </button>
     </form>
-  );
-}
-
-export function Pills<T extends string>(props: {
-  value: T;
-  onChange: (value: T) => void;
-  options: { value: T; label: string }[];
-  label: string;
-}) {
-  return (
-    <div className="flex flex-wrap items-center gap-1">
-      <span className="text-xs text-slate-500">{props.label}:</span>
-      {props.options.map((o) => (
-        <button
-          key={o.value}
-          onClick={() => props.onChange(o.value)}
-          className={`rounded-full border px-2.5 py-0.5 text-xs whitespace-nowrap ${props.value === o.value ? "border-slate-900 bg-slate-900 text-white" : "border-slate-300 text-slate-700 hover:bg-slate-100"}`}
-        >
-          {o.label}
-        </button>
-      ))}
-    </div>
   );
 }
 

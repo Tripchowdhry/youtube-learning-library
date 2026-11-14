@@ -8,6 +8,7 @@ import { WelcomePanel } from "@/components/GettingStarted";
 import { Tour, TourButton, useSectionTour } from "@/components/Tour";
 import { SAMPLE_VIDEO } from "@/lib/onboarding";
 import { Brush, Clapperboard, ExternalLink, FilePen, Folder as FolderIcon, ArrowUp, Copy, Eye, FolderPlus, Images, Inbox, Link2, Link2Off, NotebookText, Pencil, PencilLine, Sparkles, Tag, Trash2, TriangleAlert, type LucideIcon } from "lucide-react";
+import FilterMenu from "@/components/FilterMenu";
 import { Ico, type Tone } from "@/components/Icon";
 import MoreMenu from "@/components/MoreMenu";
 import Link from "next/link";
@@ -19,7 +20,6 @@ import {
   ArticleNote,
   PERIODS,
   type Period,
-  Pills,
   ReadCheck,
   SectionSwitch,
   type Toast,
@@ -725,6 +725,21 @@ export default function Library({ userEmail }: { userEmail: string }) {
                 </SmallButton>
               </>
             )}
+            <FilterMenu
+              groups={[
+                { label: "Added", value: period, options: PERIODS.map((p) => ({ value: p.value, label: p.label })), onChange: (v) => setPeriod(v as Period) },
+                {
+                  label: "Show",
+                  value: watchFilter,
+                  options: [
+                    { value: "all", label: "All" },
+                    { value: "unwatched", label: "Unwatched" },
+                    { value: "watched", label: "✓ Watched" },
+                  ],
+                  onChange: (v) => setWatchFilter(v as typeof watchFilter),
+                },
+              ]}
+            />
             <ItemSortSelect sort={itemSort} onChange={setItemSort} />
           </div>
 
@@ -750,25 +765,6 @@ export default function Library({ userEmail }: { userEmail: string }) {
               ))}
             </div>
           )}
-
-          <div className="mb-4 flex flex-wrap items-center gap-2 text-sm">
-            <Pills
-              value={period}
-              onChange={setPeriod}
-              options={PERIODS.map((p) => ({ value: p.value, label: p.label }))}
-              label="Added"
-            />
-            <Pills
-              value={watchFilter}
-              onChange={setWatchFilter}
-              options={[
-                { value: "all", label: "All" },
-                { value: "unwatched", label: "Unwatched" },
-                { value: "watched", label: "✓ Watched" },
-              ]}
-              label="Show"
-            />
-          </div>
 
           {loading ? (
             <p className="text-slate-500">Loading your library…</p>
