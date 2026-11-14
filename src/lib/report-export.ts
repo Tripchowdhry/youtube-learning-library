@@ -198,3 +198,93 @@ export async function downloadWord(title: string, body: string, resolve: Resolve
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 10_000);
 }
+
+// ---------- PDF ----------
+
+// A picture for a PDF: a JPEG or PNG data URL and a size that fits the page.
+async function pdfPicture(url: string) {
+  const pic = await wordPicture(url);
+  const bytes = new Uint8Array(pic.data);
+  let binary = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  // Word's size fits 576px; a PDF page has about 480 points of room.
+  const scale = Math.min(1, 480 / pic.width);
+  return {
+    image: `data:image/${pic.type === "png" ? "png" : "jpeg"};base64,${btoa(binary)}`,
+    width: Math.round(pic.width * scale),
+  };
+}
+
+// The same document as Download Word, as a PDF: ready to send, and the same on every device.
+export async function downloadPdf(title: string, body: string, resolve: Resolve) {
+  // Loaded only when someone downloads, so the rest of the app never carries it.
+  const [{ default: pdfMake }, { default: vfs }] = await Promise.all([import("pdfmake/build/pdfmake"), import("pdfmake/build/vfs_fonts")]);
+
+  type Text = { text: string | Text[]; bold?: boolean; italics?: boolean; decoration?: "underline"; link?: string; color?: string };
+  const runs = (parts: Inline[]): Text[] =>
+    parts.map((p) => ({
+      text: p.text,
+      bold: p.bold || undefined,
+      italics: p.italic || undefined,
+      decoration: p.underline || p.href ? ("underline" as const) : undefined,
+      link: p.href,
+      color: p.href ? "#2563eb" : undefined,
+    }));
+
+  const content: object[] = [];
+  const blocks = parseReport(body);
+  for (let i = 0; i < blocks.length; i++) {
+    const b = blocks[i];
+    if (b.type === "li" || b.type === "ol") {
+      // Items next to each other make one list.
+      const items: Text[][] = [];
+      const start = b.type === "ol" ? Number(b.num) || 1 : 1;
+      while (i < blocks.length && blocks[i].type === b.type) {
+        const it = blocks[i++] as Extract<Block, { type: "li" | "ol" }>;
+        items.push(runs(it.inline));
+      }
+      i--;
+      const list = items.map((t) => ({ text: t, margin: [0, 0, 0, 3] }));
+      content.push(b.type === "ol" ? { ol: list, start, margin: [0, 0, 0, 8] } : { ul: list, margin: [0, 0, 0, 8] });
+    } else if (b.type === "img") {
+      try {
+        content.push({ ...(await pdfPicture(resolve(b.src))), margin: [0, 4, 0, b.caption ? 2 : 10] });
+      } catch {
+        content.push({ text: `[Picture: ${resolve(b.src)}]`, italics: true, margin: [0, 0, 0, 8] });
+      }
+      if (b.caption) content.push({ text: b.caption, italics: true, fontSize: 9, color: "#64748b", margin: [0, 0, 0, 10] });
+    } else if (b.type === "quote") {
+      content.push({ text: runs(b.inline), color: "#475569", margin: [16, 0, 0, 8] });
+    } else {
+      content.push({ text: runs(b.inline), style: b.type });
+    }
+  }
+
+  const doc = pdfMake.createPdf(
+    {
+      info: { title, creator: "BrainShelf" },
+      pageMargins: [56, 56, 56, 56],
+      content: content as never,
+      defaultStyle: { fontSize: 11, lineHeight: 1.25, color: "#1e293b" },
+      styles: {
+        h1: { fontSize: 22, bold: true, margin: [0, 0, 0, 12], color: "#0f172a" },
+        h2: { fontSize: 15, bold: true, margin: [0, 14, 0, 6], color: "#0f172a" },
+        h3: { fontSize: 12, bold: true, margin: [0, 10, 0, 4], color: "#0f172a" },
+        p: { margin: [0, 0, 0, 8] },
+      },
+      footer: (page: number, pages: number) => ({ text: `${page} / ${pages}`, alignment: "center", fontSize: 8, color: "#94a3b8", margin: [0, 20, 0, 0] }),
+    },
+    undefined,
+    undefined,
+    vfs,
+  );
+  const blob = await new Promise<Blob>((done) => doc.getBlob(done));
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${fileName(title)}.pdf`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
+}

@@ -17,7 +17,8 @@ import {
   type SourceKind,
   type SourceSection,
 } from "@/lib/report";
-import { copyReport, downloadWord } from "@/lib/report-export";
+import { copyReport } from "@/lib/report-export";
+import DownloadMenu from "@/components/DownloadMenu";
 import { pageToPng } from "@/lib/handwriting-image";
 import { DRAFT_STYLES, draftStyle, type DraftStyle } from "@/lib/report-styles";
 import { createClient } from "@/lib/supabase/client";
@@ -30,7 +31,6 @@ import {
   Clapperboard,
   Copy,
   Eye,
-  FileDown,
   FileText,
   GraduationCap,
   Layers,
@@ -428,7 +428,6 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
   // ---------- Export ----------
 
   const resolve = useCallback((src: string) => pictureUrl(supabase, src), [supabase]);
-  const [exporting, setExporting] = useState(false);
 
   async function copy() {
     try {
@@ -439,16 +438,6 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
     }
   }
 
-  async function word() {
-    setExporting(true);
-    try {
-      await downloadWord(title.trim() || "Report", body, resolve);
-    } catch {
-      notify("Couldn't make the Word file. Try again.", true);
-    } finally {
-      setExporting(false);
-    }
-  }
 
   // ---------- Sharing ----------
 
@@ -815,13 +804,13 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
           >
             <Ico icon={Link2} tone="blue" size={14} /> {shareToken ? "Shared" : "Share"}
           </button>
-          <button
-            onClick={word}
-            disabled={!body.trim() || exporting}
-            className="flex items-center gap-1.5 rounded-md bg-blue-600 px-2.5 py-1 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-          >
-            <FileDown size={14} aria-hidden /> {exporting ? "Making file…" : "Download Word"}
-          </button>
+          <DownloadMenu
+            title={title.trim() || "Report"}
+            makeDocument={() => body}
+            resolve={resolve}
+            disabled={!body.trim()}
+            onError={(m) => notify(m, true)}
+          />
         </div>
 
         {shareToken && shareOpen && (
