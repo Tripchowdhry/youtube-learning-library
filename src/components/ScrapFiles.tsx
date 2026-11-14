@@ -25,7 +25,7 @@ import {
   formatSize,
   type ScrapFile,
 } from "@/lib/files";
-import { findLocalFile, forgetLocalFile, isLocalFile, rememberLocalFile, type FileHandle, type PickerWindow } from "@/lib/local-files";
+import { findLocalFile as findOnComputer, forgetLocalFile, isLocalFile, rememberLocalFile, type FileHandle, type PickerWindow } from "@/lib/local-files";
 import { parseReport } from "@/lib/report";
 
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -125,7 +125,7 @@ export default function ScrapFiles(props: {
   onChange: (files: ScrapFile[]) => void;
   // The AI's answer, as HTML to add to the end of the page's text.
   onAnswer: (html: string) => void;
-  onNotice: (text: string) => void;
+  onNotice: (text: string, ok?: boolean) => void;
 }) {
   const { supabase, scrapId, files } = props;
   const [viewing, setViewing] = useState<{ path: string; url: string } | null>(null);
@@ -157,6 +157,14 @@ export default function ScrapFiles(props: {
       }),
     [scrapId, onAnswer],
   );
+
+  // Finds a file kept on this computer. When the browser no longer has it (another browser,
+  // a new tab on Safari or iPad, or the file moved), the person is asked to choose it again.
+  async function findLocalFile(f: ScrapFile) {
+    const file = await findOnComputer(f, () => props.onNotice(`Choose "${f.name}" on your computer. This browser needs it again.`, true));
+    if (!file) props.onNotice(`"${f.name}" wasn't opened. Choose the same file on your computer to see it here.`);
+    return file;
+  }
 
   async function open(f: ScrapFile, download = false) {
     if (isLocalFile(f)) {
@@ -215,7 +223,7 @@ export default function ScrapFiles(props: {
     // A file sent in the last 48 hours is still with Google, so it isn't sent again.
     const sentBefore = isLocalFile(f) ? sentVideo(f.path) : null;
     const onComputer = isLocalFile(f) && !sentBefore ? await findLocalFile(f) : null;
-    if (isLocalFile(f) && !sentBefore && !onComputer) return props.onNotice(`Choose "${f.name}" on this computer to ask the AI about it.`);
+    if (isLocalFile(f) && !sentBefore && !onComputer) return;
     setPrompt("");
     setAsking(null);
     askedAbout.set(scrapId, f.path);

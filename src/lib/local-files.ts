@@ -88,9 +88,22 @@ export async function localFileNow(path: string): Promise<File | null> {
   }
 }
 
-// The video on this computer, asking the person if needed. Must run from a click.
+// The file on this computer, asking the person if needed. Must run from a click.
+// beforePick runs just before a file picker opens, to say which file to choose.
 // Returns null when they cancel or the file is gone.
-export async function findLocalFile(f: ScrapFile): Promise<File | null> {
+export async function findLocalFile(f: ScrapFile, beforePick?: () => void): Promise<File | null> {
+  const known = picked.get(f.path);
+  if (known) return known;
+  const w = window as PickerWindow;
+  // Browsers without Chrome's picker (Safari, iPad) can't remember files, and only open a
+  // picker straight from the click, so open it before anything else.
+  if (!w.showOpenFilePicker) {
+    beforePick?.();
+    const [file] = await pickWithInput(false);
+    if (!file) return null;
+    picked.set(f.path, file);
+    return file;
+  }
   const now = await localFileNow(f.path);
   if (now) return now;
   const handle = await withStore<FileHandle>("readonly", (s) => s.get(f.path));
@@ -105,22 +118,16 @@ export async function findLocalFile(f: ScrapFile): Promise<File | null> {
       // Moved or deleted on the computer: pick it again below.
     }
   }
-  const w = window as PickerWindow;
-  if (w.showOpenFilePicker) {
-    try {
-      const [again] = await w.showOpenFilePicker({ multiple: false });
-      const file = await again.getFile();
-      picked.set(f.path, file);
-      await withStore("readwrite", (s) => s.put(again, f.path));
-      return file;
-    } catch {
-      return null;
-    }
+  beforePick?.();
+  try {
+    const [again] = await w.showOpenFilePicker({ multiple: false });
+    const file = await again.getFile();
+    picked.set(f.path, file);
+    await withStore("readwrite", (s) => s.put(again, f.path));
+    return file;
+  } catch {
+    return null;
   }
-  const [file] = await pickWithInput(false);
-  if (!file) return null;
-  picked.set(f.path, file);
-  return file;
 }
 
 export async function forgetLocalFile(path: string) {
