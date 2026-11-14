@@ -7,7 +7,7 @@
 import { markAiQuestions } from "@/lib/notes-format";
 import { revealAdded } from "@/lib/reveal";
 import { useEffect, useImperativeHandle, useRef, useState } from "react";
-import { Bold, Italic, Link2, List, ListOrdered, Quote, Redo2, Underline, Undo2, type LucideIcon } from "lucide-react";
+import { Bold, ChevronDown, Italic, Link2, List, ListOrdered, Loader2, Quote, Redo2, Sparkles, Underline, Undo2, type LucideIcon } from "lucide-react";
 import { parseReport, type Block, type Inline } from "@/lib/report";
 
 type Resolve = (src: string) => string;
@@ -170,6 +170,24 @@ const plainStart = (text: string) =>
 
 // ---------- The editor ----------
 
+// Report Writer's "Improve" menu: the AI rewrites one part, shown first, used only on Replace.
+export type ImproveHow = "shorter" | "clearer" | "expand";
+const IMPROVE: { how: ImproveHow; label: string }[] = [
+  { how: "shorter", label: "Shorter" },
+  { how: "clearer", label: "Clearer" },
+  { how: "expand", label: "Expand" },
+];
+export type ImproveFn = (text: string, how: ImproveHow) => Promise<{ text: string; model: string | null }>;
+
+// Lights up the part being improved without changing the text (where the browser can).
+function highlight(range: Range | null) {
+  const css = (globalThis as { CSS?: { highlights?: Map<string, unknown> } }).CSS;
+  const Highlight = (globalThis as { Highlight?: new (r: Range) => unknown }).Highlight;
+  if (!css?.highlights || !Highlight) return;
+  if (range) css.highlights.set("report-improve", new Highlight(range));
+  else css.highlights.delete("report-improve");
+}
+
 // What a page can do to the editor from outside: put text at the cursor (a video time) or
 // show the end (after an AI answer is added).
 export type RichEditorHandle = {
@@ -189,6 +207,7 @@ export default function ReportRichEditor({
   boxClassName = "min-h-[28rem]",
   onKeyDown,
   handle,
+  onImprove,
 }: {
   body: string;
   onChange: (body: string) => void;
@@ -199,6 +218,8 @@ export default function ReportRichEditor({
   boxClassName?: string;
   onKeyDown?: (e: React.KeyboardEvent<HTMLDivElement>) => void;
   handle?: React.Ref<RichEditorHandle>;
+  // When given, the toolbar gets an Improve menu (Report Writer only).
+  onImprove?: ImproveFn;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const lastEmitted = useRef<string | null>(null);
@@ -206,6 +227,18 @@ export default function ReportRichEditor({
   const [style, setStyle] = useState<Style | "">("p");
   const [marks, setMarks] = useState({ bold: false, italic: false, underline: false });
   const [linking, setLinking] = useState<string | null>(null);
+  const [improveMenu, setImproveMenu] = useState(false);
+  const [improveHint, setImproveHint] = useState<string | null>(null);
+  const improveBox = useRef<HTMLDivElement>(null);
+  const [improving, setImproving] = useState<{
+    how: ImproveHow;
+    range: Range;
+    original: string;
+    singleBlock: boolean;
+    busy: boolean;
+    result?: { text: string; model: string | null };
+    error?: string;
+  } | null>(null);
 
   // Show the report, unless the change came from typing here (that would move the cursor).
   useEffect(() => {
@@ -214,6 +247,15 @@ export default function ReportRichEditor({
     markAiQuestions(ref.current);
     lastEmitted.current = body;
   }, [body, resolve]);
+
+  // The Improve menu closes when you click anywhere else; the highlight goes when the editor does.
+  useEffect(() => {
+    if (!improveMenu) return;
+    const close = (e: MouseEvent) => improveBox.current?.contains(e.target as Node) || setImproveMenu(false);
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, [improveMenu]);
+  useEffect(() => () => highlight(null), []);
 
   // Keep the toolbar in step with where the cursor is.
   useEffect(() => {
@@ -319,6 +361,69 @@ export default function ReportRichEditor({
     },
   }));
 
+  // The part to improve: the selected text, or else the paragraph the cursor is in.
+  const pickPart = () => {
+    const box = ref.current;
+    const r = savedRange.current;
+    if (!box || !r || !box.contains(r.startContainer)) return null;
+    const range = r.cloneRange();
+    const top = (n: Node | null) => {
+      while (n && n.parentNode !== box) n = n.parentNode;
+      return n;
+    };
+    if (range.collapsed) {
+      const block = top(range.startContainer);
+      if (!block || (block as HTMLElement).tagName === "FIGURE") return null;
+      range.selectNodeContents(block);
+    }
+    const holder = document.createElement("div");
+    const inner = document.createElement("div");
+    inner.appendChild(range.cloneContents());
+    holder.appendChild(inner);
+    const original = editorToReport(holder).trim();
+    if (!original) return null;
+    return { range, original, singleBlock: top(range.startContainer) === top(range.endContainer) && !/\n/.test(original) };
+  };
+
+  const startImprove = async (how: ImproveHow, part = improving && { range: improving.range, original: improving.original, singleBlock: improving.singleBlock }) => {
+    setImproveMenu(false);
+    if (!onImprove) return;
+    const picked = part || pickPart();
+    if (!picked) {
+      setImproving(null);
+      setImproveHint("Select some text in the report, or put the cursor in a paragraph, then choose Improve.");
+      return;
+    }
+    setImproveHint(null);
+    highlight(picked.range);
+    setImproving({ how, ...picked, busy: true });
+    try {
+      const result = await onImprove(picked.original, how);
+      setImproving((cur) => (cur && cur.range === picked.range ? { ...cur, how, busy: false, result, error: undefined } : cur));
+    } catch (e) {
+      setImproving((cur) => (cur && cur.range === picked.range ? { ...cur, how, busy: false, error: (e as Error).message } : cur));
+    }
+  };
+
+  const closeImprove = () => {
+    highlight(null);
+    setImproving(null);
+  };
+
+  // Swaps the picked part for the new version. It goes through the browser's own editing, so Undo brings the old text back.
+  const replaceImprove = () => {
+    if (!improving?.result || !ref.current) return;
+    ref.current.focus();
+    const sel = document.getSelection();
+    sel?.removeAllRanges();
+    sel?.addRange(improving.range);
+    const blocks = parseReport(improving.result.text);
+    if (improving.singleBlock && blocks.length === 1 && blocks[0].type === "p") document.execCommand("insertHTML", false, inlineHtml(blocks[0].inline));
+    else document.execCommand("insertHTML", false, editorHtml(blocks, resolve));
+    emit();
+    closeImprove();
+  };
+
   const addLink = () => {
     const url = (linking ?? "").trim();
     setLinking(null);
@@ -358,7 +463,91 @@ export default function ReportRichEditor({
         <Divider />
         <ToolButton label="Undo" Icon={Undo2} onClick={() => run("undo")} />
         <ToolButton label="Redo" Icon={Redo2} onClick={() => run("redo")} />
+        {onImprove && (
+          <div ref={improveBox} className="relative ml-auto">
+            <button
+              type="button"
+              onClick={() => setImproveMenu((o) => !o)}
+              aria-haspopup="menu"
+              aria-expanded={improveMenu}
+              title="Let AI improve the selected text, or the paragraph the cursor is in"
+              className="flex items-center gap-1 rounded-md bg-[#f6f3ff] px-2 py-1 text-sm font-medium text-[#2b3b5e] ring-1 ring-[#e2d9fb] hover:bg-[#efeaff]"
+            >
+              {improving?.busy ? <Loader2 size={14} className="animate-spin text-[#7c3aed]" aria-hidden /> : <Sparkles size={14} className="text-[#7c3aed]" aria-hidden />}
+              {improving?.busy ? "Improving…" : "Improve"}
+              <ChevronDown size={14} aria-hidden />
+            </button>
+            {improveMenu && (
+              <div role="menu" className="absolute right-0 z-20 mt-1 w-36 rounded-lg bg-white p-1 shadow-lg ring-1 ring-violet-200">
+                {IMPROVE.map((m) => (
+                  <button
+                    key={m.how}
+                    type="button"
+                    role="menuitem"
+                    onClick={() => startImprove(m.how, null)}
+                    className="block w-full rounded-md px-2 py-1 text-left text-sm font-medium text-[#2b3b5e] hover:bg-violet-50"
+                  >
+                    {m.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
+      {improveHint && (
+        <p className="flex items-center gap-2 border-b border-slate-200 bg-[#f6f3ff] px-3 py-1.5 text-sm text-slate-700">
+          <span className="mr-auto">{improveHint}</span>
+          <button type="button" onClick={() => setImproveHint(null)} className="text-slate-500 underline">
+            OK
+          </button>
+        </p>
+      )}
+      {improving && (
+        <div className="sticky top-14 z-10 border-b border-[#e2d9fb] bg-[#f6f3ff] px-3 py-2 shadow-sm" role="status">
+          <p className="mb-1 flex items-center gap-1.5 text-xs font-medium text-slate-600">
+            <Sparkles size={13} className={`text-[#7c3aed] ${improving.busy ? "animate-pulse" : ""}`} aria-hidden />
+            {improving.busy
+              ? `Making it ${improving.how === "expand" ? "longer" : improving.how}… The lit-up part is what will change.`
+              : improving.error
+                ? "Couldn't improve it."
+                : `${IMPROVE.find((m) => m.how === improving.how)?.label}${improving.result?.model ? `, from ${improving.result.model}` : ""}. Nothing changes until you choose Replace.`}
+          </p>
+          {improving.busy ? (
+            <div className="space-y-1.5 rounded-md bg-white p-2 ring-1 ring-[#e2d9fb]">
+              {[90, 75, 60].map((w) => (
+                <div key={w} className="h-3 animate-pulse rounded bg-[#e9e3fb]" style={{ width: `${w}%` }} />
+              ))}
+            </div>
+          ) : improving.error ? (
+            <p className="text-sm text-red-700">{improving.error}</p>
+          ) : (
+            <div
+              className="report-editor max-h-72 overflow-y-auto rounded-md bg-white px-3 py-2 text-slate-800 ring-1 ring-[#e2d9fb]"
+              dangerouslySetInnerHTML={{ __html: editorHtml(parseReport(improving.result?.text ?? ""), resolve) }}
+            />
+          )}
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            {improving.result && !improving.busy && (
+              <button type="button" onClick={replaceImprove} className="rounded-md bg-[#2b3b5e] px-3 py-1 text-sm font-medium text-white hover:bg-[#22304d]">
+                Replace
+              </button>
+            )}
+            <button type="button" onClick={closeImprove} className="rounded-md border border-slate-300 bg-white px-3 py-1 text-sm hover:bg-slate-50">
+              {improving.busy ? "Cancel" : "Keep mine"}
+            </button>
+            {!improving.busy && (
+              <button
+                type="button"
+                onClick={() => startImprove(improving.how)}
+                className="ml-auto flex items-center gap-1 rounded-md px-2 py-1 text-sm text-[#2b3b5e] hover:bg-[#efeaff]"
+              >
+                <Sparkles size={13} className="text-[#7c3aed]" aria-hidden /> Try again
+              </button>
+            )}
+          </div>
+        </div>
+      )}
       {linking !== null && (
         <form
           onSubmit={(e) => {

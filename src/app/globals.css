@@ -48,3 +48,6 @@ body {
   border-radius: 4px;
   padding: 2px 8px;
 }
+
+/* Report Writer's Improve: the part the AI is rewriting, lit up without changing the text. */
+::highlight(report-improve) { background-color: #ddd6fe; }
