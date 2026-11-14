@@ -632,7 +632,7 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
         </button>
         <BrandMark />
         <SectionSwitch active={kind} />
-        <SearchBox value={query} onChange={setQuery} placeholder="Search titles, sites, notes…" className="ml-auto w-full max-w-xs" />
+        <SearchBox value={query} onChange={setQuery} placeholder="Search titles, sites, notes…" className="ml-auto w-full min-w-0 max-w-xs" />
         <Link
           data-tour="clips"
           href="/clips"
@@ -640,11 +640,11 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
           title="See and delete your clips to free up space"
         >
           <Ico icon={Images} tone="violet" />
-          Clips
+          <span className="hidden sm:inline">Clips</span>
         </Link>
         <div className="hidden items-center gap-2 text-sm text-slate-500 sm:flex">
           <span className="max-w-40 truncate">{userEmail}</span>
-          <button onClick={signOut} className="rounded-md px-2 py-1 hover:bg-slate-100">
+          <button onClick={signOut} className="rounded-md px-2 py-1 whitespace-nowrap hover:bg-slate-100">
             Sign out
           </button>
         </div>
