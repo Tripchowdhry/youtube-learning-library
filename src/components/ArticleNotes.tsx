@@ -260,7 +260,7 @@ export default function ArticleNotes(props: {
         revision.current += 1;
         setNotes(addAnswer(notesRef.current, answer as string));
         setSaveState("unsaved");
-        requestAnimationFrame(() => box.current?.scrollToEnd());
+        requestAnimationFrame(() => box.current?.revealFrom(answer as string));
         return true;
       }),
     [article.id],

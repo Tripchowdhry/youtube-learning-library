@@ -1,5 +1,6 @@
 "use client";
 
+import { revealAdded } from "@/lib/reveal";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -32,21 +33,12 @@ const MODE_KEY = "scrap-mode";
 const ALLOWED_TAGS = new Set(["P", "DIV", "BR", "B", "STRONG", "I", "EM", "U", "H1", "H2", "H3", "UL", "OL", "LI", "MARK", "SPAN"]);
 
 // Clips (screenshots) in the text are kept only when they come from your own clips storage.
-// Scrolls to the answer and gives it a short violet glow (an animation only, so nothing
-// extra is saved with the text).
+// Scrolls to the newly added answer and lights it up.
 function revealAnswerIn(box: HTMLElement | null, start: { current: number | null }) {
   const from = start.current;
   if (!box || from === null) return;
   start.current = null;
-  const added = Array.from(box.children).slice(from) as HTMLElement[];
-  if (!added.length) return;
-  added[0].scrollIntoView({ behavior: "smooth", block: "center" });
-  for (const el of added) {
-    el.animate([{ backgroundColor: "#ede9fe" }, { backgroundColor: "#ede9fe", offset: 0.6 }, { backgroundColor: "transparent" }], {
-      duration: 4000,
-      easing: "ease-out",
-    });
-  }
+  revealAdded(Array.from(box.children).slice(from));
 }
 
 function cleanHtml(html: string, clipPrefix: string) {

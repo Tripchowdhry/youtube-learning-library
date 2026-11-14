@@ -544,7 +544,7 @@ export default function StudyPage({ videoId }: { videoId: string }) {
       if (key !== `ask:${videoId}`) return false;
       setTyped(addAnswer(typedRef.current, answer as string));
       setSaveState("unsaved");
-      requestAnimationFrame(() => typedBox.current?.scrollToEnd());
+      requestAnimationFrame(() => typedBox.current?.revealFrom(answer as string));
       return true;
     });
   }, [loaded, videoId]);

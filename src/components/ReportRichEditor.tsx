@@ -4,6 +4,7 @@
 // shown already formatted. Underneath, the report is still kept in the simple text format that
 // Copy and Download Word read, so nothing else changes.
 
+import { revealAdded } from "@/lib/reveal";
 import { useEffect, useImperativeHandle, useRef, useState } from "react";
 import { Bold, Italic, Link2, List, ListOrdered, Quote, Redo2, Underline, Undo2, type LucideIcon } from "lucide-react";
 import { parseReport, type Block, type Inline } from "@/lib/report";
@@ -158,11 +159,25 @@ export function editorToReport(root: HTMLElement) {
   return lines.map((l, i) => (i === 0 ? "" : isItem(l) && isItem(lines[i - 1]) ? "\n" : "\n\n") + l).join("");
 }
 
+// The first words of a line without Markdown marks or spaces, for matching a shown paragraph.
+const plainStart = (text: string) =>
+  (text.split("\n").find((l) => l.trim()) ?? "")
+    .replace(/[*_#>`]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 40);
+
 // ---------- The editor ----------
 
 // What a page can do to the editor from outside: put text at the cursor (a video time) or
 // show the end (after an AI answer is added).
-export type RichEditorHandle = { insertAtLineStart: (text: string) => void; scrollToEnd: () => void };
+export type RichEditorHandle = {
+  insertAtLineStart: (text: string) => void;
+  scrollToEnd: () => void;
+  // Scrolls to the last paragraph that starts with this text and lights it up, with all
+  // that follows it (an AI answer just added at the end).
+  revealFrom: (startText: string) => void;
+};
 
 export default function ReportRichEditor({
   body,
@@ -291,6 +306,13 @@ export default function ReportRichEditor({
     },
     scrollToEnd() {
       if (ref.current) ref.current.scrollTop = ref.current.scrollHeight;
+    },
+    revealFrom(startText) {
+      const blocks = Array.from(ref.current?.children ?? []);
+      const want = plainStart(startText);
+      const at = blocks.findLastIndex((b) => want && plainStart(b.textContent ?? "").startsWith(want));
+      if (at >= 0) revealAdded(blocks.slice(at));
+      else if (ref.current) ref.current.scrollTop = ref.current.scrollHeight;
     },
   }));
 
