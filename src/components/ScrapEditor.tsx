@@ -11,7 +11,7 @@ import { formatDate } from "@/components/ReadingLibrary";
 import { createClient } from "@/lib/supabase/client";
 import type { ArticleCategory, NotePage, NoteStroke, Scrap } from "@/lib/types";
 import { hasWriting, openingMode } from "@/lib/note-mode";
-import { Bold, Highlighter, Italic, Keyboard, List, ListOrdered, PenLine, RemoveFormatting, Trash2, Underline } from "lucide-react";
+import { Bold, Eraser, Highlighter, Italic, Keyboard, List, ListOrdered, PenLine, RemoveFormatting, Trash2, Underline } from "lucide-react";
 import { Divider, ToolButton, editorToReport } from "@/components/ReportRichEditor";
 import NotesExport from "@/components/NotesExport";
 import ScrapFiles, { AttachFileButton, addFiles, type Chosen } from "@/components/ScrapFiles";
@@ -214,6 +214,18 @@ export default function ScrapEditor({ scrapId }: { scrapId: string }) {
     }
     document.execCommand("styleWithCSS", false, command === "hiliteColor" ? "true" : "false");
     document.execCommand(command, false, value);
+    onTyped();
+  }
+
+  // Empties the typed page. Done as one edit, so Ctrl/Cmd+Z brings it back.
+  function clearTyped() {
+    const el = editor.current;
+    if (!el || isEmpty) return;
+    if (!window.confirm("Erase everything typed on this page?\nCtrl/Cmd+Z right after brings it back.")) return;
+    el.focus();
+    document.execCommand("selectAll");
+    document.execCommand("delete");
+    if (el.textContent?.trim() || el.querySelector("img")) el.innerHTML = "";
     onTyped();
   }
 
@@ -485,7 +497,7 @@ export default function ScrapEditor({ scrapId }: { scrapId: string }) {
               <AttachFileButton onFiles={attach} busy={adding} />
               {mode === "type" ? (
                 <>
-                  <TypingTools onFormat={format} />
+                  <TypingTools onFormat={format} onClear={clearTyped} canClear={!isEmpty} />
                   <div className="ml-auto">
                     <NotesExport
                       saveState={saveState}
@@ -587,7 +599,8 @@ export default function ScrapEditor({ scrapId }: { scrapId: string }) {
 }
 
 // The same kind of toolbar as Report Writer, plus Highlight.
-function TypingTools({ onFormat }: { onFormat: (command: string, value?: string) => void }) {
+function TypingTools(props: { onFormat: (command: string, value?: string) => void; onClear: () => void; canClear: boolean }) {
+  const { onFormat } = props;
   return (
     <div
       className="flex flex-wrap items-center gap-1"
@@ -615,6 +628,16 @@ function TypingTools({ onFormat }: { onFormat: (command: string, value?: string)
       <ToolButton label="Numbered list" Icon={ListOrdered} onClick={() => onFormat("insertOrderedList")} />
       <ToolButton label="Highlight" Icon={Highlighter} onClick={() => onFormat("hiliteColor", "#fef08a")} />
       <ToolButton label="Clear formatting" Icon={RemoveFormatting} onClick={() => onFormat("removeFormat")} />
+      <Divider />
+      <button
+        onClick={props.onClear}
+        disabled={!props.canClear}
+        title="Erase everything typed on this page"
+        className="flex items-center gap-1 rounded-md px-2 py-1 text-sm text-slate-700 hover:bg-red-50 hover:text-red-700 disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-slate-700"
+      >
+        <Eraser size={15} aria-hidden />
+        Clear sheet
+      </button>
     </div>
   );
 }
