@@ -149,9 +149,9 @@ export default function LandingTour() {
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex items-center gap-2 border-b border-slate-200 px-4 py-2.5">
-                <span className="flex items-center gap-1 rounded-full bg-slate-50 px-2 py-0.5 text-xs font-medium text-slate-500 ring-1 ring-slate-200">
-                  <Ico icon={Eye} tone="slate" size={13} />
-                  Preview of the app
+                <span className="flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-slate-900 ring-1 ring-blue-200">
+                  <Ico icon={Eye} tone="blue" size={13} />
+                  BrainShelf preview
                 </span>
                 <span className="text-sm text-slate-500">
                   {i + 1} of {SLIDES.length}

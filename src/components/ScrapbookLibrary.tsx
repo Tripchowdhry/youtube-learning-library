@@ -587,6 +587,7 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
                           onClick={() => previewShare(currentCategory.share_token!)}
                           icon={Eye}
                           tone="blue"
+                          pill
                           title="See this category the way people with the link see it"
                         >
                           Preview

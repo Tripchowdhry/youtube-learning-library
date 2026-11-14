@@ -829,8 +829,8 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
               </button>
             </div>
             <div className="mt-2 flex items-center gap-3 text-sm">
-              <a href={`/r/${shareToken}?preview=${reportId}`} className="flex items-center gap-1 text-blue-700 underline">
-                <Eye size={14} aria-hidden /> Preview what they see
+              <a href={`/r/${shareToken}?preview=${reportId}`} className="flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2.5 py-0.5 text-slate-900 hover:bg-blue-100">
+                <Eye size={14} aria-hidden className="text-blue-600" /> Preview what they see
               </a>
               <button onClick={stopSharing} className="ml-auto text-slate-600 underline hover:text-slate-900">
                 Stop sharing

@@ -730,6 +730,7 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
                           onClick={() => previewShare(currentCategory.share_token!)}
                           icon={Eye}
                           tone="blue"
+                          pill
                           title="See this category the way people with the link see it"
                         >
                           Preview
@@ -1263,6 +1264,7 @@ export function SmallButton({
   title,
   icon: Icon,
   tone = "slate",
+  pill,
 }: {
   children?: React.ReactNode;
   onClick: () => void;
@@ -1271,6 +1273,8 @@ export function SmallButton({
   title?: string;
   icon?: LucideIcon;
   tone?: Tone;
+  // A light blue pill, used for Preview buttons.
+  pill?: boolean;
 }) {
   return (
     <button
@@ -1278,7 +1282,7 @@ export function SmallButton({
       disabled={disabled}
       title={title}
       aria-label={title}
-      className={`inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs disabled:opacity-30 ${danger ? "border-red-200 text-red-600 hover:bg-red-50" : "border-slate-300 text-slate-700 hover:bg-slate-100"}`}
+      className={`inline-flex items-center gap-1 border px-2 py-1 text-xs disabled:opacity-30 ${danger ? "rounded-md border-red-200 text-red-600 hover:bg-red-50" : pill ? "rounded-full border-blue-200 bg-blue-50 text-slate-900 hover:bg-blue-100" : "rounded-md border-slate-300 text-slate-700 hover:bg-slate-100"}`}
     >
       {Icon && <Ico icon={Icon} tone={danger ? "red" : tone} size={14} />}
       {children}
