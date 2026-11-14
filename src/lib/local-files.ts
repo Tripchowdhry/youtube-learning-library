@@ -1,11 +1,12 @@
 "use client";
 
-// Videos that stay on the person's computer. The ScrapBook page keeps only their name and
-// size; the video itself is read from the computer when it's played or sent to the AI.
+// Files that stay on the person's computer (PDFs, pictures, documents, videos). The ScrapBook
+// page keeps only their name and size; the file itself is read from the computer when it's
+// opened or sent to the AI.
 // Chrome and Edge can remember the file (with the person's OK each visit). Other browsers,
 // and iPads, need the file picked again after the page is reloaded.
 
-import type { ScrapFile } from "@/lib/files";
+import { fileType, type ScrapFile } from "@/lib/files";
 
 export const LOCAL_PREFIX = "local/";
 export const isLocalFile = (f: { path: string }) => f.path.startsWith(LOCAL_PREFIX);
@@ -48,13 +49,10 @@ async function withStore<T>(mode: IDBTransactionMode, run: (s: IDBObjectStore) =
   }
 }
 
-const VIDEO_TYPES = [{ description: "Videos", accept: { "video/*": [".mp4", ".mov", ".m4v", ".webm", ".avi", ".mpg", ".mpeg", ".wmv", ".3gp"] } }];
-
 function pickWithInput(multiple: boolean): Promise<File[]> {
   return new Promise((resolve) => {
     const input = document.createElement("input");
     input.type = "file";
-    input.accept = "video/*";
     input.multiple = multiple;
     input.onchange = () => resolve(Array.from(input.files ?? []));
     input.oncancel = () => resolve([]);
@@ -62,12 +60,12 @@ function pickWithInput(multiple: boolean): Promise<File[]> {
   });
 }
 
-// Keeps a chosen video on the computer: the page stores only its name and size.
-export async function rememberLocalVideo(file: File, handle?: FileHandle): Promise<ScrapFile> {
+// Keeps a chosen file on the computer: the page stores only its name, size and type.
+export async function rememberLocalFile(file: File, handle?: FileHandle): Promise<ScrapFile> {
   const path = `${LOCAL_PREFIX}${crypto.randomUUID()}`;
   picked.set(path, file);
   if (handle) await withStore("readwrite", (s) => s.put(handle, path));
-  return { path, name: file.name, size: file.size, type: file.type || "video/mp4", added_at: new Date().toISOString() };
+  return { path, name: file.name, size: file.size, type: fileType(file), added_at: new Date().toISOString() };
 }
 
 export const isVideo = (file: { name: string; type: string }) =>
@@ -110,7 +108,7 @@ export async function findLocalFile(f: ScrapFile): Promise<File | null> {
   const w = window as PickerWindow;
   if (w.showOpenFilePicker) {
     try {
-      const [again] = await w.showOpenFilePicker({ multiple: false, types: VIDEO_TYPES });
+      const [again] = await w.showOpenFilePicker({ multiple: false });
       const file = await again.getFile();
       picked.set(f.path, file);
       await withStore("readwrite", (s) => s.put(again, f.path));

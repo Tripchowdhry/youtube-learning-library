@@ -146,12 +146,17 @@ const INLINE_MAX = 14_000_000;
 
 type StoredFile = { name: string; uri: string; state?: string };
 
-// Gemini names some video types its own way (a .mov is "video/quicktime" in the browser).
+// Gemini names some types its own way (a .mov is "video/quicktime" in the browser).
 export function geminiVideoType(type: string) {
   return (
-    ({ "video/quicktime": "video/mov", "video/x-msvideo": "video/avi", "video/x-ms-wmv": "video/wmv", "video/x-flv": "video/x-flv" } as Record<string, string>)[
-      type
-    ] ?? type
+    (
+      {
+        "video/quicktime": "video/mov",
+        "video/x-msvideo": "video/avi",
+        "video/x-ms-wmv": "video/wmv",
+        "text/markdown": "text/plain",
+      } as Record<string, string>
+    )[type] ?? type
   );
 }
 
@@ -222,8 +227,9 @@ export async function uploadVideoInPieces(size: number, mimeType: string, owner:
   return name;
 }
 
-// Asks about a video the browser sent to Gemini's file store, once Gemini has it ready.
-export async function askAboutUploadedVideo(fileName: string, owner: string, instructions: string, request: string) {
+// Asks about a file (a video, PDF, picture or text) the browser sent to Gemini's file store,
+// once Gemini has it ready.
+export async function askAboutUploadedFile(fileName: string, owner: string, instructions: string, request: string) {
   if (!/^files\/[\w-]+$/.test(fileName)) throw new GeminiError("That video isn't known.", 400);
   const key = process.env.GEMINI_API_KEY ?? "";
   const read = async () => {
@@ -236,13 +242,17 @@ export async function askAboutUploadedVideo(fileName: string, owner: string, ins
     await new Promise((r) => setTimeout(r, 2000));
     file = (await read()) ?? file;
   }
-  if (file?.state === "PROCESSING") throw new GeminiError("The AI is still getting the video ready. Try again in a minute.", 504);
-  if (file?.state === "FAILED") throw new GeminiError("The AI couldn't open this video. It may be damaged or in a format it can't read.", 422);
-  const video = { file_data: { mime_type: geminiVideoType(file!.mimeType ?? "video/mp4"), file_uri: file!.uri } };
+  if (file?.state === "PROCESSING") throw new GeminiError("The AI is still getting the file ready. Try again in a minute.", 504);
+  if (file?.state === "FAILED") throw new GeminiError("The AI couldn't open this file. It may be damaged or in a format it can't read.", 422);
+  const mimeType = geminiVideoType(file!.mimeType ?? "application/octet-stream");
+  const part = { file_data: { mime_type: mimeType, file_uri: file!.uri } };
+  if (!mimeType.startsWith("video/")) {
+    return generate(() => ({ systemInstruction: { parts: [{ text: instructions }] }, contents: [{ role: "user", parts: [part, { text: request }] }] }), "read this file");
+  }
   return generate(
     (full) => ({
       systemInstruction: { parts: [{ text: instructions }] },
-      contents: [{ role: "user", parts: [full ? { ...video, video_metadata: { fps: FRAMES_PER_SECOND } } : video, { text: request }] }],
+      contents: [{ role: "user", parts: [full ? { ...part, video_metadata: { fps: FRAMES_PER_SECOND } } : part, { text: request }] }],
       generationConfig: { mediaResolution: "MEDIA_RESOLUTION_LOW" },
     }),
     "watch this video",
