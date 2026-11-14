@@ -22,6 +22,10 @@ export function aiReadable(file: { name: string; type: string }) {
 // to Google directly. Bigger ones would take too long for one request to pass on.
 export const BACKUP_MAX_BYTES = 300 * 1024 * 1024;
 
+// The biggest file that can be added to a ScrapBook page.
+export const ADD_MAX_MB = 200;
+export const ADD_MAX_BYTES = ADD_MAX_MB * 1024 * 1024;
+
 // The browser sometimes leaves the type empty; go by the name then.
 export function fileType(file: { name: string; type: string }) {
   if (file.type) return file.type;

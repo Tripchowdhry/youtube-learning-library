@@ -14,6 +14,8 @@ import { askConfirm } from "@/components/ConfirmDialog";
 import { editorHtml } from "@/components/ReportRichEditor";
 import { onAiJobDone, runAiJob, setAiJobNote, useAiJobs, useSecondsSince } from "@/lib/ai-jobs";
 import {
+  ADD_MAX_BYTES,
+  ADD_MAX_MB,
   BACKUP_MAX_BYTES,
   FILES_BUCKET,
   FILES_SETUP,
@@ -40,7 +42,7 @@ const PRESETS = [
 ];
 
 const iconFor = (f: ScrapFile) =>
-  isLocalFile(f) ? Film : f.type === "application/pdf" ? FileText : f.type.startsWith("image/") ? ImageIcon : FileIcon;
+  f.type.startsWith("video/") ? Film : f.type === "application/pdf" ? FileText : f.type.startsWith("image/") ? ImageIcon : FileIcon;
 
 export type Chosen = { file: File; handle?: FileHandle };
 
@@ -63,7 +65,7 @@ export function AttachFileButton({ onFiles, busy }: { onFiles: (files: Chosen[])
       <button
         onClick={choose}
         disabled={busy}
-        title="Add a PDF, slides, a document, a picture or a video to this page. It stays on your computer."
+        title={`Add PDFs, pictures, documents or videos (up to ${ADD_MAX_MB} MB each). They stay on your computer.`}
         className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold ring-1 ring-slate-300 hover:bg-slate-100 disabled:opacity-50"
       >
         <Ico icon={Paperclip} tone="sky" size={16} />
@@ -90,13 +92,21 @@ export function AttachFileButton({ onFiles, busy }: { onFiles: (files: Chosen[])
 export async function addFiles(files: Chosen[]) {
   const added: ScrapFile[] = [];
   let problem: string | null = null;
+  const tooBig: string[] = [];
   for (const { file: f, handle } of files) {
+    if (f.size > ADD_MAX_BYTES) {
+      tooBig.push(`“${f.name}” (${Math.round(f.size / 1024 / 1024)} MB)`);
+      continue;
+    }
     try {
       added.push(await rememberLocalFile(f, handle));
     } catch (e) {
       problem ??= e instanceof Error ? e.message : "A file couldn't be added.";
       if (problem === FILES_SETUP) break;
     }
+  }
+  if (tooBig.length) {
+    problem = `Too big to add: ${tooBig.join(", ")}. Files can be up to ${ADD_MAX_MB} MB, so ${tooBig.length > 1 ? "these weren't" : "it wasn't"} added.`;
   }
   return { added, problem };
 }
