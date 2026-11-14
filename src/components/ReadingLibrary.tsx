@@ -632,7 +632,7 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
         </button>
         <BrandMark />
         <SectionSwitch active={kind} />
-        <SearchBox value={query} onChange={setQuery} placeholder="Search titles, sites, notes…" className="ml-auto w-full min-w-0 max-w-xs" />
+        <SearchBox value={query} onChange={setQuery} placeholder="Search titles, sites, notes…" className="ml-auto w-auto sm:w-full sm:max-w-xs" collapse />
         <Link
           data-tour="clips"
           href="/clips"

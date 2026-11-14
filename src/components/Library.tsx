@@ -607,7 +607,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
         <span data-tour="sections" className="shrink-0">
           <SectionSwitch active="videos" />
         </span>
-        <SearchBox value={query} onChange={setQuery} placeholder="Search titles, channels, notes…" className="ml-auto w-full min-w-0 max-w-xs" tour="search" />
+        <SearchBox value={query} onChange={setQuery} placeholder="Search titles, channels, notes…" className="ml-auto w-auto sm:w-full sm:max-w-xs" collapse tour="search" />
         <Link
           data-tour="clips"
           href="/clips"
