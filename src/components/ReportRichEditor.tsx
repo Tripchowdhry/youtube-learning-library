@@ -4,6 +4,7 @@
 // shown already formatted. Underneath, the report is still kept in the simple text format that
 // Copy and Download Word read, so nothing else changes.
 
+import { markAiQuestions } from "@/lib/notes-format";
 import { revealAdded } from "@/lib/reveal";
 import { useEffect, useImperativeHandle, useRef, useState } from "react";
 import { Bold, Italic, Link2, List, ListOrdered, Quote, Redo2, Underline, Undo2, type LucideIcon } from "lucide-react";
@@ -210,6 +211,7 @@ export default function ReportRichEditor({
   useEffect(() => {
     if (!ref.current || body === lastEmitted.current) return;
     ref.current.innerHTML = editorHtml(parseReport(body), resolve);
+    markAiQuestions(ref.current);
     lastEmitted.current = body;
   }, [body, resolve]);
 
@@ -233,6 +235,7 @@ export default function ReportRichEditor({
 
   const emit = () => {
     if (!ref.current) return;
+    markAiQuestions(ref.current);
     const next = editorToReport(ref.current);
     lastEmitted.current = next;
     onChange(next);

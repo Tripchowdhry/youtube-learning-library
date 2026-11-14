@@ -1,5 +1,6 @@
 "use client";
 
+import { markAiQuestions } from "@/lib/notes-format";
 import { revealAdded } from "@/lib/reveal";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -156,6 +157,7 @@ export default function ScrapEditor({ scrapId }: { scrapId: string }) {
   useEffect(() => {
     if (!scrap || mode !== "type" || !editor.current) return;
     editor.current.innerHTML = bodyRef.current;
+    markAiQuestions(editor.current);
     setIsEmpty(!editor.current.textContent?.trim() && !editor.current.querySelector("img"));
     revealAnswerIn(editor.current, answerStart);
   }, [scrap, mode]);
@@ -205,6 +207,7 @@ export default function ScrapEditor({ scrapId }: { scrapId: string }) {
 
   function onTyped() {
     if (!editor.current) return;
+    markAiQuestions(editor.current);
     bodyRef.current = editor.current.innerHTML;
     setIsEmpty(!editor.current.textContent?.trim() && !editor.current.querySelector("img"));
     setSaveState("unsaved");
@@ -371,6 +374,7 @@ export default function ScrapEditor({ scrapId }: { scrapId: string }) {
       bodyRef.current = `${bodyRef.current}${html}`;
       if (editor.current) {
         editor.current.insertAdjacentHTML("beforeend", html);
+        markAiQuestions(editor.current);
         setIsEmpty(false);
         revealAnswerIn(editor.current, answerStart);
       } else {

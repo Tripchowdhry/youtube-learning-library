@@ -31,13 +31,11 @@ import { docSections, hasExtractableText, hasTextView, textForAi, type DocSectio
 
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
-// The AI's answer as page text: a short header saying it's from the AI, what was asked and
-// about which file, then the answer with its headings and lists.
-export function answerHtml(what: string, fileName: string, text: string) {
-  return `<p><strong>✨ AI · ${esc(what)} · ${esc(fileName)}</strong></p>${editorHtml(parseReport(text), (s) => s)}`;
+// The AI's answer as page text: the question in bold, as in the other tabs, with the file it
+// was about, then the answer with its headings and lists.
+export function answerHtml(question: string, fileName: string, text: string) {
+  return `<p><strong>✨ ${esc(question)} (${esc(fileName)})</strong></p>${editorHtml(parseReport(text), (s) => s)}`;
 }
-
-const shortQuestion = (q: string) => `“${q.length > 80 ? `${q.slice(0, 77).trimEnd()}…` : q}”`;
 
 // Which file each page's AI answer is about, so its progress shows under that file.
 // Kept outside the page so it survives going to another page and back.
@@ -234,7 +232,7 @@ export default function ScrapFiles(props: {
 
   // The AI keeps working if the person leaves; the answer is then added to the saved page.
   // A file on this computer is sent to the AI first (asking for it again if needed).
-  async function ask(f: ScrapFile, text: string, label?: string) {
+  async function ask(f: ScrapFile, text: string) {
     const clean = text.trim();
     if (!clean || aiStartedAt !== null) return;
     // A file sent in the last 48 hours is still with Google, so it isn't sent again.
@@ -280,7 +278,7 @@ export default function ScrapFiles(props: {
           if (!res.ok || !data.text) {
             return { error: res.status === 504 ? "The AI took too long. Try a smaller file." : (data.error ?? `The AI couldn't answer (error ${res.status}).`) };
           }
-          return { result: answerHtml(label ?? shortQuestion(clean), f.name, data.text) };
+          return { result: answerHtml(clean, f.name, data.text) };
         } catch {
           // Stopped or failed before the AI got it: tidy away the temporary pieces.
           if (target.parts?.length) await supabase.storage.from(FILES_BUCKET).remove(target.parts);
@@ -359,7 +357,7 @@ export default function ScrapFiles(props: {
                   {PRESETS.map((p) => (
                     <button
                       key={p.label}
-                      onClick={() => ask(f, p.prompt, p.label)}
+                      onClick={() => ask(f, p.prompt)}
                       className="rounded-full bg-white px-3 py-1 text-xs text-violet-800 ring-1 ring-violet-200 hover:bg-violet-100"
                     >
                       {p.label}

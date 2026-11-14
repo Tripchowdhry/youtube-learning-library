@@ -20,3 +20,14 @@ export function notesDocument(title: string, url: string | null, text: string, c
   if (clips.length) parts.push(clips.map((c) => `${c.t === null ? "" : `[${formatTime(c.t)}] `}![clip](${c.path})`).join("\n"));
   return parts.join("\n\n");
 }
+
+// Marks each AI question line ("✨ …") in a notes box so it shows with a coloured background.
+// The mark is only for showing: it's put back after every change and never saved.
+export function markAiQuestions(box: HTMLElement | null) {
+  if (!box) return;
+  for (const el of Array.from(box.children)) {
+    const isQuestion = (el.textContent ?? "").trimStart().startsWith("✨");
+    if (isQuestion) el.setAttribute("data-ai-q", "");
+    else el.removeAttribute("data-ai-q");
+  }
+}
