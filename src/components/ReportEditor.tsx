@@ -671,7 +671,7 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
         {picking && (
           <div className="rounded-lg border border-slate-200 p-3">
             <div className="mb-2 flex flex-wrap items-center gap-2">
-              <nav className="flex rounded-lg bg-slate-100 p-0.5">
+              <nav className="grid w-full grid-cols-2 rounded-lg bg-slate-100 p-0.5 sm:flex sm:w-auto">
                 {TABS.map((t) => (
                   <button
                     key={t.key}

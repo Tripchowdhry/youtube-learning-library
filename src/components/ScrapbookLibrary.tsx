@@ -489,7 +489,7 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
         </button>
         <BrandMark />
         <SectionSwitch active="scrap" />
-        <SearchBox value={query} onChange={setQuery} placeholder="Search titles and text…" className="ml-auto w-full max-w-xs" />
+        <SearchBox value={query} onChange={setQuery} placeholder="Search titles and text…" className="ml-auto w-auto sm:w-full sm:max-w-xs" collapse />
         <Link
           data-tour="clips"
           href="/clips"
@@ -497,11 +497,11 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
           title="See and delete your clips to free up space"
         >
           <Ico icon={Images} tone="violet" />
-          Clips
+          <span className="hidden sm:inline">Clips</span>
         </Link>
         <div className="hidden items-center gap-2 text-sm text-slate-500 sm:flex">
           <span className="max-w-40 truncate">{userEmail}</span>
-          <button onClick={signOut} className="rounded-md px-2 py-1 hover:bg-slate-100">
+          <button onClick={signOut} className="rounded-md px-2 py-1 whitespace-nowrap hover:bg-slate-100">
             Sign out
           </button>
         </div>

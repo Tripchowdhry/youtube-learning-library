@@ -607,7 +607,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
         <span data-tour="sections" className="shrink-0">
           <SectionSwitch active="videos" />
         </span>
-        <SearchBox value={query} onChange={setQuery} placeholder="Search titles, channels, notes…" className="ml-auto w-full max-w-xs" tour="search" />
+        <SearchBox value={query} onChange={setQuery} placeholder="Search titles, channels, notes…" className="ml-auto w-auto sm:w-full sm:max-w-xs" collapse tour="search" />
         <Link
           data-tour="clips"
           href="/clips"
@@ -615,11 +615,11 @@ export default function Library({ userEmail }: { userEmail: string }) {
           title="See and delete your clips to free up space"
         >
           <Ico icon={Images} tone="violet" />
-          Clips
+          <span className="hidden sm:inline">Clips</span>
         </Link>
         <div className="hidden items-center gap-2 text-sm text-slate-500 sm:flex">
           <span className="max-w-40 truncate">{userEmail}</span>
-          <button onClick={signOut} className="rounded-md px-2 py-1 hover:bg-slate-100">
+          <button onClick={signOut} className="rounded-md px-2 py-1 whitespace-nowrap hover:bg-slate-100">
             Sign out
           </button>
         </div>
@@ -1157,7 +1157,7 @@ function VideoCard(props: {
           {/* Kept apart from the note buttons so it isn't pressed by mistake. */}
           <span className="ml-auto pl-3">
             <SmallButton onClick={props.onDelete} danger icon={Trash2}>
-              Delete video
+              Delete
             </SmallButton>
           </span>
         </div>
