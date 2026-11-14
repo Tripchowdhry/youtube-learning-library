@@ -35,7 +35,7 @@ export default function Landing({ error }: { error?: string }) {
             <p className="text-sm text-slate-500">Sign in with Google. No new password.</p>
             {error && <p className="text-sm text-red-600">Sign-in didn&apos;t work. Please try again.</p>}
           </div>
-          <Shot src="/landing/videos.webp" alt="Your video library in BrainShelf, with categories, notes and summaries" label="your video library" className="mt-12" />
+          <Shot src="/landing/videos.webp" alt="Your video library in BrainShelf, with categories, notes and summaries" className="mt-12" />
         </div>
       </section>
 
@@ -78,7 +78,7 @@ export default function Landing({ error }: { error?: string }) {
 
 // A screenshot of the app in a browser frame, marked as a preview. Clicking it goes to sign-in,
 // since a picture can't be used; hovering says so.
-function Shot({ src, alt, label, className = "" }: { src: string; alt: string; label: string; className?: string }) {
+function Shot({ src, alt, className = "" }: { src: string; alt: string; className?: string }) {
   return (
     <a
       href="#start"
@@ -91,7 +91,7 @@ function Shot({ src, alt, label, className = "" }: { src: string; alt: string; l
         <span className="h-2.5 w-2.5 rounded-full bg-green-300" />
         <span className="ml-auto flex items-center gap-1 rounded-full bg-white px-2 py-0.5 text-xs font-medium text-slate-500 ring-1 ring-slate-200">
           <Ico icon={Eye} tone="slate" size={13} />
-          Preview: {label}
+          {BRAND.name} preview
         </span>
       </div>
       <DeviceShot src={src} alt={alt} lazy />
