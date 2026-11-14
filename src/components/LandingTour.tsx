@@ -78,6 +78,25 @@ const SLIDES: Slide[] = [
   },
 ];
 
+// A screenshot taken at the size of the screen it's seen on: a phone, a tablet or a laptop.
+// "/landing/videos.webp" also has "/landing/videos-ipad.webp" and "/landing/videos-phone.webp".
+export function DeviceShot({ src, alt, className = "", lazy }: { src: string; alt: string; className?: string; lazy?: boolean }) {
+  const sized = (size: string) => src.replace(/\.webp$/, `-${size}.webp`);
+  return (
+    <picture>
+      <source media="(max-width: 639px)" srcSet={sized("phone")} />
+      <source media="(max-width: 1023px)" srcSet={sized("ipad")} />
+      <img
+        src={src}
+        alt={alt}
+        draggable={false}
+        loading={lazy ? "lazy" : undefined}
+        className={`block w-full select-none ${className}`}
+      />
+    </picture>
+  );
+}
+
 // A short picture tour of BrainShelf for people who haven't signed in yet, opened from the FAQ.
 export default function LandingTour() {
   const [open, setOpen] = useState(false);
@@ -147,12 +166,7 @@ export default function LandingTour() {
                 </button>
               </div>
               <div className="overflow-y-auto">
-                <img
-                  src={s.src}
-                  alt={s.alt}
-                  draggable={false}
-                  className="block w-full select-none border-b border-slate-200"
-                />
+                <DeviceShot src={s.src} alt={s.alt} className="max-h-[55vh] border-b border-slate-200 object-cover object-top" />
                 <div className="p-5">
                   <h3 className="flex items-center gap-2 text-xl font-bold">
                     <Ico icon={s.icon} tone={s.tone} size={24} />

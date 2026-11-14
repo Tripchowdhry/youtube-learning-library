@@ -496,7 +496,7 @@ export default function VaultLibrary({ userEmail }: { userEmail: string }) {
         <SectionSwitch active="vault" />
         <SearchBox value={query} onChange={setQuery} placeholder="Search names, web addresses, user IDs…" className="ml-auto w-auto sm:w-full sm:max-w-xs" collapse />
         <div className="hidden items-center gap-2 text-sm text-slate-500 sm:flex">
-          <span className="max-w-40 truncate">{userEmail}</span>
+          <span className="hidden max-w-40 truncate lg:inline">{userEmail}</span>
           <button onClick={signOut} className="rounded-md px-2 py-1 whitespace-nowrap hover:bg-slate-100">
             Sign out
           </button>
