@@ -35,8 +35,14 @@ function openDb(): Promise<IDBDatabase> {
     req.onupgradeneeded = () => {
       for (const name of [HANDLES, COPIES]) if (!req.result.objectStoreNames.contains(name)) req.result.createObjectStore(name);
     };
-    req.onsuccess = () => resolve(req.result);
+    req.onsuccess = () => {
+      // Let a newer version of the page (in another tab) upgrade the storage.
+      req.result.onversionchange = () => req.result.close();
+      resolve(req.result);
+    };
     req.onerror = () => reject(req.error);
+    // An older tab still holds the storage open: carry on without it rather than wait.
+    req.onblocked = () => reject(new Error("blocked"));
   });
 }
 
