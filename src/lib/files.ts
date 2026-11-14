@@ -77,6 +77,12 @@ export async function fileLink(supabase: SupabaseClient, path: string, download 
 
 // Videos kept on the computer ("local/…") have nothing stored, so only the rest are removed.
 export async function deleteScrapFiles(supabase: SupabaseClient, paths: string[]) {
+  // Files kept on this computer: let go of the browser's copy too.
+  const local = paths.filter((p) => p.startsWith("local/"));
+  if (local.length && typeof window !== "undefined") {
+    const { forgetLocalFile } = await import("@/lib/local-files");
+    await Promise.all(local.map(forgetLocalFile));
+  }
   const stored = paths.filter((p) => !p.startsWith("local/"));
   if (!stored.length) return;
   await supabase.storage.from(FILES_BUCKET).remove(stored);
