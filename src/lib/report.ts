@@ -14,6 +14,8 @@ export type Report = {
   body: string;
   // Text read from handwritten notes, by sourceKey. Only there once supabase/report-handwriting.sql is run.
   handwriting?: Record<string, string>;
+  // Set while the report is shared as a read-only link (supabase/report-share.sql).
+  share_token?: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -231,3 +233,6 @@ export function pictureUrl(supabase: SupabaseClient, src: string) {
 export function fileName(title: string) {
   return (title.replace(/[\\/:*?"<>|]+/g, " ").replace(/\s+/g, " ").trim() || "Report").slice(0, 100);
 }
+
+// A shared report, as anyone with its link sees it.
+export type SharedReport = { title: string; body: string; updated_at: string };
