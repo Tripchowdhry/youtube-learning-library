@@ -68,9 +68,14 @@ export function onAiJobDone(taker: Taker) {
 
 // Stop: cancels the request, drops whatever it brings back, and shows no error,
 // so the person can ask again right away.
+// Jobs the person stopped, until they ask again, so a question box can keep the question.
+const stopped = new Set<string>();
+export const wasStopped = (key: string) => stopped.has(key);
+
 export function stopAiJob(key: string) {
   const controller = controllers.get(key);
   if (!controller) return;
+  stopped.add(key);
   controller.abort();
   controllers.delete(key);
   update({ running: snapshot.running.filter((j) => j.key !== key) });
@@ -88,6 +93,7 @@ export async function runAiJob<T>(options: {
   const { key, label } = options;
   if (isAiJobRunning(key)) return;
   clearAiError(key);
+  stopped.delete(key);
   const controller = new AbortController();
   controllers.set(key, controller);
   update({ running: [...snapshot.running, { key, label, startedAt: Date.now() }] });

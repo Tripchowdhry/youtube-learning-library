@@ -3,7 +3,7 @@
 import StopAiButton from "@/components/StopAiButton";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { askConfirm } from "@/components/ConfirmDialog";
-import { onAiJobDone, runAiJob, useAiJobs, useSecondsSince } from "@/lib/ai-jobs";
+import { onAiJobDone, runAiJob, useAiJobs, useSecondsSince, wasStopped } from "@/lib/ai-jobs";
 import { createClient } from "@/lib/supabase/client";
 import type { Article, NotePage } from "@/lib/types";
 import { askArticleAi } from "@/lib/video-ai";
@@ -400,11 +400,18 @@ export default function ArticleNotes(props: {
 function AskAi(props: { jobKey: string; word: string; startedAt: number | null; error: string | null; onAsk: (prompt: string) => void }) {
   const [prompt, setPrompt] = useState("");
   const busy = props.startedAt !== null;
+
+  // Once the answer is in, the question box is emptied; after a failure or Stop the question
+  // stays so it can be asked again.
+  const wasBusy = useRef(busy);
+  useEffect(() => {
+    if (wasBusy.current && !busy && !props.error && !wasStopped(props.jobKey)) setPrompt("");
+    wasBusy.current = busy;
+  }, [busy, props.error, props.jobKey]);
   function ask(text: string) {
     const clean = text.trim();
     if (!clean || busy) return;
     props.onAsk(clean);
-    setPrompt("");
   }
   return (
     <div className="rounded-xl bg-white p-3 shadow-sm ring-1 ring-violet-200">

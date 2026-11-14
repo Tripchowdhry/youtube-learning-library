@@ -12,7 +12,7 @@ import { Download, Eye, EyeOff, File as FileIcon, FileText, Film, Image as Image
 import { Ico } from "@/components/Icon";
 import { askConfirm } from "@/components/ConfirmDialog";
 import { editorHtml } from "@/components/ReportRichEditor";
-import { onAiJobDone, runAiJob, setAiJobNote, useAiJobs, useSecondsSince } from "@/lib/ai-jobs";
+import { onAiJobDone, runAiJob, setAiJobNote, useAiJobs, useSecondsSince, wasStopped } from "@/lib/ai-jobs";
 import {
   ADD_MAX_BYTES,
   ADD_MAX_MB,
@@ -147,6 +147,15 @@ export default function ScrapFiles(props: {
   const aiStartedAt = aiJob?.startedAt ?? null;
   const aiError = aiJobs.errors.get(aiKey) ?? null;
 
+  // Once the answer is in, the question box is emptied; after a failure or Stop the question
+  // stays so it can be asked again.
+  const wasBusy = useRef(aiStartedAt !== null);
+  useEffect(() => {
+    const busy = aiStartedAt !== null;
+    if (wasBusy.current && !busy && !aiError && !wasStopped(aiKey)) setPrompt("");
+    wasBusy.current = busy;
+  }, [aiStartedAt, aiError, aiKey]);
+
   // An answer that arrives while the page is open goes straight into its text.
   const { onAnswer } = props;
   useEffect(
@@ -232,7 +241,6 @@ export default function ScrapFiles(props: {
     const sentBefore = isLocalFile(f) ? sentVideo(f.path) : null;
     const onComputer = isLocalFile(f) && !sentBefore ? await findLocalFile(f) : null;
     if (isLocalFile(f) && !sentBefore && !onComputer) return;
-    setPrompt("");
     setAsking(null);
     askedAbout.set(scrapId, f.path);
     const asText = !aiReadable(f) && hasExtractableText(f);
