@@ -89,8 +89,8 @@ function Shot({ src, alt, className = "" }: { src: string; alt: string; classNam
         <span className="h-2.5 w-2.5 rounded-full bg-red-300" />
         <span className="h-2.5 w-2.5 rounded-full bg-amber-300" />
         <span className="h-2.5 w-2.5 rounded-full bg-green-300" />
-        <span className="ml-auto flex items-center gap-1 rounded-full bg-white px-2 py-0.5 text-xs font-medium text-slate-500 ring-1 ring-slate-200">
-          <Ico icon={Eye} tone="slate" size={13} />
+        <span className="ml-auto flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700 ring-1 ring-blue-200">
+          <Ico icon={Eye} tone="blue" size={13} />
           {BRAND.name} preview
         </span>
       </div>
@@ -116,3 +116,4 @@ function Faq({ q, a, open }: { q: string; a: React.ReactNode; open?: boolean }) 
     </details>
   );
 }
+
