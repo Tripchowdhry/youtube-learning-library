@@ -16,7 +16,7 @@ export function ReportIcon({ size = 16, className }: { size?: number; className?
   );
 }
 
-// The way into Report Writer, on its own row above the Videos, Reading and Tutorials lists.
+// The way into Report Writer, on its own row above the list in every tab.
 // It sits outside the section tabs, so the header stays as it was.
 export default function ReportWriterLink() {
   return (
