@@ -1,5 +1,6 @@
 "use client";
 
+import { revealById } from "@/lib/reveal";
 import StopAiButton from "@/components/StopAiButton";
 import ReportWriterLink from "@/components/ReportWriterLink";
 import { Tour, TourButton, useSectionTour } from "@/components/Tour";
@@ -330,6 +331,7 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
         const { articleId, note, model } = result as AiNote;
         setArticles((prev) => prev.map((a) => (a.id === articleId ? { ...a, note } : a)));
         if (model) notify(`Note written by ${model}`);
+        revealById(`ai-note-${articleId}`);
         return true;
       }),
     [notify],
@@ -957,12 +959,14 @@ function ArticleRow(props: {
           {" · "}Added {formatDate(article.created_at)}
           {article.read_at && <span className="text-green-700"> · Read {formatDate(article.read_at)}</span>}
         </p>
-        <ArticleNote
-          note={article.note}
-          editing={editingNote}
-          setEditing={setEditingNote}
-          onSave={props.onSaveNote}
-        />
+        <div id={`ai-note-${article.id}`} className="rounded-md">
+          <ArticleNote
+            note={article.note}
+            editing={editingNote}
+            setEditing={setEditingNote}
+            onSave={props.onSaveNote}
+          />
+        </div>
         {props.aiNoteError && !article.note && (
           <p className="flex items-center gap-1 rounded-md bg-red-50 px-2 py-1 text-xs text-red-700 ring-1 ring-red-200">
             <Ico icon={TriangleAlert} tone="red" size={14} />

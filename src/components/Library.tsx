@@ -1,5 +1,6 @@
 "use client";
 
+import { revealById } from "@/lib/reveal";
 import ReportWriterLink from "@/components/ReportWriterLink";
 import BrandMark from "@/components/BrandMark";
 import { WelcomePanel } from "@/components/GettingStarted";
@@ -290,6 +291,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
         const { videoId, note, model } = result as AiNote;
         setVideos((prev) => prev.map((v) => (v.id === videoId ? { ...v, note } : v)));
         if (model) notify(`Note written by ${model}`);
+        revealById(`ai-note-${videoId}`);
         return true;
       }),
     [notify],
@@ -1063,7 +1065,9 @@ function VideoCard(props: {
           {video.channel && `${video.channel} · `}Added {formatDate(video.created_at)}
           {video.watched_at && <span className="text-green-700"> · Watched {formatDate(video.watched_at)}</span>}
         </p>
-        <ArticleNote note={video.note} editing={editingNote} setEditing={setEditingNote} onSave={props.onSaveNote} />
+        <div id={`ai-note-${video.id}`} className="rounded-md">
+          <ArticleNote note={video.note} editing={editingNote} setEditing={setEditingNote} onSave={props.onSaveNote} />
+        </div>
         {props.aiNoteError && !video.note && (
           <p className="flex items-center gap-1 rounded-md bg-red-50 px-2 py-1 text-xs text-red-700 ring-1 ring-red-200">
             <Ico icon={TriangleAlert} tone="red" size={14} />
