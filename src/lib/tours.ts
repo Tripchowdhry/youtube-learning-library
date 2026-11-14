@@ -68,7 +68,7 @@ export const TOURS = {
     {
       target: "read-filter",
       title: "Know what you've finished",
-      text: "Open an item to read it here. Scrolling to the end ticks it ✓ Read, or tap the ✓ yourself. Pick Unread to see what's left.",
+      text: "Open an item to read it here. Scrolling to the end ticks it ✓ Read, or tap the ✓ yourself. Use Filter, then Unread, to see what's left.",
     },
     {
       title: "Notes beside what you read",

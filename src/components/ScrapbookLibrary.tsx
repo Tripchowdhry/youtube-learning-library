@@ -26,7 +26,6 @@ import {
 import {
   NavItem,
   PERIODS,
-  Pills,
   SectionSwitch,
   SetupNotice,
   SmallButton,
@@ -38,6 +37,7 @@ import { createClient } from "@/lib/supabase/client";
 import type { ArticleCategory, Scrap } from "@/lib/types";
 import { Images, ArrowUp, Copy, Eye, FileText, Link2, Link2Off, Inbox, NotebookPen, Pencil, PencilLine, Tag, Trash2 } from "lucide-react";
 import MoreMenu from "@/components/MoreMenu";
+import FilterMenu from "@/components/FilterMenu";
 import { Ico } from "@/components/Icon";
 
 type View = { kind: "all" } | { kind: "uncategorized" } | { kind: "category"; id: string };
@@ -601,6 +601,7 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
                     </SmallButton>
                   </>
                 )}
+                <FilterMenu groups={[{ label: "Created", value: period, options: PERIODS.map((p) => ({ value: p.value, label: p.label })), onChange: (v) => setPeriod(v as Period) }]} />
                 <ItemSortSelect sort={itemSort} onChange={setItemSort} />
               </div>
 
@@ -613,15 +614,6 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
                   categoryOptions={categoryOptions}
                 />
               )}
-
-              <div className="mb-4 flex flex-wrap items-center gap-2 text-sm">
-                <Pills
-                  value={period}
-                  onChange={setPeriod}
-                  options={PERIODS.map((p) => ({ value: p.value, label: p.label }))}
-                  label="Created"
-                />
-              </div>
 
               {loading ? (
                 <p className="text-slate-500">Loading your ScrapBook…</p>
