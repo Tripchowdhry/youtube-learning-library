@@ -9,7 +9,7 @@ import StopAiButton from "@/components/StopAiButton";
 import { useEffect, useRef, useState } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { Download, Eye, EyeOff, File as FileIcon, FileText, Film, Image as ImageIcon, Paperclip, Play, Sparkles, Trash2, TriangleAlert } from "lucide-react";
-import { Ico } from "@/components/Icon";
+import { Ico, type Tone } from "@/components/Icon";
 import { askConfirm } from "@/components/ConfirmDialog";
 import { editorHtml } from "@/components/ReportRichEditor";
 import { onAiJobDone, runAiJob, setAiJobNote, useAiJobs, useSecondsSince, wasStopped } from "@/lib/ai-jobs";
@@ -335,6 +335,7 @@ export default function ScrapFiles(props: {
                   <SmallButton
                     onClick={() => setAsking(asking === f.path ? null : f.path)}
                     icon={Sparkles}
+                    tone="violet"
                     disabled={aiStartedAt !== null}
                     title={aiStartedAt !== null ? "Wait for the current answer" : "Ask the AI about this file"}
                   >
@@ -342,7 +343,7 @@ export default function ScrapFiles(props: {
                   </SmallButton>
                 )}
                 {!local && (
-                  <SmallButton onClick={() => open(f, true)} icon={Download}>
+                  <SmallButton onClick={() => open(f, true)} icon={Download} tone="blue">
                     Download
                   </SmallButton>
                 )}
@@ -528,16 +529,16 @@ async function sendFile(
   return { parts, size: video.size };
 }
 
-function SmallButton(props: { onClick: () => void; icon: typeof Eye; children: React.ReactNode; danger?: boolean; disabled?: boolean; title?: string; pill?: boolean }) {
-  const Icon = props.icon;
+// Matches the app's other small buttons: coloured icons, red for Delete, and a blue pill for View.
+function SmallButton(props: { onClick: () => void; icon: typeof Eye; children: React.ReactNode; danger?: boolean; disabled?: boolean; title?: string; pill?: boolean; tone?: Tone }) {
   return (
     <button
       onClick={props.onClick}
       disabled={props.disabled}
       title={props.title}
-      className={`inline-flex items-center gap-1 border px-2 py-0.5 text-xs disabled:opacity-50 ${props.danger ? "rounded-md border-red-200 bg-white text-red-600 hover:bg-red-50" : props.pill ? "rounded-full border-blue-200 bg-blue-50 text-slate-900 hover:bg-blue-100" : "rounded-md border-slate-300 bg-white text-slate-700 hover:bg-slate-100"}`}
+      className={`inline-flex items-center gap-1 border px-2 py-1 text-xs disabled:opacity-30 ${props.danger ? "rounded-md border-red-200 bg-white text-red-600 hover:bg-red-50" : props.pill ? "rounded-full border-blue-200 bg-blue-50 text-slate-900 hover:bg-blue-100" : "rounded-md border-slate-300 bg-white text-slate-700 hover:bg-slate-100"}`}
     >
-      <Icon size={13} aria-hidden className={props.pill ? "text-blue-600" : undefined} />
+      <Ico icon={props.icon} tone={props.danger ? "red" : props.pill ? "blue" : (props.tone ?? "slate")} size={14} />
       {props.children}
     </button>
   );
