@@ -19,6 +19,7 @@ import {
 } from "@/lib/report";
 import { copyReport, downloadWord } from "@/lib/report-export";
 import { pageToPng } from "@/lib/handwriting-image";
+import { DRAFT_STYLES, draftStyle, type DraftStyle } from "@/lib/report-styles";
 import { createClient } from "@/lib/supabase/client";
 import { ReportIcon } from "@/components/ReportWriterLink";
 import {
@@ -93,6 +94,7 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
   const [onlyWithNotes, setOnlyWithNotes] = useState(true);
 
   const [focus, setFocus] = useState("");
+  const [style, setStyle] = useState<DraftStyle>("summary");
   const [aiBusy, setAiBusy] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
   const [titleIdeas, setTitleIdeas] = useState<{ titles: string[]; model: string | null } | null>(null);
@@ -337,7 +339,7 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
       const res = await fetch("/api/report-ai", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: reportTitle, prompt: focus, sources: chosen, handwriting: usedHandwriting() }),
+        body: JSON.stringify({ title: reportTitle, prompt: focus, style, sources: chosen, handwriting: usedHandwriting() }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -724,11 +726,26 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
               <Ico icon={Sparkles} tone="violet" /> Draft with AI
             </p>
             <p className="mb-2 text-sm text-slate-600">AI writes one report from your notes.</p>
+            {/* The kind of report to write; one is chosen at a time */}
+            <div className="mb-1.5 flex flex-wrap gap-1.5" role="radiogroup" aria-label="Kind of report">
+              {DRAFT_STYLES.map((st) => (
+                <button
+                  key={st.key}
+                  role="radio"
+                  aria-checked={style === st.key}
+                  onClick={() => setStyle(st.key)}
+                  className={`rounded-full px-2.5 py-0.5 text-sm ${style === st.key ? "bg-violet-600 font-medium text-white" : "bg-white text-slate-700 ring-1 ring-violet-200 hover:bg-violet-50"}`}
+                >
+                  {st.label}
+                </button>
+              ))}
+            </div>
+            <p className="mb-2 text-xs text-slate-500">{draftStyle(style).note}</p>
             <input
               value={focus}
               onChange={(e) => setFocus(e.target.value)}
               maxLength={2000}
-              placeholder="Optional: what should it focus on?"
+              placeholder="Optional: anything else it should focus on?"
               aria-label="What the AI draft should focus on"
               className="mb-2 w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm"
             />
@@ -738,7 +755,7 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
               className="flex items-center gap-1.5 rounded-md bg-violet-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-violet-700 disabled:opacity-60"
             >
               <Sparkles size={14} aria-hidden />
-              {aiBusy ? "Writing… (up to a minute or two)" : "Draft with AI"}
+              {aiBusy ? "Writing… (up to a minute or two)" : draftStyle(style).button}
             </button>
             {aiError && <p className="mt-2 text-sm text-red-700">{aiError}</p>}
           </div>
