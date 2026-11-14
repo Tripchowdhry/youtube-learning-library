@@ -43,7 +43,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
-import ReportRichEditor from "@/components/ReportRichEditor";
+import ReportRichEditor, { type ImproveHow } from "@/components/ReportRichEditor";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 type Chosen = { kind: SourceKind; id: string };
@@ -407,6 +407,23 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
     const oldHeading = `# ${title.trim() || UNTITLED}`;
     if (body.startsWith(oldHeading + "\n")) setBody(`# ${next}` + body.slice(oldHeading.length));
   }
+
+  // Improve in the editor's toolbar: the AI rewrites one part (Shorter, Clearer or Expand).
+  // The editor shows the new version and only uses it if Replace is chosen.
+  const improvePart = useCallback(
+    async (text: string, how: ImproveHow) => {
+      const res = await fetch("/api/report-improve", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text, how, report: body }),
+      }).catch(() => null);
+      if (!res) throw new Error("The AI couldn't be reached. Check your connection and try again.");
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error ?? `The AI couldn't improve it (error ${res.status}).`);
+      return { text: String(data.text ?? ""), model: data.model ? String(data.model) : null };
+    },
+    [body],
+  );
 
   // ---------- Export ----------
 
@@ -836,7 +853,7 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
           </div>
         )}
 
-        <ReportRichEditor body={body} onChange={setBody} resolve={resolve} />
+        <ReportRichEditor body={body} onChange={setBody} resolve={resolve} onImprove={improvePart} />
       </section>
 
       {toast && (
