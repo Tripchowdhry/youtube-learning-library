@@ -20,7 +20,7 @@ import { createClient } from "@/lib/supabase/client";
 import { formatTime, loadYouTubeApi, type YouTubePlayer } from "@/lib/youtube-player";
 import type { NoteImage, NotePage, NoteStroke, Video } from "@/lib/types";
 import { hasWriting, openingMode } from "@/lib/note-mode";
-import { onAiJobDone, runAiJob, useAiJobs, useSecondsSince } from "@/lib/ai-jobs";
+import { onAiJobDone, runAiJob, useAiJobs, useSecondsSince, wasStopped } from "@/lib/ai-jobs";
 import { askVideoAi } from "@/lib/video-ai";
 import { askConfirm } from "./ConfirmDialog";
 import ReportRichEditor, { type RichEditorHandle } from "@/components/ReportRichEditor";
@@ -859,6 +859,14 @@ function AskAi(props: {
   const [prompt, setPrompt] = useState("");
   const [open, setOpen] = useState(true);
   const busy = props.startedAt !== null;
+
+  // Once the answer is in, the question box is emptied; after a failure or Stop the question
+  // stays so it can be asked again.
+  const wasBusy = useRef(busy);
+  useEffect(() => {
+    if (wasBusy.current && !busy && !props.error && !wasStopped(props.jobKey)) setPrompt("");
+    wasBusy.current = busy;
+  }, [busy, props.error, props.jobKey]);
 
   function ask(text: string) {
     const clean = text.trim();
