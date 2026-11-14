@@ -30,6 +30,8 @@ import {
   FileText,
   GraduationCap,
   Layers,
+  Loader2,
+  PenLine,
   Sparkles,
   X,
   type LucideIcon,
@@ -40,6 +42,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 type Chosen = { kind: SourceKind; id: string };
 type SaveState = "saved" | "saving" | "error";
+
+const UNTITLED = "Untitled report";
 
 const TABS: { key: SourceSection; name: string; Icon: LucideIcon; tone: Tone }[] = [
   { key: "videos", name: "Videos", Icon: Clapperboard, tone: "red" },
@@ -79,6 +83,9 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
   const [focus, setFocus] = useState("");
   const [aiBusy, setAiBusy] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
+  const [titleIdeas, setTitleIdeas] = useState<{ titles: string[]; model: string | null } | null>(null);
+  const [titleBusy, setTitleBusy] = useState(false);
+  const [titleError, setTitleError] = useState<string | null>(null);
   const [toast, setToast] = useState<{ text: string; isError?: boolean } | null>(null);
 
   const mounted = useRef(true);
@@ -114,7 +121,8 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
       }
       const row = r.data as Report;
       setReport(row);
-      setTitle(row.title);
+      // A new report starts with an empty title box, so there's nothing to delete first.
+      setTitle(row.title === UNTITLED ? "" : row.title);
       setBody(row.body ?? "");
       const list = (rs.data ?? []).map((x) => ({ kind: x.source_kind as SourceKind, id: x.source_id as string }));
       setChosen(list);
@@ -136,12 +144,12 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
 
   const lastSaved = useRef({ title: "", body: "" });
   useEffect(() => {
-    if (report) lastSaved.current = { title: report.title, body: report.body };
+    if (report) lastSaved.current = { title: report.title === UNTITLED ? "" : report.title, body: report.body };
   }, [report]);
 
   const saveText = useCallback(
     async (nextTitle: string, nextBody: string) => {
-      const cleanTitle = nextTitle.trim().slice(0, 200) || "Untitled report";
+      const cleanTitle = nextTitle.trim().slice(0, 200) || UNTITLED;
       setSaveState("saving");
       const { error } = await supabase
         .from("reports")
@@ -218,7 +226,7 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
   async function compile() {
     if (!chosenSources.length) return notify("Choose at least one video, reading or tutorial first.", true);
     if (!(await okToReplace())) return;
-    setBody(compileReport(title.trim() || "Untitled report", chosenSources));
+    setBody(compileReport(title.trim() || UNTITLED, chosenSources));
   }
 
   async function draftWithAi() {
@@ -226,7 +234,7 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
     if (!(await okToReplace())) return;
     setAiBusy(true);
     setAiError(null);
-    const reportTitle = title.trim() || "Untitled report";
+    const reportTitle = title.trim() || UNTITLED;
     try {
       const res = await fetch("/api/report-ai", {
         method: "POST",
@@ -252,6 +260,42 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
     } finally {
       if (mounted.current) setAiBusy(false);
     }
+  }
+
+  // Three AI title ideas to pick from. Nothing changes until one is picked.
+  async function suggestTitles() {
+    // Always clickable; if there's nothing to go on yet, say so instead of greying the button out.
+    if (!chosen.length && !body.trim()) {
+      setTitleIdeas(null);
+      setTitleError("Choose some notes below first, and the AI will suggest titles from them.");
+      return;
+    }
+    setTitleBusy(true);
+    setTitleError(null);
+    setTitleIdeas(null);
+    try {
+      const res = await fetch("/api/report-ai", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode: "title", sources: chosen, body }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!mounted.current) return;
+      if (!res.ok) setTitleError(data.error ?? `The AI couldn't suggest titles (error ${res.status}).`);
+      else setTitleIdeas({ titles: Array.isArray(data.titles) ? data.titles : [], model: data.model ? String(data.model) : null });
+    } catch {
+      if (mounted.current) setTitleError("The AI couldn't be reached. Check your connection and try again.");
+    } finally {
+      if (mounted.current) setTitleBusy(false);
+    }
+  }
+
+  function pickTitle(next: string) {
+    setTitle(next);
+    setTitleIdeas(null);
+    // Keep the report's own heading in step when it still shows the old title.
+    const oldHeading = `# ${title.trim() || UNTITLED}`;
+    if (body.startsWith(oldHeading + "\n")) setBody(`# ${next}` + body.slice(oldHeading.length));
   }
 
   // ---------- Export ----------
@@ -324,16 +368,81 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
 
   return (
     <Shell
-      title={
-        <input
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          maxLength={200}
-          aria-label="Report title"
-          className="min-w-0 flex-1 rounded-md border border-transparent px-2 py-1 text-lg font-semibold hover:border-slate-300 focus:border-blue-500 focus:outline-none"
-        />
-      }
+      title={<span className="min-w-0 truncate text-lg font-semibold">{title.trim() || UNTITLED}</span>}
     >
+      {/* The report's title, in its own clearly marked box at the top */}
+      <section className="mb-5 rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
+        <div className="mb-1.5 flex flex-wrap items-center gap-2">
+          <label htmlFor="report-title" className="mr-auto flex items-center gap-1.5 text-sm font-semibold text-[#2b3b5e]">
+            <PenLine size={15} aria-hidden /> Report title
+          </label>
+          <button
+            onClick={suggestTitles}
+            disabled={titleBusy}
+            aria-busy={titleBusy}
+            title="Let AI suggest titles from your chosen notes"
+            className={`flex items-center gap-1.5 rounded-md bg-[#f6f3ff] px-2.5 py-1 text-sm font-medium text-[#2b3b5e] ring-1 ring-[#e2d9fb] hover:bg-[#efeaff] ${titleBusy ? "cursor-wait" : ""}`}
+          >
+            {titleBusy ? <Loader2 size={15} className="animate-spin text-[#7c3aed]" aria-hidden /> : <Ico icon={Sparkles} tone="violet" size={15} />}
+            {titleBusy ? "Thinking…" : "Suggest with AI"}
+          </button>
+        </div>
+        <input
+          id="report-title"
+          value={title}
+          onChange={(e) => {
+            setTitle(e.target.value);
+            setTitleError(null);
+          }}
+          onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
+          autoFocus={!title}
+          maxLength={200}
+          placeholder="Give your report a title, like “What I learned about transformers”"
+          className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xl font-semibold text-slate-900 placeholder:font-normal placeholder:text-slate-400 focus:border-[#7c6bd6] focus:ring-2 focus:ring-[#ece6ff] focus:outline-none"
+        />
+        {titleBusy && (
+          <div className="mt-2 rounded-lg bg-[#f6f3ff] p-2 ring-1 ring-[#e2d9fb]" role="status">
+            <p className="mb-1 flex items-center gap-1.5 px-1 text-xs font-medium text-slate-600">
+              <Sparkles size={13} className="animate-pulse text-[#7c3aed]" aria-hidden /> Reading your notes and thinking of titles…
+            </p>
+            <div className="flex flex-col gap-1">
+              {[70, 85, 60].map((w) => (
+                <div key={w} className="rounded-md bg-white px-3 py-2 ring-1 ring-[#e2d9fb]">
+                  <div className="h-3.5 animate-pulse rounded bg-[#e9e3fb]" style={{ width: `${w}%` }} />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        {titleIdeas && (
+          <div className="mt-2 rounded-lg bg-[#f6f3ff] p-2 ring-1 ring-[#e2d9fb]">
+            <div className="mb-1 flex items-center px-1 text-xs font-medium text-slate-600">
+              <span className="mr-auto">
+                {titleIdeas.titles.length
+                  ? `${titleIdeas.model ? `Ideas from ${titleIdeas.model}. ` : ""}Pick one, or keep typing your own:`
+                  : "No ideas came back. Try again."}
+              </span>
+              <button onClick={() => setTitleIdeas(null)} className="rounded p-0.5 text-slate-400 hover:text-slate-700" aria-label="Close suggestions">
+                <X size={14} />
+              </button>
+            </div>
+            <div className="flex flex-col gap-1">
+              {titleIdeas.titles.map((idea) => (
+                <button
+                  key={idea}
+                  onClick={() => pickTitle(idea)}
+                  className="rounded-md bg-white px-3 py-1.5 text-left text-sm font-medium text-slate-800 ring-1 ring-[#e2d9fb] hover:bg-[#efeaff]"
+                >
+                  {idea}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+        {titleError && <p className="mt-2 text-sm text-red-700">{titleError}</p>}
+        <p className="mt-1.5 text-xs text-slate-500">Used at the top of the report and as the Word file&apos;s name. It saves as you type.</p>
+      </section>
+
       {saveError && <p className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{saveError}</p>}
 
       {/* 1. Choose */}
