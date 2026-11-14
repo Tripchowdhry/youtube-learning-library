@@ -30,10 +30,17 @@ import { parseReport } from "@/lib/report";
 
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
-// The AI's answer as page text: the question in bold, then the answer with its headings and lists.
-export function answerHtml(prompt: string, model: string | undefined, text: string) {
-  return `<p><strong>✨ ${esc(prompt)}${model ? ` (${esc(model)})` : ""}</strong></p>${editorHtml(parseReport(text), (s) => s)}`;
+// The AI's answer as page text: a short header saying it's from the AI, what was asked and
+// about which file, then the answer with its headings and lists.
+export function answerHtml(what: string, fileName: string, text: string) {
+  return `<p><strong>✨ AI · ${esc(what)} · ${esc(fileName)}</strong></p>${editorHtml(parseReport(text), (s) => s)}`;
 }
+
+const shortQuestion = (q: string) => `“${q.length > 80 ? `${q.slice(0, 77).trimEnd()}…` : q}”`;
+
+// Which file each page's AI answer is about, so its progress shows under that file.
+// Kept outside the page so it survives going to another page and back.
+const askedAbout = new Map<string, string>();
 
 const PRESETS = [
   { label: "Summary", prompt: "Summarize this file in about 150 words." },
@@ -202,7 +209,7 @@ export default function ScrapFiles(props: {
 
   // The AI keeps working if the person leaves; the answer is then added to the saved page.
   // A file on this computer is sent to the AI first (asking for it again if needed).
-  async function ask(f: ScrapFile, text: string) {
+  async function ask(f: ScrapFile, text: string, label?: string) {
     const clean = text.trim();
     if (!clean || aiStartedAt !== null) return;
     // A file sent in the last 48 hours is still with Google, so it isn't sent again.
@@ -211,6 +218,7 @@ export default function ScrapFiles(props: {
     if (isLocalFile(f) && !sentBefore && !onComputer) return props.onNotice(`Choose "${f.name}" on this computer to ask the AI about it.`);
     setPrompt("");
     setAsking(null);
+    askedAbout.set(scrapId, f.path);
     runAiJob<string>({
       key: aiKey,
       label: `AI answer about "${f.name}"`,
@@ -239,7 +247,7 @@ export default function ScrapFiles(props: {
           if (!res.ok || !data.text) {
             return { error: res.status === 504 ? "The AI took too long. Try a smaller file." : (data.error ?? `The AI couldn't answer (error ${res.status}).`) };
           }
-          return { result: answerHtml(`${clean} (${f.name})`, data.model, data.text) };
+          return { result: answerHtml(label ?? shortQuestion(clean), f.name, data.text) };
         } catch {
           // Stopped or failed before the AI got it: tidy away the temporary pieces.
           if (target.parts?.length) await supabase.storage.from(FILES_BUCKET).remove(target.parts);
@@ -258,6 +266,8 @@ export default function ScrapFiles(props: {
   }
 
   if (!files.length && aiStartedAt === null && !aiError) return null;
+  const aiFile = askedAbout.get(scrapId);
+  const aiOnList = files.some((f) => f.path === aiFile);
 
   return (
     <div className="flex flex-col gap-2 rounded-xl bg-white p-3 shadow-sm ring-1 ring-slate-200">
@@ -291,7 +301,12 @@ export default function ScrapFiles(props: {
                   </SmallButton>
                 )}
                 {aiReadable(f) && (
-                  <SmallButton onClick={() => setAsking(asking === f.path ? null : f.path)} icon={Sparkles} disabled={aiStartedAt !== null}>
+                  <SmallButton
+                    onClick={() => setAsking(asking === f.path ? null : f.path)}
+                    icon={Sparkles}
+                    disabled={aiStartedAt !== null}
+                    title={aiStartedAt !== null ? "Wait for the current answer" : "Ask the AI about this file"}
+                  >
                     Ask AI
                   </SmallButton>
                 )}
@@ -311,7 +326,7 @@ export default function ScrapFiles(props: {
                   {PRESETS.map((p) => (
                     <button
                       key={p.label}
-                      onClick={() => ask(f, p.prompt)}
+                      onClick={() => ask(f, p.prompt, p.label)}
                       className="rounded-full bg-white px-3 py-1 text-xs text-violet-800 ring-1 ring-violet-200 hover:bg-violet-100"
                     >
                       {p.label}
@@ -343,24 +358,21 @@ export default function ScrapFiles(props: {
                 </p>
               </div>
             )}
+            {aiFile === f.path && aiStartedAt !== null && <Working startedAt={aiStartedAt} jobKey={aiKey} note={aiJob?.note} />}
+            {aiFile === f.path && aiError && <AiError text={aiError} />}
             {viewing?.path === f.path &&
               (isVideo ? (
-                <video src={viewing.url} controls autoPlay className="max-h-[75vh] w-full rounded-md bg-black ring-1 ring-slate-200" />
+                <video src={viewing.url} controls autoPlay className="max-h-[50vh] w-full rounded-md bg-black ring-1 ring-slate-200" />
               ) : f.type.startsWith("image/") ? (
-                <img src={viewing.url} alt={f.name} className="max-h-[70vh] w-auto max-w-full self-start rounded-md ring-1 ring-slate-200" />
+                <img src={viewing.url} alt={f.name} className="max-h-[50vh] w-auto max-w-full self-start rounded-md ring-1 ring-slate-200" />
               ) : (
-                <iframe src={viewing.url} title={f.name} className="h-[75vh] w-full rounded-md ring-1 ring-slate-200" />
+                <iframe src={viewing.url} title={f.name} className="h-[55vh] w-full rounded-md ring-1 ring-slate-200" />
               ))}
           </div>
         );
       })}
-      {aiStartedAt !== null && <Working startedAt={aiStartedAt} jobKey={aiKey} note={aiJob?.note} />}
-      {aiError && (
-        <p className="flex items-center gap-1.5 rounded-md bg-red-50 px-2 py-1.5 text-sm text-red-700 ring-1 ring-red-200">
-          <Ico icon={TriangleAlert} tone="red" size={15} />
-          {aiError}
-        </p>
-      )}
+      {!aiOnList && aiStartedAt !== null && <Working startedAt={aiStartedAt} jobKey={aiKey} note={aiJob?.note} />}
+      {!aiOnList && aiError && <AiError text={aiError} />}
     </div>
   );
 }
@@ -483,17 +495,27 @@ async function sendFile(
   return { parts, size: video.size };
 }
 
-function SmallButton(props: { onClick: () => void; icon: typeof Eye; children: React.ReactNode; danger?: boolean; disabled?: boolean }) {
+function SmallButton(props: { onClick: () => void; icon: typeof Eye; children: React.ReactNode; danger?: boolean; disabled?: boolean; title?: string }) {
   const Icon = props.icon;
   return (
     <button
       onClick={props.onClick}
       disabled={props.disabled}
+      title={props.title}
       className={`inline-flex items-center gap-1 rounded-md border bg-white px-2 py-0.5 text-xs disabled:opacity-50 ${props.danger ? "border-red-200 text-red-600 hover:bg-red-50" : "border-slate-300 text-slate-700 hover:bg-slate-100"}`}
     >
       <Icon size={13} aria-hidden />
       {props.children}
     </button>
+  );
+}
+
+function AiError({ text }: { text: string }) {
+  return (
+    <p className="flex items-center gap-1.5 rounded-md bg-red-50 px-2 py-1.5 text-sm text-red-700 ring-1 ring-red-200">
+      <Ico icon={TriangleAlert} tone="red" size={15} />
+      {text}
+    </p>
   );
 }
 

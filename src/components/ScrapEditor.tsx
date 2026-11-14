@@ -32,6 +32,23 @@ const MODE_KEY = "scrap-mode";
 const ALLOWED_TAGS = new Set(["P", "DIV", "BR", "B", "STRONG", "I", "EM", "U", "H1", "H2", "H3", "UL", "OL", "LI", "MARK", "SPAN"]);
 
 // Clips (screenshots) in the text are kept only when they come from your own clips storage.
+// Scrolls to the answer and gives it a short violet glow (an animation only, so nothing
+// extra is saved with the text).
+function revealAnswerIn(box: HTMLElement | null, start: { current: number | null }) {
+  const from = start.current;
+  if (!box || from === null) return;
+  start.current = null;
+  const added = Array.from(box.children).slice(from) as HTMLElement[];
+  if (!added.length) return;
+  added[0].scrollIntoView({ behavior: "smooth", block: "center" });
+  for (const el of added) {
+    el.animate([{ backgroundColor: "#ede9fe" }, { backgroundColor: "#ede9fe", offset: 0.6 }, { backgroundColor: "transparent" }], {
+      duration: 4000,
+      easing: "ease-out",
+    });
+  }
+}
+
 function cleanHtml(html: string, clipPrefix: string) {
   const doc = new DOMParser().parseFromString(`<div>${html}</div>`, "text/html");
   const walk = (el: Element) => {
@@ -92,9 +109,9 @@ export default function ScrapEditor({ scrapId }: { scrapId: string }) {
   const [pages, setPages] = useState<NotePage[]>([emptyPage()]);
   const [mode, setMode] = useState<Mode>("type");
   const [saveState, setSaveState] = useState<SaveState>("saved");
-  const [notice, setNotice] = useState<string | null>(null);
-  const showNotice = useCallback((text: string) => {
-    setNotice(text);
+  const [notice, setNotice] = useState<{ text: string; ok?: boolean } | null>(null);
+  const showNotice = useCallback((text: string, ok?: boolean) => {
+    setNotice({ text, ok });
     setTimeout(() => setNotice(null), 5000);
   }, []);
   // Files on the page. filesReady is false until supabase/files.sql has been run.
@@ -103,6 +120,8 @@ export default function ScrapEditor({ scrapId }: { scrapId: string }) {
   const [adding, setAdding] = useState(false);
 
   const editor = useRef<HTMLDivElement>(null);
+  // Where a newly added AI answer starts in the typed text, until it has been shown.
+  const answerStart = useRef<number | null>(null);
   // The typed text lives in the editor box itself; this copy is what gets saved.
   const bodyRef = useRef("");
   const [bodyTick, setBodyTick] = useState(0);
@@ -146,6 +165,7 @@ export default function ScrapEditor({ scrapId }: { scrapId: string }) {
     if (!scrap || mode !== "type" || !editor.current) return;
     editor.current.innerHTML = bodyRef.current;
     setIsEmpty(!editor.current.textContent?.trim() && !editor.current.querySelector("img"));
+    revealAnswerIn(editor.current, answerStart);
   }, [scrap, mode]);
 
   // ---------- Saving ----------
@@ -350,17 +370,26 @@ export default function ScrapEditor({ scrapId }: { scrapId: string }) {
   }
 
   // An AI answer about a file goes to the end of the typed text, shown in Typing.
-  const addAnswer = useCallback((html: string) => {
-    bodyRef.current = `${bodyRef.current}${html}`;
-    if (editor.current) {
-      editor.current.insertAdjacentHTML("beforeend", html);
-      setIsEmpty(false);
-    } else {
-      setMode("type");
-    }
-    setSaveState("unsaved");
-    setBodyTick((t) => t + 1);
-  }, []);
+  // The page then scrolls to it and lights it up for a moment, so it's clear where it went.
+  const addAnswer = useCallback(
+    (html: string) => {
+      const before = document.createElement("div");
+      before.innerHTML = bodyRef.current;
+      answerStart.current = before.children.length;
+      bodyRef.current = `${bodyRef.current}${html}`;
+      if (editor.current) {
+        editor.current.insertAdjacentHTML("beforeend", html);
+        setIsEmpty(false);
+        revealAnswerIn(editor.current, answerStart);
+      } else {
+        setMode("type");
+      }
+      setSaveState("unsaved");
+      setBodyTick((t) => t + 1);
+      showNotice("✨ The AI's answer was added to your page.", true);
+    },
+    [showNotice],
+  );
 
   function chooseMode(next: Mode) {
     setMode(next);
@@ -377,8 +406,7 @@ export default function ScrapEditor({ scrapId }: { scrapId: string }) {
     if (!window.confirm(`Delete "${title || "Untitled"}" from your ScrapBook?\nThis can't be undone.`)) return;
     const { error } = await supabase.from("scraps").delete().eq("id", scrapId);
     if (error) {
-      setNotice(error.message);
-      setTimeout(() => setNotice(null), 4000);
+      showNotice(error.message);
       return;
     }
     await deleteScrapFiles(supabase, files.map((f) => f.path));
@@ -590,8 +618,10 @@ export default function ScrapEditor({ scrapId }: { scrapId: string }) {
       </main>
 
       {notice && (
-        <div className="fixed bottom-4 left-1/2 z-40 -translate-x-1/2 rounded-lg bg-red-600 px-4 py-2 text-sm text-white shadow-lg">
-          {notice}
+        <div
+          className={`fixed bottom-4 left-1/2 z-40 -translate-x-1/2 rounded-lg px-4 py-2 text-sm text-white shadow-lg ${notice.ok ? "bg-violet-700" : "bg-red-600"}`}
+        >
+          {notice.text}
         </div>
       )}
     </div>
