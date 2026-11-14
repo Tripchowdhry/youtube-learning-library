@@ -36,6 +36,9 @@ export async function POST(request: Request) {
   const wanted: Wanted[] = (Array.isArray(body.sources) ? body.sources : [])
     .filter((s: Wanted) => (s?.kind === "video" || s?.kind === "article") && typeof s.id === "string")
     .slice(0, MAX_SOURCES);
+  // Text read from handwritten pages, checked by the person and kept with the report, by "kind:id".
+  const handwriting: Record<string, string> =
+    body.handwriting && typeof body.handwriting === "object" && !Array.isArray(body.handwriting) ? body.handwriting : {};
   if (!wanted.length && !reportText) {
     return NextResponse.json({ error: "Choose at least one video, reading or tutorial first." }, { status: 400 });
   }
@@ -55,7 +58,7 @@ export async function POST(request: Request) {
   const notes = new Map((n.data ?? []).map((r) => [r.video_id as string, (r.text as string) ?? ""]));
   const articles = new Map((a.data ?? []).map((r) => [r.id as string, r]));
 
-  // The notes, numbered in the order the person chose. Items without typed notes are left out.
+  // The notes, numbered in the order the person chose. Items with no typed or handwritten notes are left out.
   const used: { n: number; title: string; url: string }[] = [];
   const parts: string[] = [];
   let total = 0;
@@ -63,7 +66,9 @@ export async function POST(request: Request) {
     const row = s.kind === "video" ? videos.get(s.id) : articles.get(s.id);
     if (!row) continue;
     const saved = s.kind === "video" ? (notes.get(s.id) ?? "") : ((row.notes as string | null) ?? "");
-    const text = splitTypedClips(saved).text.trim().slice(0, NOTES_MAX);
+    const typed = splitTypedClips(saved).text.trim();
+    const hand = String(handwriting[`${s.kind}:${s.id}`] ?? "").trim();
+    const text = [typed, hand && `Handwritten notes:\n${hand}`].filter(Boolean).join("\n\n").slice(0, NOTES_MAX);
     if (!text || total + text.length > TOTAL_MAX) continue;
     total += text.length;
     const num = used.length + 1;
@@ -78,7 +83,7 @@ export async function POST(request: Request) {
   if (titleMode) return suggestTitles(parts, reportText);
   if (!used.length) {
     return NextResponse.json(
-      { error: "None of the chosen items have typed notes yet, so there's nothing for the AI to work from." },
+      { error: "None of the chosen items have typed notes or read handwriting yet, so there's nothing for the AI to work from." },
       { status: 400 },
     );
   }

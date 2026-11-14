@@ -12,6 +12,8 @@ export type Report = {
   user_id: string;
   title: string;
   body: string;
+  // Text read from handwritten notes, by sourceKey. Only there once supabase/report-handwriting.sql is run.
+  handwriting?: Record<string, string>;
   created_at: string;
   updated_at: string;
 };
@@ -38,8 +40,9 @@ export type ReportSource = {
   // Typed notes and AI answers, without the clips.
   notes: string;
   clips: TypedClip[];
-  // Handwriting pages with something on them (read in a later step).
+  // Handwriting pages with something on them, and those pages themselves.
   handPages: number;
+  pages: NotePage[];
   createdAt: string;
 };
 
@@ -60,12 +63,18 @@ type ArticleRow = {
   kind: string;
   category_id: string | null;
   notes?: string | null;
+  pages?: NotePage[] | null;
   created_at: string;
 };
 type CategoryRow = { id: string; name: string };
 
-const usedPages = (pages: NotePage[] | null) =>
-  (pages ?? []).filter((p) => p?.strokes?.length || p?.stamps?.length || p?.images?.length).length;
+const usedPages = (pages: NotePage[] | null | undefined) =>
+  (pages ?? []).filter((p) => p?.strokes?.length || p?.stamps?.length || p?.images?.length);
+
+function handwriting(pages: NotePage[] | null | undefined) {
+  const used = usedPages(pages);
+  return { handPages: used.length, pages: used };
+}
 
 // Every video, reading and tutorial, with its notes. Read-only.
 export async function loadSources(supabase: SupabaseClient): Promise<ReportSource[]> {
@@ -97,7 +106,7 @@ export async function loadSources(supabase: SupabaseClient): Promise<ReportSourc
       category: row.category_id ? (categoryName.get(row.category_id) ?? null) : null,
       notes: text,
       clips,
-      handPages: usedPages(note?.pages ?? null),
+      ...handwriting(note?.pages),
       createdAt: row.created_at,
     };
   });
@@ -117,7 +126,7 @@ export async function loadSources(supabase: SupabaseClient): Promise<ReportSourc
         category: row.category_id ? (categoryName.get(row.category_id) ?? null) : null,
         notes: text,
         clips,
-        handPages: 0,
+        ...handwriting(row.pages),
         createdAt: row.created_at,
       };
     });
@@ -128,7 +137,8 @@ export async function loadSources(supabase: SupabaseClient): Promise<ReportSourc
 // ---------- Building a report without AI ----------
 
 // Puts each item's notes under its own heading, with its link and clips.
-export function compileReport(title: string, sources: ReportSource[]) {
+// `handwriting` is the text read from handwritten pages, by sourceKey.
+export function compileReport(title: string, sources: ReportSource[], handwriting: Record<string, string> = {}) {
   const parts = [`# ${title}`];
   sources.forEach((s, i) => {
     const lines = [`## ${i + 1}. ${s.title}`];
@@ -138,7 +148,9 @@ export function compileReport(title: string, sources: ReportSource[]) {
       lines.push("");
       for (const c of s.clips) lines.push(`![${c.t === null ? "" : `At ${formatTime(c.t)}`}](${c.path})`);
     }
-    if (s.handPages && !s.notes.trim()) lines.push("", `(${s.handPages} handwritten page${s.handPages === 1 ? "" : "s"} not included yet.)`);
+    const hand = handwriting[sourceKey(s)]?.trim();
+    if (hand) lines.push("", "### Handwritten notes", "", hand);
+    else if (s.handPages) lines.push("", `(${s.handPages} handwritten page${s.handPages === 1 ? "" : "s"} not included. Use “Read handwriting” to add ${s.handPages === 1 ? "it" : "them"}.)`);
     if (!hasNotes(s)) lines.push("", "(No notes yet.)");
     parts.push(lines.join("\n"));
   });

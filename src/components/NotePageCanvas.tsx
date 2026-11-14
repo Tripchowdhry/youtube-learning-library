@@ -33,7 +33,7 @@ function hitImage(images: NoteImage[], x: number, y: number) {
   return [...images].reverse().find((im) => x >= im.x && x <= im.x + im.w && y >= im.y && y <= im.y + im.h);
 }
 
-function drawStroke(ctx: CanvasRenderingContext2D, stroke: NoteStroke) {
+export function drawStroke(ctx: CanvasRenderingContext2D, stroke: NoteStroke) {
   const pts = stroke.points;
   if (!pts.length) return;
   ctx.lineCap = "round";

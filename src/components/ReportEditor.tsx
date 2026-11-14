@@ -18,12 +18,14 @@ import {
   type SourceSection,
 } from "@/lib/report";
 import { copyReport, downloadWord } from "@/lib/report-export";
+import { pageToPng } from "@/lib/handwriting-image";
 import { createClient } from "@/lib/supabase/client";
 import { ReportIcon } from "@/components/ReportWriterLink";
 import {
   ArrowDown,
   ArrowLeft,
   ArrowUp,
+  Check,
   Clapperboard,
   Copy,
   FileDown,
@@ -61,6 +63,14 @@ function notesSummary(s: ReportSource) {
   return bits.length ? bits.join(", ") : "no notes yet";
 }
 
+// What's in a chosen item, without the handwriting (it has its own button next to it).
+function typedSummary(s: ReportSource) {
+  const bits: string[] = [];
+  if (s.notes.trim()) bits.push("typed notes");
+  if (s.clips.length) bits.push(`${s.clips.length} clip${s.clips.length === 1 ? "" : "s"}`);
+  return bits.join(", ");
+}
+
 // One report: choose the notes, build it (as they are, or with AI), then edit, copy or download it.
 export default function ReportEditor({ reportId }: { reportId: string }) {
   const supabase = useMemo(() => createClient(), []);
@@ -86,6 +96,12 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
   const [titleIdeas, setTitleIdeas] = useState<{ titles: string[]; model: string | null } | null>(null);
   const [titleBusy, setTitleBusy] = useState(false);
   const [titleError, setTitleError] = useState<string | null>(null);
+  // Text read from handwritten pages, by sourceKey, kept with the report (never in the notes themselves).
+  const [handwriting, setHandwriting] = useState<Record<string, string>>({});
+  const [handReady, setHandReady] = useState(false);
+  const [handReading, setHandReading] = useState<{ key: string; page: number; total: number } | null>(null);
+  const [handReview, setHandReview] = useState<{ key: string; text: string; model: string | null; fresh: boolean } | null>(null);
+  const [handError, setHandError] = useState<{ key: string; text: string } | null>(null);
   const [toast, setToast] = useState<{ text: string; isError?: boolean } | null>(null);
 
   const mounted = useRef(true);
@@ -124,6 +140,9 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
       // A new report starts with an empty title box, so there's nothing to delete first.
       setTitle(row.title === UNTITLED ? "" : row.title);
       setBody(row.body ?? "");
+      // The handwriting column exists once supabase/report-handwriting.sql is run.
+      setHandReady("handwriting" in row);
+      setHandwriting(row.handwriting && typeof row.handwriting === "object" ? row.handwriting : {});
       const list = (rs.data ?? []).map((x) => ({ kind: x.source_kind as SourceKind, id: x.source_id as string }));
       setChosen(list);
       setPicking(list.length === 0);
@@ -212,6 +231,76 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
     updateChosen(next);
   }
 
+  // ---------- Handwriting ----------
+
+  // Only the chosen items' handwriting is sent to the AI.
+  function usedHandwriting() {
+    return Object.fromEntries(chosen.map(sourceKey).filter((k) => handwriting[k]?.trim()).map((k) => [k, handwriting[k]]));
+  }
+
+  // Draws each handwritten page as a picture and has the AI read it, one page at a time.
+  // The text is shown for checking; nothing is kept until it's saved.
+  async function readHandwriting(s: ReportSource) {
+    const key = sourceKey(s);
+    setHandError(null);
+    setHandReview(null);
+    if (!handReady) {
+      setHandError({
+        key,
+        text: "Reading handwriting needs one setup step first. In Supabase, open SQL Editor and run the file supabase/report-handwriting.sql once, then reload this page.",
+      });
+      return;
+    }
+    const pages = s.pages.filter((p) => p.strokes?.length);
+    if (!pages.length) {
+      setHandError({ key, text: "These pages only have pictures or stickers on them, no writing to read." });
+      return;
+    }
+    const texts: string[] = [];
+    let model: string | null = null;
+    try {
+      for (let i = 0; i < pages.length; i++) {
+        setHandReading({ key, page: i + 1, total: pages.length });
+        const image = pageToPng(pages[i]);
+        if (!image) continue;
+        const res = await fetch("/api/report-handwriting", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ image }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!mounted.current) return;
+        if (!res.ok) {
+          setHandError({ key, text: data.error ?? `The AI couldn't read page ${i + 1} (error ${res.status}).` });
+          return;
+        }
+        if (data.model) model = String(data.model);
+        const text = String(data.text ?? "").trim();
+        if (text) texts.push(text);
+      }
+      if (!mounted.current) return;
+      if (!texts.length) setHandError({ key, text: "The AI couldn't find any writing to read on these pages." });
+      else setHandReview({ key, text: texts.join("\n\n"), model, fresh: true });
+    } catch {
+      if (mounted.current) setHandError({ key, text: "The AI couldn't be reached. Check your connection and try again." });
+    } finally {
+      if (mounted.current) setHandReading(null);
+    }
+  }
+
+  // Keeps the checked text with this report. Empty text removes it.
+  async function saveHandwriting(key: string, text: string) {
+    const next = { ...handwriting };
+    if (text.trim()) next[key] = text.trim();
+    else delete next[key];
+    const { error } = await supabase.from("reports").update({ handwriting: next }).eq("id", reportId);
+    if (!mounted.current) return;
+    if (error) return notify(`Couldn't save the handwriting text: ${error.message}`, true);
+    setHandwriting(next);
+    setHandReview(null);
+    notify(text.trim() ? "Saved. It's used when you put the report together or draft it with AI." : "Removed the handwriting text.");
+  }
+
   // ---------- Building ----------
 
   async function okToReplace() {
@@ -226,7 +315,7 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
   async function compile() {
     if (!chosenSources.length) return notify("Choose at least one video, reading or tutorial first.", true);
     if (!(await okToReplace())) return;
-    setBody(compileReport(title.trim() || UNTITLED, chosenSources));
+    setBody(compileReport(title.trim() || UNTITLED, chosenSources, handwriting));
   }
 
   async function draftWithAi() {
@@ -239,7 +328,7 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
       const res = await fetch("/api/report-ai", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: reportTitle, prompt: focus, sources: chosen }),
+        body: JSON.stringify({ title: reportTitle, prompt: focus, sources: chosen, handwriting: usedHandwriting() }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -277,7 +366,7 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
       const res = await fetch("/api/report-ai", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mode: "title", sources: chosen, body }),
+        body: JSON.stringify({ mode: "title", sources: chosen, body, handwriting: usedHandwriting() }),
       });
       const data = await res.json().catch(() => ({}));
       if (!mounted.current) return;
@@ -464,17 +553,44 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
             {chosen.map((c, i) => {
               const s = byKey.get(sourceKey(c));
               const tabInfo = s ? TAB[s.section] : null;
+              const key = sourceKey(c);
+              const handButton = s && s.handPages > 0 && (
+                <HandwritingButton
+                  pages={s.handPages}
+                  read={Boolean(handwriting[key])}
+                  progress={handReading?.key === key ? handReading : null}
+                  busy={Boolean(handReading)}
+                  onRead={() => readHandwriting(s)}
+                  onOpen={() => setHandReview(handReview?.key === key ? null : { key, text: handwriting[key], model: null, fresh: false })}
+                />
+              );
               return (
-                <li key={sourceKey(c)} className="flex items-center gap-2 rounded-md bg-slate-50 px-2 py-1.5 text-sm">
-                  <span className="w-5 text-right text-slate-400">{i + 1}.</span>
-                  {tabInfo && <Ico icon={tabInfo.Icon} tone={tabInfo.tone} />}
-                  <span className="min-w-0 flex-1 truncate">
-                    {s ? s.title : sources ? <i className="text-slate-500">Removed from your library</i> : "…"}
-                  </span>
-                  {s && <span className="hidden text-xs text-slate-500 sm:inline">{notesSummary(s)}</span>}
-                  <IconButton label="Move up" onClick={() => move(i, -1)} disabled={i === 0} Icon={ArrowUp} />
-                  <IconButton label="Move down" onClick={() => move(i, 1)} disabled={i === chosen.length - 1} Icon={ArrowDown} />
-                  <IconButton label="Remove" onClick={() => updateChosen(chosen.filter((_, j) => j !== i))} Icon={X} />
+                <li key={sourceKey(c)} className="rounded-md bg-slate-50 px-2 py-1.5 text-sm">
+                  <div className="flex items-center gap-2">
+                    <span className="w-5 text-right text-slate-400">{i + 1}.</span>
+                    {tabInfo && <Ico icon={tabInfo.Icon} tone={tabInfo.tone} />}
+                    <span className="min-w-0 flex-1 truncate">
+                      {s ? s.title : sources ? <i className="text-slate-500">Removed from your library</i> : "…"}
+                    </span>
+                    {s && <span className="hidden text-xs text-slate-500 sm:inline">{s.handPages ? typedSummary(s) : notesSummary(s)}</span>}
+                    {handButton && <span className="hidden sm:flex">{handButton}</span>}
+                    <IconButton label="Move up" onClick={() => move(i, -1)} disabled={i === 0} Icon={ArrowUp} />
+                    <IconButton label="Move down" onClick={() => move(i, 1)} disabled={i === chosen.length - 1} Icon={ArrowDown} />
+                    <IconButton label="Remove" onClick={() => updateChosen(chosen.filter((_, j) => j !== i))} Icon={X} />
+                  </div>
+                  {/* On a phone the button gets its own line, so the title stays readable */}
+                  {handButton && <div className="mt-1 ml-7 flex sm:hidden">{handButton}</div>}
+                  {s && handError?.key === sourceKey(s) && <p className="mt-1.5 ml-7 text-sm text-red-700">{handError.text}</p>}
+                  {s && handReview?.key === sourceKey(s) && (
+                    <HandwritingReview
+                      review={handReview}
+                      busy={Boolean(handReading)}
+                      onChange={(text) => setHandReview({ ...handReview, text })}
+                      onSave={() => saveHandwriting(handReview.key, handReview.text)}
+                      onReadAgain={() => readHandwriting(s)}
+                      onCancel={() => setHandReview(null)}
+                    />
+                  )}
                 </li>
               );
             })}
@@ -628,6 +744,98 @@ function Shell({ title, children }: { title: React.ReactNode; children: React.Re
         {typeof title === "string" ? <span className="text-lg font-semibold">{title}</span> : title}
       </header>
       <main className="mx-auto w-full max-w-4xl flex-1 px-4 py-6">{children}</main>
+    </div>
+  );
+}
+
+// Next to a chosen item with handwritten pages: read them with AI, or open the text already read.
+function HandwritingButton({
+  pages,
+  read,
+  progress,
+  busy,
+  onRead,
+  onOpen,
+}: {
+  pages: number;
+  read: boolean;
+  progress: { page: number; total: number } | null;
+  busy: boolean;
+  onRead: () => void;
+  onOpen: () => void;
+}) {
+  const base = "flex shrink-0 items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium ring-1";
+  if (progress) {
+    return (
+      <span className={`${base} bg-[#f6f3ff] text-[#2b3b5e] ring-[#e2d9fb]`} role="status">
+        <Loader2 size={13} className="animate-spin text-[#7c3aed]" aria-hidden /> Reading page {progress.page} of {progress.total}…
+      </span>
+    );
+  }
+  if (read) {
+    return (
+      <button onClick={onOpen} title="See or fix the text read from your handwriting" className={`${base} bg-white text-green-700 ring-green-200 hover:bg-green-50`}>
+        <Check size={13} aria-hidden /> Handwriting read
+      </button>
+    );
+  }
+  return (
+    <button
+      onClick={onRead}
+      disabled={busy}
+      title={`Let AI read your ${pages} handwritten page${pages === 1 ? "" : "s"}, so the writing can go in the report`}
+      className={`${base} bg-[#f6f3ff] text-[#2b3b5e] ring-[#e2d9fb] hover:bg-[#efeaff] disabled:opacity-50`}
+    >
+      <Ico icon={Sparkles} tone="violet" size={13} /> Read handwriting ({pages})
+    </button>
+  );
+}
+
+// The text read from the handwriting, to check and fix before it's used.
+function HandwritingReview({
+  review,
+  busy,
+  onChange,
+  onSave,
+  onReadAgain,
+  onCancel,
+}: {
+  review: { text: string; model: string | null; fresh: boolean };
+  busy: boolean;
+  onChange: (text: string) => void;
+  onSave: () => void;
+  onReadAgain: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <div className="mt-2 ml-7 rounded-lg bg-[#f6f3ff] p-2 ring-1 ring-[#e2d9fb]">
+      <p className="mb-1 px-1 text-xs font-medium text-slate-600">
+        {review.fresh
+          ? `${review.model ? `Read by ${review.model}. ` : ""}Check it against your page and fix anything it got wrong. [?] marks words it couldn't read.`
+          : "The text read from your handwriting. Edit it here; your handwritten page stays as it is."}
+      </p>
+      <textarea
+        value={review.text}
+        onChange={(e) => onChange(e.target.value)}
+        rows={Math.min(14, Math.max(4, review.text.split("\n").length + 1))}
+        aria-label="Text read from your handwriting"
+        className="w-full rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm leading-relaxed"
+      />
+      <div className="mt-1.5 flex flex-wrap items-center gap-2">
+        <button onClick={onSave} className="rounded-md bg-[#2b3b5e] px-3 py-1 text-sm font-medium text-white hover:bg-[#22304d]">
+          {review.fresh ? "Use this text" : "Save changes"}
+        </button>
+        <button onClick={onCancel} className="rounded-md border border-slate-300 bg-white px-3 py-1 text-sm hover:bg-slate-50">
+          Cancel
+        </button>
+        <button
+          onClick={onReadAgain}
+          disabled={busy}
+          className="ml-auto flex items-center gap-1 rounded-md px-2 py-1 text-sm text-[#2b3b5e] hover:bg-[#efeaff] disabled:opacity-50"
+        >
+          <Sparkles size={13} className="text-[#7c3aed]" aria-hidden /> Read again
+        </button>
+      </div>
     </div>
   );
 }
