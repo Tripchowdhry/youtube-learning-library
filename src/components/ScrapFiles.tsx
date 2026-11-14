@@ -27,6 +27,7 @@ import {
 } from "@/lib/files";
 import { findLocalFile as findOnComputer, forgetLocalFile, isLocalFile, rememberLocalFile, type FileHandle, type PickerWindow } from "@/lib/local-files";
 import { parseReport } from "@/lib/report";
+import { hasExtractableText, textForAi } from "@/lib/doc-text";
 
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
@@ -227,6 +228,8 @@ export default function ScrapFiles(props: {
     setPrompt("");
     setAsking(null);
     askedAbout.set(scrapId, f.path);
+    const asText = !aiReadable(f) && hasExtractableText(f);
+    const sendType = asText ? "text/plain" : f.type;
     runAiJob<string>({
       key: aiKey,
       label: `AI answer about "${f.name}"`,
@@ -235,7 +238,14 @@ export default function ScrapFiles(props: {
         try {
           if (sentBefore) target = { geminiFile: sentBefore };
           else if (onComputer) {
-            const sent = await sendFile(supabase, onComputer, f.type, signal, (note) => setAiJobNote(aiKey, note));
+            // Word, PowerPoint and Excel go as their words, pulled out on this computer.
+            let toSend: File = onComputer;
+            if (asText) {
+              const text = await textForAi(onComputer);
+              if (!(text instanceof File)) return { error: text.error };
+              toSend = text;
+            }
+            const sent = await sendFile(supabase, toSend, sendType, signal, (note) => setAiJobNote(aiKey, note));
             if (sent.error) return { error: sent.error };
             target = { geminiFile: sent.geminiFile, parts: sent.parts, size: sent.size };
           }
@@ -243,7 +253,7 @@ export default function ScrapFiles(props: {
           const res = await fetch("/api/file-ai", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ ...target, name: f.name, type: f.type, prompt: clean }),
+            body: JSON.stringify({ ...target, name: f.name, type: sendType, prompt: clean }),
             signal,
           });
           const data = await res.json().catch(() => ({}));
@@ -308,7 +318,7 @@ export default function ScrapFiles(props: {
                     {viewing?.path === f.path ? "Hide" : isVideo ? "Play" : "View"}
                   </SmallButton>
                 )}
-                {aiReadable(f) && (
+                {(aiReadable(f) || (local && hasExtractableText(f))) && (
                   <SmallButton
                     onClick={() => setAsking(asking === f.path ? null : f.path)}
                     icon={Sparkles}
