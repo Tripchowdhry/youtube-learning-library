@@ -30,6 +30,7 @@ import {
   FileText,
   GraduationCap,
   Layers,
+  Loader2,
   PenLine,
   Sparkles,
   X,
@@ -82,7 +83,7 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
   const [focus, setFocus] = useState("");
   const [aiBusy, setAiBusy] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
-  const [titleIdeas, setTitleIdeas] = useState<string[] | null>(null);
+  const [titleIdeas, setTitleIdeas] = useState<{ titles: string[]; model: string | null } | null>(null);
   const [titleBusy, setTitleBusy] = useState(false);
   const [titleError, setTitleError] = useState<string | null>(null);
   const [toast, setToast] = useState<{ text: string; isError?: boolean } | null>(null);
@@ -275,7 +276,7 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
       const data = await res.json().catch(() => ({}));
       if (!mounted.current) return;
       if (!res.ok) setTitleError(data.error ?? `The AI couldn't suggest titles (error ${res.status}).`);
-      else setTitleIdeas(Array.isArray(data.titles) ? data.titles : []);
+      else setTitleIdeas({ titles: Array.isArray(data.titles) ? data.titles : [], model: data.model ? String(data.model) : null });
     } catch {
       if (mounted.current) setTitleError("The AI couldn't be reached. Check your connection and try again.");
     } finally {
@@ -372,10 +373,11 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
           <button
             onClick={suggestTitles}
             disabled={titleBusy || (!chosen.length && !body.trim())}
+            aria-busy={titleBusy}
             title={chosen.length || body.trim() ? "Let AI suggest titles from your chosen notes" : "Choose some notes first"}
-            className="flex items-center gap-1.5 rounded-md bg-[#f6f3ff] px-2.5 py-1 text-sm font-medium text-[#2b3b5e] ring-1 ring-[#e2d9fb] hover:bg-[#efeaff] disabled:opacity-50"
+            className={`flex items-center gap-1.5 rounded-md bg-[#f6f3ff] px-2.5 py-1 text-sm font-medium text-[#2b3b5e] ring-1 ring-[#e2d9fb] hover:bg-[#efeaff] ${titleBusy ? "cursor-wait" : "disabled:opacity-50"}`}
           >
-            <Ico icon={Sparkles} tone="violet" size={15} />
+            {titleBusy ? <Loader2 size={15} className="animate-spin text-[#7c3aed]" aria-hidden /> : <Ico icon={Sparkles} tone="violet" size={15} />}
             {titleBusy ? "Thinking…" : "Suggest with AI"}
           </button>
         </div>
@@ -389,16 +391,34 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
           placeholder="Give your report a title, like “What I learned about transformers”"
           className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xl font-semibold text-slate-900 placeholder:font-normal placeholder:text-slate-400 focus:border-[#7c6bd6] focus:ring-2 focus:ring-[#ece6ff] focus:outline-none"
         />
+        {titleBusy && (
+          <div className="mt-2 rounded-lg bg-[#f6f3ff] p-2 ring-1 ring-[#e2d9fb]" role="status">
+            <p className="mb-1 flex items-center gap-1.5 px-1 text-xs font-medium text-slate-600">
+              <Sparkles size={13} className="animate-pulse text-[#7c3aed]" aria-hidden /> Reading your notes and thinking of titles…
+            </p>
+            <div className="flex flex-col gap-1">
+              {[70, 85, 60].map((w) => (
+                <div key={w} className="rounded-md bg-white px-3 py-2 ring-1 ring-[#e2d9fb]">
+                  <div className="h-3.5 animate-pulse rounded bg-[#e9e3fb]" style={{ width: `${w}%` }} />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
         {titleIdeas && (
           <div className="mt-2 rounded-lg bg-[#f6f3ff] p-2 ring-1 ring-[#e2d9fb]">
             <div className="mb-1 flex items-center px-1 text-xs font-medium text-slate-600">
-              <span className="mr-auto">{titleIdeas.length ? "Pick one, or keep typing your own:" : "No ideas came back. Try again."}</span>
+              <span className="mr-auto">
+                {titleIdeas.titles.length
+                  ? `${titleIdeas.model ? `Ideas from ${titleIdeas.model}. ` : ""}Pick one, or keep typing your own:`
+                  : "No ideas came back. Try again."}
+              </span>
               <button onClick={() => setTitleIdeas(null)} className="rounded p-0.5 text-slate-400 hover:text-slate-700" aria-label="Close suggestions">
                 <X size={14} />
               </button>
             </div>
             <div className="flex flex-col gap-1">
-              {titleIdeas.map((idea) => (
+              {titleIdeas.titles.map((idea) => (
                 <button
                   key={idea}
                   onClick={() => pickTitle(idea)}

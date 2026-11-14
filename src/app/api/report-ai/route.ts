@@ -124,7 +124,7 @@ async function suggestTitles(parts: string[], reportText: string) {
     "Each title is clear and specific to what the notes cover, at most 10 words, in title case.",
   ].join("\n");
   try {
-    const { text } = await askAboutFile(
+    const { text, model } = await askAboutFile(
       { bytes: Buffer.from(file, "utf8"), mimeType: "text/plain" },
       instructions,
       "Suggest 3 titles for this report.",
@@ -135,7 +135,7 @@ async function suggestTitles(parts: string[], reportText: string) {
       .filter((line) => line && line.length <= 150)
       .slice(0, 3);
     if (!titles.length) return NextResponse.json({ error: "The AI didn't suggest any titles. Try again." }, { status: 502 });
-    return NextResponse.json({ titles });
+    return NextResponse.json({ titles, model });
   } catch (error) {
     if (error instanceof GeminiError) return NextResponse.json({ error: error.message }, { status: error.status });
     return NextResponse.json({ error: "The AI couldn't be reached. Try again." }, { status: 502 });
