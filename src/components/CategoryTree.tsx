@@ -39,7 +39,7 @@ export default function CategoryTree<C extends TreeNode>(props: {
               <div className="min-w-0 flex-1">
                 <NavItem
                   icon={cat.share_token ? Link2 : Tag}
-                  tone={cat.share_token ? "sky" : "orange"}
+                  tone={cat.share_token ? "blue" : "amber"}
                   label={cat.name}
                   count={props.count(cat.id)}
                   active={props.activeId === cat.id}

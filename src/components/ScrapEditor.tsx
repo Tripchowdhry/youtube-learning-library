@@ -512,7 +512,7 @@ export default function ScrapEditor({ scrapId }: { scrapId: string }) {
                     onClick={() => chooseMode(id)}
                     className={`flex items-center gap-1.5 rounded-md px-3 py-1 text-sm ${mode === id ? "bg-white font-semibold shadow-sm" : "text-slate-600"}`}
                   >
-                    <Ico icon={icon} tone={id === "write" ? "indigo" : "slate"} size={15} />
+                    <Ico icon={icon} tone={id === "write" ? "blue" : "slate"} size={15} />
                     {label}
                   </button>
                 ))}

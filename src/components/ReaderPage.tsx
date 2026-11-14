@@ -189,7 +189,7 @@ export default function ReaderPage({ articleId }: { articleId: string }) {
               rel="noreferrer"
               className="hidden shrink-0 items-center gap-1 rounded-md border border-slate-300 px-2 py-1 text-xs text-slate-700 hover:bg-slate-100 sm:inline-flex"
             >
-              <Ico icon={ExternalLink} tone="sky" size={14} />
+              <Ico icon={ExternalLink} tone="blue" size={14} />
               Original
             </a>
             <button
@@ -203,7 +203,7 @@ export default function ReaderPage({ articleId }: { articleId: string }) {
               }
             >
               {!showNotes && (
-                <Ico icon={hasNotes ? NotebookText : Pencil} tone={hasNotes ? "amber" : "yellow"} size={14} />
+                <Ico icon={hasNotes ? NotebookText : Pencil} tone={hasNotes ? "amber" : "amber"} size={14} />
               )}
               {showNotes ? "Hide notes" : hasNotes ? "Open notes" : "Take notes"}
             </button>
@@ -233,7 +233,7 @@ export default function ReaderPage({ articleId }: { articleId: string }) {
             <div className="mt-3">
               {!article.note && !editingNote ? (
                 <button onClick={() => setEditingNote(true)} className="inline-flex items-center gap-1 text-sm text-slate-500 hover:underline">
-                  <Ico icon={FilePen} tone="sky" size={15} />
+                  <Ico icon={FilePen} tone="blue" size={15} />
                   Add a summary
                 </button>
               ) : (

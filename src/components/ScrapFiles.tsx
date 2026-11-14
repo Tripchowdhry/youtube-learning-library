@@ -74,7 +74,7 @@ export function AttachFileButton({ onFiles, busy }: { onFiles: (files: Chosen[])
         title={`Add videos, PDFs, pictures or documents (up to ${ADD_MAX_MB} MB). Kept on your computer.`}
         className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold ring-1 ring-slate-300 hover:bg-slate-100 disabled:opacity-50"
       >
-        <Ico icon={Paperclip} tone="sky" size={16} />
+        <Ico icon={Paperclip} tone="blue" size={16} />
         {busy ? "Adding…" : "Add file"}
       </button>
       <input
@@ -303,7 +303,7 @@ export default function ScrapFiles(props: {
   return (
     <div className="flex flex-col gap-2 rounded-xl bg-white p-3 shadow-sm ring-1 ring-slate-200">
       <p className="flex items-center gap-1.5 text-sm font-semibold">
-        <Ico icon={Paperclip} tone="sky" size={15} />
+        <Ico icon={Paperclip} tone="blue" size={15} />
         Files
       </p>
       {files.map((f) => {
@@ -313,7 +313,7 @@ export default function ScrapFiles(props: {
         return (
           <div key={f.path} className="flex flex-col gap-2">
             <div className="flex flex-wrap items-center gap-2 rounded-lg bg-slate-50 px-2 py-1.5 ring-1 ring-slate-200">
-              <Ico icon={iconFor(f)} tone={f.type === "application/pdf" ? "red" : "sky"} size={16} />
+              <Ico icon={iconFor(f)} tone={f.type === "application/pdf" ? "red" : "blue"} size={16} />
               <button
                 onClick={() => open(f)}
                 className="min-w-0 truncate text-left text-sm font-medium text-slate-800 hover:underline"

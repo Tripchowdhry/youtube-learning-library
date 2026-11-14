@@ -90,7 +90,7 @@ function PreviewBanner({ text, back }: { text: string; back: string }) {
   return (
     <div className="mb-6 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm text-violet-900">
       <span className="flex items-center gap-1.5 font-semibold">
-        <Ico icon={Eye} tone="violet" size={16} />
+        <Ico icon={Eye} tone="blue" size={16} />
         Preview: what people with the link see
       </span>
       <span className="text-violet-800">{text}</span>
@@ -161,7 +161,7 @@ function CategorySection({ shared, categoryId }: { shared: SharedCategory; categ
           {articles.map((a) => (
             <li key={a.id} className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
               <a href={a.url} target="_blank" rel="noreferrer" className="flex items-start gap-2 font-medium hover:underline">
-                <Ico icon={ExternalLink} tone="sky" size={16} className="mt-1 shrink-0" />
+                <Ico icon={ExternalLink} tone="blue" size={16} className="mt-1 shrink-0" />
                 <span className="line-clamp-2">{a.title || a.url}</span>
               </a>
               {(a.site || a.author) && (
@@ -178,7 +178,7 @@ function CategorySection({ shared, categoryId }: { shared: SharedCategory; categ
             return (
               <article key={s.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                 <h3 className="flex items-center gap-2 font-semibold">
-                  <Ico icon={FileText} tone="sky" size={18} />
+                  <Ico icon={FileText} tone="blue" size={18} />
                   {s.title}
                 </h3>
                 {text && <p className="mt-2 whitespace-pre-wrap text-slate-700">{text}</p>}
@@ -190,7 +190,7 @@ function CategorySection({ shared, categoryId }: { shared: SharedCategory; categ
       {children.map((child) => (
         <div key={child.id} className="mt-8">
           <h2 className="mb-3 flex items-center gap-2 text-xl font-semibold">
-            <Ico icon={Tag} tone="orange" size={20} />
+            <Ico icon={Tag} tone="amber" size={20} />
             {child.name}
           </h2>
           <CategorySection shared={shared} categoryId={child.id} />

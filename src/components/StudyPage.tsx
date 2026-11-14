@@ -838,11 +838,11 @@ function TypedNotes(props: {
 }
 
 const AI_PRESETS = [
-  { label: "Summary in 100 words", icon: FileText, tone: "sky", prompt: "Summarize the video in 100 words." },
+  { label: "Summary in 100 words", icon: FileText, tone: "blue", prompt: "Summarize the video in 100 words." },
   {
     label: "Key innovations",
     icon: Lightbulb,
-    tone: "yellow",
+    tone: "amber",
     prompt: "Write a short report highlighting the key innovations in this video, with the time each one comes up.",
   },
   { label: "How to use it in 3 steps", icon: Footprints, tone: "green", prompt: "Explain in 3 steps how to use what this video shows." },
@@ -877,7 +877,7 @@ function AskAi(props: {
   return (
     <div data-tour="ask-ai" className="rounded-xl bg-white p-3 shadow-sm ring-1 ring-violet-200">
       <button onClick={() => setOpen((o) => !o)} className="flex w-full items-center gap-2 text-left text-sm font-semibold">
-        <Ico icon={Sparkles} tone="yellow" />
+        <Ico icon={Sparkles} tone="amber" />
         Ask AI about this video
         {busy && <span className="font-normal text-violet-700">Watching the video… this can take a minute</span>}
         <span className="ml-auto text-xs font-normal text-slate-500">{open ? "Hide" : "Show"}</span>
@@ -1005,7 +1005,7 @@ function Toolbar(props: {
             onClick={() => props.setMode(id)}
             className={`flex items-center gap-1.5 rounded-md px-3 py-1 text-sm ${props.mode === id ? "bg-white font-semibold shadow-sm" : "text-slate-600"}`}
           >
-            <Ico icon={icon} tone={id === "write" ? "indigo" : "slate"} size={15} />
+            <Ico icon={icon} tone={id === "write" ? "blue" : "slate"} size={15} />
             {label}
           </button>
         ))}
@@ -1097,7 +1097,7 @@ function Toolbar(props: {
           className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm text-slate-700 ring-1 ring-slate-300 hover:bg-slate-100"
           title="Remove all the text you typed for this video"
         >
-          <Ico icon={Brush} tone="orange" size={15} />
+          <Ico icon={Brush} tone="amber" size={15} />
           Clear typed notes
         </button>
       )}
