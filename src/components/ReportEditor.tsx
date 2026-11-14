@@ -30,6 +30,7 @@ import {
   FileText,
   GraduationCap,
   Layers,
+  PenLine,
   Sparkles,
   X,
   type LucideIcon,
@@ -40,6 +41,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 type Chosen = { kind: SourceKind; id: string };
 type SaveState = "saved" | "saving" | "error";
+
+const UNTITLED = "Untitled report";
 
 const TABS: { key: SourceSection; name: string; Icon: LucideIcon; tone: Tone }[] = [
   { key: "videos", name: "Videos", Icon: Clapperboard, tone: "red" },
@@ -114,7 +117,8 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
       }
       const row = r.data as Report;
       setReport(row);
-      setTitle(row.title);
+      // A new report starts with an empty title box, so there's nothing to delete first.
+      setTitle(row.title === UNTITLED ? "" : row.title);
       setBody(row.body ?? "");
       const list = (rs.data ?? []).map((x) => ({ kind: x.source_kind as SourceKind, id: x.source_id as string }));
       setChosen(list);
@@ -136,12 +140,12 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
 
   const lastSaved = useRef({ title: "", body: "" });
   useEffect(() => {
-    if (report) lastSaved.current = { title: report.title, body: report.body };
+    if (report) lastSaved.current = { title: report.title === UNTITLED ? "" : report.title, body: report.body };
   }, [report]);
 
   const saveText = useCallback(
     async (nextTitle: string, nextBody: string) => {
-      const cleanTitle = nextTitle.trim().slice(0, 200) || "Untitled report";
+      const cleanTitle = nextTitle.trim().slice(0, 200) || UNTITLED;
       setSaveState("saving");
       const { error } = await supabase
         .from("reports")
@@ -218,7 +222,7 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
   async function compile() {
     if (!chosenSources.length) return notify("Choose at least one video, reading or tutorial first.", true);
     if (!(await okToReplace())) return;
-    setBody(compileReport(title.trim() || "Untitled report", chosenSources));
+    setBody(compileReport(title.trim() || UNTITLED, chosenSources));
   }
 
   async function draftWithAi() {
@@ -226,7 +230,7 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
     if (!(await okToReplace())) return;
     setAiBusy(true);
     setAiError(null);
-    const reportTitle = title.trim() || "Untitled report";
+    const reportTitle = title.trim() || UNTITLED;
     try {
       const res = await fetch("/api/report-ai", {
         method: "POST",
@@ -324,16 +328,26 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
 
   return (
     <Shell
-      title={
+      title={<span className="min-w-0 truncate text-lg font-semibold">{title.trim() || UNTITLED}</span>}
+    >
+      {/* The report's title, in its own clearly marked box at the top */}
+      <section className="mb-5 rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
+        <label htmlFor="report-title" className="mb-1.5 flex items-center gap-1.5 text-sm font-semibold text-[#2b3b5e]">
+          <PenLine size={15} aria-hidden /> Report title
+        </label>
         <input
+          id="report-title"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
+          autoFocus={!title}
           maxLength={200}
-          aria-label="Report title"
-          className="min-w-0 flex-1 rounded-md border border-transparent px-2 py-1 text-lg font-semibold hover:border-slate-300 focus:border-blue-500 focus:outline-none"
+          placeholder="Give your report a title, like “What I learned about transformers”"
+          className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xl font-semibold text-slate-900 placeholder:font-normal placeholder:text-slate-400 focus:border-[#7c6bd6] focus:ring-2 focus:ring-[#ece6ff] focus:outline-none"
         />
-      }
-    >
+        <p className="mt-1.5 text-xs text-slate-500">Used at the top of the report and as the Word file&apos;s name. It saves as you type.</p>
+      </section>
+
       {saveError && <p className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{saveError}</p>}
 
       {/* 1. Choose */}
