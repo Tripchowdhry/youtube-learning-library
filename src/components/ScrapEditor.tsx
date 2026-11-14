@@ -323,7 +323,7 @@ export default function ScrapEditor({ scrapId }: { scrapId: string }) {
   async function attach(chosen: Chosen[]) {
     if (!filesReady) return showNotice(FILES_SETUP);
     setAdding(true);
-    const { added, problem } = await addFiles(supabase, chosen);
+    const { added, problem } = await addFiles(chosen);
     setAdding(false);
     if (added.length) {
       setFiles((f) => [...f, ...added]);

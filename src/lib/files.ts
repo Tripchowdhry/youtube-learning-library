@@ -35,6 +35,8 @@ export function fileType(file: { name: string; type: string }) {
       jpg: "image/jpeg",
       jpeg: "image/jpeg",
       webp: "image/webp",
+      gif: "image/gif",
+      heic: "image/heic",
       mp4: "video/mp4",
       mov: "video/quicktime",
       webm: "video/webm",

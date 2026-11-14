@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { GeminiError, askAboutFile, askAboutUploadedVideo, geminiConfigured, uploadVideoInPieces } from "@/lib/gemini";
+import { GeminiError, askAboutFile, askAboutUploadedFile, geminiConfigured, uploadVideoInPieces } from "@/lib/gemini";
 import { FILES_BUCKET, aiReadable, fileType } from "@/lib/files";
 import { createClient } from "@/lib/supabase/server";
 
@@ -48,7 +48,7 @@ export async function POST(request: Request) {
         }
       });
       await supabase.storage.from(FILES_BUCKET).remove(parts);
-      const { text, model } = await askAboutUploadedVideo(geminiFile, user.id, instructions, ask);
+      const { text, model } = await askAboutUploadedFile(geminiFile, user.id, instructions, ask);
       // Google keeps the video 48 hours: the browser reuses it for more questions.
       return NextResponse.json({ text, model, geminiFile });
     } catch (e) {
@@ -60,7 +60,7 @@ export async function POST(request: Request) {
 
   if (body.geminiFile) {
     try {
-      const { text, model } = await askAboutUploadedVideo(String(body.geminiFile), user.id, instructions, ask);
+      const { text, model } = await askAboutUploadedFile(String(body.geminiFile), user.id, instructions, ask);
       return NextResponse.json({ text, model, geminiFile: body.geminiFile });
     } catch (e) {
       if (e instanceof GeminiError) return NextResponse.json({ error: e.message }, { status: e.status });
