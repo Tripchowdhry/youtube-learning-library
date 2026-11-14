@@ -1,5 +1,6 @@
 "use client";
 
+import SearchBox from "@/components/SearchBox";
 import ReportWriterLink from "@/components/ReportWriterLink";
 import { Tour, TourButton, useSectionTour } from "@/components/Tour";
 import { deleteScrapFiles, type ScrapFile } from "@/lib/files";
@@ -488,13 +489,7 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
         </button>
         <BrandMark />
         <SectionSwitch active="scrap" />
-        <input
-          type="search"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search titles and text…"
-          className="ml-auto w-full max-w-xs rounded-md border border-slate-300 px-3 py-1.5 text-sm"
-        />
+        <SearchBox value={query} onChange={setQuery} placeholder="Search titles and text…" className="ml-auto w-full max-w-xs" />
         <Link
           data-tour="clips"
           href="/clips"

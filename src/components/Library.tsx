@@ -1,5 +1,6 @@
 "use client";
 
+import SearchBox from "@/components/SearchBox";
 import { revealById } from "@/lib/reveal";
 import ReportWriterLink from "@/components/ReportWriterLink";
 import BrandMark from "@/components/BrandMark";
@@ -606,14 +607,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
         <span data-tour="sections" className="shrink-0">
           <SectionSwitch active="videos" />
         </span>
-        <input
-          data-tour="search"
-          type="search"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search titles, channels, notes…"
-          className="ml-auto w-full max-w-xs rounded-md border border-slate-300 px-3 py-1.5 text-sm"
-        />
+        <SearchBox value={query} onChange={setQuery} placeholder="Search titles, channels, notes…" className="ml-auto w-full max-w-xs" tour="search" />
         <Link
           data-tour="clips"
           href="/clips"

@@ -1,5 +1,6 @@
 "use client";
 
+import SearchBox from "@/components/SearchBox";
 import ReportWriterLink from "@/components/ReportWriterLink";
 import { Tour, TourButton, useSectionTour } from "@/components/Tour";
 import BrandMark from "@/components/BrandMark";
@@ -493,13 +494,7 @@ export default function VaultLibrary({ userEmail }: { userEmail: string }) {
         </button>
         <BrandMark />
         <SectionSwitch active="vault" />
-        <input
-          type="search"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search names, web addresses, user IDs…"
-          className="ml-auto w-full max-w-xs rounded-md border border-slate-300 px-3 py-1.5 text-sm"
-        />
+        <SearchBox value={query} onChange={setQuery} placeholder="Search names, web addresses, user IDs…" className="ml-auto w-full max-w-xs" />
         <div className="hidden items-center gap-2 text-sm text-slate-500 sm:flex">
           <span className="max-w-40 truncate">{userEmail}</span>
           <button onClick={signOut} className="rounded-md px-2 py-1 hover:bg-slate-100">

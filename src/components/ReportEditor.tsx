@@ -1,5 +1,6 @@
 "use client";
 
+import SearchBox from "@/components/SearchBox";
 import { askConfirm } from "@/components/ConfirmDialog";
 import { Ico, type Tone } from "@/components/Icon";
 import { SetupNotice } from "@/components/ReadingLibrary";
@@ -387,13 +388,7 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
                   </button>
                 ))}
               </nav>
-              <input
-                type="search"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search titles, categories and notes…"
-                className="min-w-0 flex-1 rounded-md border border-slate-300 px-3 py-1.5 text-sm"
-              />
+              <SearchBox value={query} onChange={setQuery} placeholder="Search titles, categories and notes…" className="min-w-0 flex-1" />
               <label className="flex items-center gap-1.5 text-sm text-slate-600">
                 <input type="checkbox" checked={onlyWithNotes} onChange={(e) => setOnlyWithNotes(e.target.checked)} />
                 Only ones with notes
