@@ -548,7 +548,9 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
               Put together
             </button>
           </div>
-          <div className="rounded-lg border border-violet-200 bg-violet-50/40 p-3">
+          <div className="relative overflow-hidden rounded-lg border border-violet-200 bg-violet-50/40 p-3 pt-4">
+            {/* A purple stripe, the colour used for AI throughout Report Writer */}
+            <span aria-hidden className="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-[#c4b5fd] via-[#8b5cf6] to-[#6d28d9]" />
             <p className="mb-1 flex items-center gap-1.5 font-medium">
               <Ico icon={Sparkles} tone="violet" /> Draft with AI
             </p>
