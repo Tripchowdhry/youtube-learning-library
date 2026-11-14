@@ -65,7 +65,7 @@ export function AttachFileButton({ onFiles, busy }: { onFiles: (files: Chosen[])
       <button
         onClick={choose}
         disabled={busy}
-        title={`Add PDFs, pictures, documents or videos (up to ${ADD_MAX_MB} MB each). They stay on your computer; Ask AI sends Google a copy that it deletes after 48 hours.`}
+        title={`Add videos, PDFs, pictures or documents (up to ${ADD_MAX_MB} MB each). They stay on your computer; Ask AI sends Google a copy that it deletes after 48 hours.`}
         className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold ring-1 ring-slate-300 hover:bg-slate-100 disabled:opacity-50"
       >
         <Ico icon={Paperclip} tone="sky" size={16} />
