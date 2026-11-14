@@ -28,15 +28,11 @@ export default function Landing({ error }: { error?: string }) {
       {/* Hero */}
       <section className="bg-gradient-to-b from-blue-50 to-white">
         <div className="mx-auto max-w-6xl px-4 pt-14 pb-10 text-center sm:pt-20">
-          <p className="mx-auto mb-4 inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1 text-sm text-slate-600 shadow-sm ring-1 ring-slate-200">
-            <BrandLogo size={16} />
-            {BRAND.name}: {BRAND.tagline}
-          </p>
           <h1 className="text-balance text-4xl font-bold tracking-tight sm:text-6xl">{BRAND.headline}</h1>
           <p className="mx-auto mt-4 max-w-2xl text-lg text-slate-600">{BRAND.description}</p>
           <div id="start" className="mt-8 flex scroll-mt-40 flex-col items-center gap-2">
             <SignInButton />
-            <p className="text-sm text-slate-500">Uses your Google account, so there&apos;s no new password to make.</p>
+            <p className="text-sm text-slate-500">Sign in with Google. No new password.</p>
             {error && <p className="text-sm text-red-600">Sign-in didn&apos;t work. Please try again.</p>}
           </div>
           <Shot src="/landing/videos.webp" alt="Your video library in BrainShelf, with categories, notes and summaries" label="your video library" className="mt-12" />
@@ -49,7 +45,6 @@ export default function Landing({ error }: { error?: string }) {
           <h2 className="text-center text-3xl font-bold">Tour and questions</h2>
           <div className="mt-8 flex flex-col gap-3">
             <Faq q="What does BrainShelf look like?" open a={<>A quick picture tour of the main screens: videos, notes, reading, Report Writer, the ScrapBook and the Vault.<br /><LandingTour /></>} />
-            <Faq q="What do I sign in with?" a="Your Google account. There's no new password to remember." />
             <Faq q="What can I save?" a="YouTube videos, articles, X posts, tutorials and course pages, plus your own ScrapBook pages and Vault entries." />
             <Faq q="Does it work on my phone?" a="Yes. It runs in your phone's browser, and you can draw notes with your finger or a pen." />
             <Faq q="Who can see my notes?" a="Only you. If you share a category, people with the link see the videos in it, not your notes." />
@@ -72,7 +67,6 @@ export default function Landing({ error }: { error?: string }) {
             <BrandLogo size={18} />
             {BRAND.name}
           </span>
-          <span>{BRAND.tagline}</span>
           <Link href="/privacy" className="ml-auto underline">
             Privacy policy
           </Link>
