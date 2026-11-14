@@ -27,7 +27,7 @@ import {
 } from "@/lib/files";
 import { findLocalFile as findOnComputer, forgetLocalFile, isLocalFile, rememberLocalFile, type FileHandle, type PickerWindow } from "@/lib/local-files";
 import { parseReport } from "@/lib/report";
-import { hasExtractableText, textForAi } from "@/lib/doc-text";
+import { docSections, hasExtractableText, hasTextView, textForAi, type DocSection } from "@/lib/doc-text";
 
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
@@ -129,7 +129,7 @@ export default function ScrapFiles(props: {
   onNotice: (text: string, ok?: boolean) => void;
 }) {
   const { supabase, scrapId, files } = props;
-  const [viewing, setViewing] = useState<{ path: string; url: string } | null>(null);
+  const [viewing, setViewing] = useState<{ path: string; url?: string; doc?: DocSection[] } | null>(null);
   const [asking, setAsking] = useState<string | null>(null);
   const [prompt, setPrompt] = useState("");
 
@@ -169,7 +169,7 @@ export default function ScrapFiles(props: {
 
   async function open(f: ScrapFile, download = false) {
     if (isLocalFile(f)) {
-      if (/^(video\/|image\/|application\/pdf$)/.test(f.type)) return toggleView(f);
+      if (/^(video\/|image\/|application\/pdf$)/.test(f.type) || hasTextView(f)) return toggleView(f);
       // Slides, documents and the like open (or download) in the browser from the computer.
       const file = await findLocalFile(f);
       if (file) window.open(URL.createObjectURL(file), "_blank", "noopener");
@@ -188,7 +188,14 @@ export default function ScrapFiles(props: {
     if (viewing?.path === f.path) return setViewing(null);
     if (isLocalFile(f)) {
       const file = await findLocalFile(f);
-      if (file) setViewing({ path: f.path, url: URL.createObjectURL(file) });
+      if (!file) return;
+      // Office and text files: their content is shown on the page, read on this computer.
+      if (hasTextView(f)) {
+        const doc = await docSections(file);
+        if (!Array.isArray(doc)) return props.onNotice(doc.error);
+        return setViewing({ path: f.path, doc });
+      }
+      setViewing({ path: f.path, url: URL.createObjectURL(file) });
       return;
     }
     try {
@@ -296,7 +303,7 @@ export default function ScrapFiles(props: {
       {files.map((f) => {
         const local = isLocalFile(f);
         const isVideo = f.type.startsWith("video/");
-        const canView = isVideo || f.type === "application/pdf" || f.type.startsWith("image/");
+        const canView = isVideo || f.type === "application/pdf" || f.type.startsWith("image/") || (local && hasTextView(f));
         return (
           <div key={f.path} className="flex flex-col gap-2">
             <div className="flex flex-wrap items-center gap-2 rounded-lg bg-slate-50 px-2 py-1.5 ring-1 ring-slate-200">
@@ -379,7 +386,9 @@ export default function ScrapFiles(props: {
             {aiFile === f.path && aiStartedAt !== null && <Working startedAt={aiStartedAt} jobKey={aiKey} note={aiJob?.note} />}
             {aiFile === f.path && aiError && <AiError text={aiError} />}
             {viewing?.path === f.path &&
-              (isVideo ? (
+              (viewing.doc ? (
+                <DocView sections={viewing.doc} />
+              ) : isVideo ? (
                 <video src={viewing.url} controls autoPlay className="max-h-[50vh] w-full rounded-md bg-black ring-1 ring-slate-200" />
               ) : f.type.startsWith("image/") ? (
                 <img src={viewing.url} alt={f.name} className="max-h-[50vh] w-auto max-w-full self-start rounded-md ring-1 ring-slate-200" />
@@ -525,6 +534,37 @@ function SmallButton(props: { onClick: () => void; icon: typeof Eye; children: R
       <Icon size={13} aria-hidden />
       {props.children}
     </button>
+  );
+}
+
+// An Office or text file's content, read on this computer: text by paragraph, slides one
+// after another, and sheets as tables.
+function DocView({ sections }: { sections: DocSection[] }) {
+  return (
+    <div className="max-h-[55vh] overflow-auto rounded-md bg-white p-4 text-sm leading-relaxed text-slate-800 ring-1 ring-slate-200">
+      <p className="mb-3 text-xs text-slate-500">The words in this file, without its layout or pictures.</p>
+      {sections.map((s, i) => (
+        <section key={i} className={i ? "mt-4 border-t border-slate-200 pt-3" : ""}>
+          {s.title && <h3 className="mb-1.5 font-semibold text-slate-900">{s.title}</h3>}
+          {s.lines?.map((line, j) => (line.trim() ? <p key={j} className="mb-1.5 whitespace-pre-wrap">{line}</p> : null))}
+          {s.rows && (
+            <table className="border-collapse text-xs">
+              <tbody>
+                {s.rows.map((row, j) => (
+                  <tr key={j} className={j === 0 ? "bg-slate-50 font-semibold" : ""}>
+                    {row.map((cell, k) => (
+                      <td key={k} className="border border-slate-200 px-2 py-1 align-top whitespace-pre-wrap">
+                        {cell}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </section>
+      ))}
+    </div>
   );
 }
 

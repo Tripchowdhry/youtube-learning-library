@@ -58,15 +58,18 @@ async function wordText(file: Blob) {
   return paragraphs(parse(xml.replace(/<w:tab\/>/g, "<w:t> </w:t>").replace(/<w:br\/>/g, "<w:t>\n</w:t>")), "w:p", "w:t");
 }
 
-async function slidesText(file: Blob) {
+// A part of a file to show: a slide or a page of text (lines), or a sheet (rows of cells).
+export type DocSection = { title?: string; lines?: string[]; rows?: string[][] };
+
+async function slideSections(file: Blob): Promise<DocSection[]> {
   const files = await readZip(file, (n) => /^ppt\/slides\/slide\d+\.xml$/.test(n));
-  return [...files.keys()]
-    .sort(byNumber)
-    .map((name, i) => `Slide ${i + 1}\n${paragraphs(parse(files.get(name)!), "a:p", "a:t")}`)
-    .join("\n\n");
+  return [...files.keys()].sort(byNumber).map((name, i) => ({
+    title: `Slide ${i + 1}`,
+    lines: paragraphs(parse(files.get(name)!), "a:p", "a:t").split("\n").filter(Boolean),
+  }));
 }
 
-async function sheetText(file: Blob) {
+async function sheetSections(file: Blob): Promise<DocSection[]> {
   const files = await readZip(file, (n) => n === "xl/sharedStrings.xml" || /^xl\/worksheets\/sheet\d+\.xml$/.test(n));
   const shared = files.has("xl/sharedStrings.xml")
     ? Array.from(parse(files.get("xl/sharedStrings.xml")!).getElementsByTagName("si")).map((si) =>
@@ -77,28 +80,92 @@ async function sheetText(file: Blob) {
     .filter((n) => n.includes("worksheets"))
     .sort(byNumber)
     .map((name, i) => {
-      const rows = Array.from(parse(files.get(name)!).getElementsByTagName("row")).map((row) =>
-        Array.from(row.getElementsByTagName("c"))
-          .map((c) => {
-            const v = c.getElementsByTagName("v")[0]?.textContent ?? c.getElementsByTagName("t")[0]?.textContent ?? "";
-            return c.getAttribute("t") === "s" ? (shared[Number(v)] ?? "") : v;
-          })
-          .join("\t"),
-      );
-      return `Sheet ${i + 1}\n${rows.filter((r) => r.trim()).join("\n")}`;
-    })
+      const rows = Array.from(parse(files.get(name)!).getElementsByTagName("row")).map((row) => {
+        // Cells carry their place (B3); empty ones are left out of the file, so put gaps back.
+        const cells: string[] = [];
+        for (const c of Array.from(row.getElementsByTagName("c"))) {
+          const v = c.getElementsByTagName("v")[0]?.textContent ?? c.getElementsByTagName("t")[0]?.textContent ?? "";
+          const col = columnIndex(c.getAttribute("r")) ?? cells.length;
+          cells[col] = c.getAttribute("t") === "s" ? (shared[Number(v)] ?? "") : v;
+        }
+        return Array.from(cells, (x) => x ?? "");
+      });
+      return { title: `Sheet ${i + 1}`, rows: rows.filter((r) => r.some((x) => x.trim())) };
+    });
+}
+
+function columnIndex(ref: string | null) {
+  const letters = ref?.match(/^[A-Z]+/)?.[0];
+  if (!letters) return undefined;
+  return [...letters].reduce((n, ch) => n * 26 + ch.charCodeAt(0) - 64, 0) - 1;
+}
+
+// A simple CSV reader: commas, quotes and doubled quotes.
+function csvRows(text: string): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let cell = "";
+  let quoted = false;
+  const endCell = () => {
+    row.push(cell);
+    cell = "";
+  };
+  const endRow = () => {
+    endCell();
+    rows.push(row);
+    row = [];
+  };
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (quoted) {
+      if (ch === '"' && text[i + 1] === '"') {
+        cell += '"';
+        i++;
+      } else if (ch === '"') quoted = false;
+      else cell += ch;
+    } else if (ch === '"') quoted = true;
+    else if (ch === ",") endCell();
+    else if (ch === "\n") endRow();
+    else if (ch !== "\r") cell += ch;
+  }
+  if (cell || row.length) endRow();
+  return rows.filter((r) => r.some((x) => x.trim()));
+}
+
+const asText = (sections: DocSection[]) =>
+  sections
+    .map((s) => [s.title, ...(s.lines ?? []), ...(s.rows ?? []).map((r) => r.join("\t"))].filter(Boolean).join("\n"))
     .join("\n\n");
+
+const VIEWABLE = /\.(docx|pptx|xlsx|csv|txt|md)$/i;
+export const hasTextView = (file: { name: string }) => VIEWABLE.test(file.name);
+
+// The file's content, in parts, for showing on the page.
+export async function docSections(file: File): Promise<DocSection[] | { error: string }> {
+  const ext = file.name.split(".").pop()?.toLowerCase();
+  try {
+    const sections =
+      ext === "docx"
+        ? [{ lines: (await wordText(file)).split("\n") }]
+        : ext === "pptx"
+          ? await slideSections(file)
+          : ext === "xlsx"
+            ? await sheetSections(file)
+            : ext === "csv"
+              ? [{ rows: csvRows(await file.text()) }]
+              : [{ lines: (await file.text()).split("\n") }];
+    if (!asText(sections).trim()) return { error: `"${file.name}" has no text to show (it may be only pictures).` };
+    return sections;
+  } catch {
+    return { error: `"${file.name}" couldn't be read. Try saving it as a PDF and adding that.` };
+  }
 }
 
 // The file's words as a text file for the AI, or an error to show.
 export async function textForAi(file: File): Promise<File | { error: string }> {
   const ext = file.name.split(".").pop()?.toLowerCase();
-  try {
-    const text =
-      ext === "docx" ? await wordText(file) : ext === "pptx" ? await slidesText(file) : ext === "xlsx" ? await sheetText(file) : await file.text();
-    if (!text.trim()) return { error: `"${file.name}" has no text the AI can read (it may be only pictures).` };
-    return new File([text], `${file.name}.txt`, { type: "text/plain" });
-  } catch {
-    return { error: `The words in "${file.name}" couldn't be read. Try saving it as a PDF and adding that.` };
-  }
+  if (ext === "csv") return new File([await file.text()], `${file.name}.txt`, { type: "text/plain" });
+  const sections = await docSections(file);
+  if (!Array.isArray(sections)) return sections;
+  return new File([asText(sections)], `${file.name}.txt`, { type: "text/plain" });
 }
