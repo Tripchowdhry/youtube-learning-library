@@ -643,7 +643,7 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
           <span className="hidden sm:inline">Clips</span>
         </Link>
         <div className="hidden items-center gap-2 text-sm text-slate-500 sm:flex">
-          <span className="max-w-40 truncate">{userEmail}</span>
+          <span className="hidden max-w-40 truncate lg:inline">{userEmail}</span>
           <button onClick={signOut} className="rounded-md px-2 py-1 whitespace-nowrap hover:bg-slate-100">
             Sign out
           </button>
@@ -868,7 +868,7 @@ export function SectionSwitch({ active }: { active: "videos" | SectionKind | "sc
       {items.map(({ key, href, name, Icon, tone }) => (
         <Link key={key} href={href} className={tab(active === key)} title={name}>
           <Ico icon={Icon} tone={tone} />
-          <span className="hidden sm:inline">{name}</span>
+          <span className="hidden lg:inline">{name}</span>
         </Link>
       ))}
     </nav>

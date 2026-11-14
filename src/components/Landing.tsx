@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ArrowUp, Eye } from "lucide-react";
 import BrandLogo from "@/components/BrandLogo";
 import SignInButton from "@/components/SignInButton";
-import LandingTour from "@/components/LandingTour";
+import LandingTour, { DeviceShot } from "@/components/LandingTour";
 import { Ico } from "@/components/Icon";
 import { BRAND } from "@/lib/brand";
 
@@ -100,7 +100,7 @@ function Shot({ src, alt, label, className = "" }: { src: string; alt: string; l
           Preview: {label}
         </span>
       </div>
-      <img src={src} alt={alt} draggable={false} className="block w-full select-none" loading="lazy" />
+      <DeviceShot src={src} alt={alt} lazy />
       <span className="pointer-events-none absolute inset-0 top-9 flex items-center justify-center bg-slate-900/0 opacity-0 transition group-hover:bg-slate-900/35 group-hover:opacity-100">
         <span className="flex items-center gap-1.5 rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-900 shadow-lg">
           This is a preview. Sign in to try it

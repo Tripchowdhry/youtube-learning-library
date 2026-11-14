@@ -500,7 +500,7 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
           <span className="hidden sm:inline">Clips</span>
         </Link>
         <div className="hidden items-center gap-2 text-sm text-slate-500 sm:flex">
-          <span className="max-w-40 truncate">{userEmail}</span>
+          <span className="hidden max-w-40 truncate lg:inline">{userEmail}</span>
           <button onClick={signOut} className="rounded-md px-2 py-1 whitespace-nowrap hover:bg-slate-100">
             Sign out
           </button>
