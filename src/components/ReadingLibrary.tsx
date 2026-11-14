@@ -1033,7 +1033,7 @@ function ArticleRow(props: {
             </SmallButton>
           )}
           {!article.note && !editingNote && props.aiNoteStartedAt === null && (
-            <SmallButton onClick={props.onAiNote} title="Let AI read the page and write the summary" icon={Sparkles} tone="amber">
+            <SmallButton onClick={props.onAiNote} title="Let AI read the page and write the summary" icon={Sparkles} tone="violet">
               AI summary
             </SmallButton>
           )}

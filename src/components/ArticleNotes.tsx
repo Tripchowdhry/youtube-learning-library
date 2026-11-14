@@ -416,7 +416,7 @@ function AskAi(props: { jobKey: string; word: string; startedAt: number | null; 
   return (
     <div className="rounded-xl bg-white p-3 shadow-sm ring-1 ring-violet-200">
       <p className="flex items-center gap-1.5 text-sm font-semibold">
-        <Ico icon={Sparkles} tone="amber" />
+        <Ico icon={Sparkles} tone="violet" />
         Ask AI about this {props.word}
       </p>
       <div className="mt-2 flex flex-col gap-2">

@@ -534,22 +534,25 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
       <section className="mb-5 rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
         <h2 className="mb-3 font-semibold">2. Build the report</h2>
         <div className="grid gap-3 md:grid-cols-2">
-          <div className="rounded-lg border border-slate-200 p-3">
+          <div className="overflow-hidden rounded-lg border border-slate-200 bg-white p-3 pt-4 relative">{/* A thin stripe in the BrainShelf logo's book colours */}
+            <span aria-hidden className="absolute inset-x-0 top-0 flex h-1.5"><span className="flex-1 bg-[#dc2626]" /><span className="flex-1 bg-[#16a34a]" /><span className="flex-1 bg-[#2563eb]" /><span className="flex-1 bg-[#f59e0b]" /></span>
             <p className="mb-1 flex items-center gap-1.5 font-medium">
-              <Ico icon={Layers} tone="slate" /> Put my notes together
+              <Ico icon={Layers} tone="blue" /> Put my notes together
             </p>
             <p className="mb-3 text-sm text-slate-600">Your notes as they are, no AI.</p>
             <button
               onClick={compile}
               disabled={aiBusy}
-              className="rounded-md bg-slate-800 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-900 disabled:opacity-60"
+              className="rounded-md bg-[#2b3b5e] px-3 py-1.5 text-sm font-medium text-white hover:bg-[#22304d] disabled:opacity-60"
             >
               Put together
             </button>
           </div>
-          <div className="rounded-lg border border-violet-200 bg-violet-50/40 p-3">
+          <div className="relative overflow-hidden rounded-lg border border-violet-200 bg-violet-50/40 p-3 pt-4">
+            {/* A purple stripe, the colour used for AI throughout Report Writer */}
+            <span aria-hidden className="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-[#c4b5fd] via-[#8b5cf6] to-[#6d28d9]" />
             <p className="mb-1 flex items-center gap-1.5 font-medium">
-              <Ico icon={Sparkles} tone="blue" /> Draft with AI
+              <Ico icon={Sparkles} tone="violet" /> Draft with AI
             </p>
             <p className="mb-2 text-sm text-slate-600">AI writes one report from your notes.</p>
             <input
