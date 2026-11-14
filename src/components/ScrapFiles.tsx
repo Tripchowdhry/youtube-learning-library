@@ -327,7 +327,7 @@ export default function ScrapFiles(props: {
               </span>
               <span className="ml-auto flex flex-wrap items-center gap-1">
                 {canView && (
-                  <SmallButton onClick={() => toggleView(f)} icon={viewing?.path === f.path ? EyeOff : isVideo ? Play : Eye}>
+                  <SmallButton onClick={() => toggleView(f)} icon={viewing?.path === f.path ? EyeOff : isVideo ? Play : Eye} pill>
                     {viewing?.path === f.path ? "Hide" : isVideo ? "Play" : "View"}
                   </SmallButton>
                 )}
@@ -528,16 +528,16 @@ async function sendFile(
   return { parts, size: video.size };
 }
 
-function SmallButton(props: { onClick: () => void; icon: typeof Eye; children: React.ReactNode; danger?: boolean; disabled?: boolean; title?: string }) {
+function SmallButton(props: { onClick: () => void; icon: typeof Eye; children: React.ReactNode; danger?: boolean; disabled?: boolean; title?: string; pill?: boolean }) {
   const Icon = props.icon;
   return (
     <button
       onClick={props.onClick}
       disabled={props.disabled}
       title={props.title}
-      className={`inline-flex items-center gap-1 rounded-md border bg-white px-2 py-0.5 text-xs disabled:opacity-50 ${props.danger ? "border-red-200 text-red-600 hover:bg-red-50" : "border-slate-300 text-slate-700 hover:bg-slate-100"}`}
+      className={`inline-flex items-center gap-1 border px-2 py-0.5 text-xs disabled:opacity-50 ${props.danger ? "rounded-md border-red-200 bg-white text-red-600 hover:bg-red-50" : props.pill ? "rounded-full border-blue-200 bg-blue-50 text-slate-900 hover:bg-blue-100" : "rounded-md border-slate-300 bg-white text-slate-700 hover:bg-slate-100"}`}
     >
-      <Icon size={13} aria-hidden />
+      <Icon size={13} aria-hidden className={props.pill ? "text-blue-600" : undefined} />
       {props.children}
     </button>
   );

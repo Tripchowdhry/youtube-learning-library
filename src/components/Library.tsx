@@ -711,6 +711,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
                       onClick={() => previewShare(currentFolder.share_token!)}
                       icon={Eye}
                       tone="blue"
+                      pill
                       title="See this category the way people with the link see it"
                     >
                       Preview
