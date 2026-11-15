@@ -64,3 +64,15 @@ test("signed-out visitors to private pages get the sign-in page, not an error", 
     await expect(page.getByRole("button", { name: "Get started free" }).first(), path).toBeVisible();
   }
 });
+
+test("the tab and home-screen icons are BrainShelf's", async ({ page, request }) => {
+  await page.goto("/");
+  for (const selector of ['link[rel="icon"][type="image/svg+xml"]', 'link[rel="apple-touch-icon"]', 'link[rel="manifest"]']) {
+    const href = await page.locator(selector).first().getAttribute("href");
+    expect(href, selector).toBeTruthy();
+    expect((await request.get(href!)).status(), selector).toBe(200);
+  }
+  const manifest = await (await request.get("/manifest.webmanifest")).json();
+  expect(manifest.name).toBe("BrainShelf");
+  for (const icon of manifest.icons) expect((await request.get(icon.src)).status()).toBe(200);
+});
