@@ -53,3 +53,12 @@ npm run dev
 ```
 
 Open http://localhost:3000. Add `http://localhost:3000/**` to Supabase's Redirect URLs so sign-in works locally.
+
+## Checks
+
+```bash
+npm test            # quick checks of links, errors, the Vault's encryption and more
+npm run build && npm run test:e2e   # opens the public pages on a laptop and a phone screen
+```
+
+Both run on every pull request on GitHub (see `.github/workflows/checks.yml`).
