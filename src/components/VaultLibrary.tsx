@@ -1,5 +1,6 @@
 "use client";
 
+import { friendlyError } from "@/lib/errors";
 import SearchBox from "@/components/SearchBox";
 import ReportWriterLink from "@/components/ReportWriterLink";
 import { Tour, TourButton, useSectionTour } from "@/components/Tour";
@@ -88,7 +89,7 @@ export default function VaultLibrary({ userEmail }: { userEmail: string }) {
     if (error) {
       // Before supabase/vault.sql has been run, the tables don't exist yet.
       if (/does not exist|schema cache/i.test(error.message)) setNeedsSetup(true);
-      else notify(error.message, true);
+      else notify(friendlyError(error.message), true);
     } else {
       setCategories(c.data as VaultCategory[]);
       setEntries(e.data as VaultEntry[]);
@@ -148,7 +149,7 @@ export default function VaultLibrary({ userEmail }: { userEmail: string }) {
       .insert({ salt, iterations: VAULT_ITERATIONS, check_value })
       .select()
       .single();
-    if (error) return notify(error.message, true);
+    if (error) return notify(friendlyError(error.message), true);
     setVaultKey(data as VaultKey);
     setKey(next);
     notify("Your vault is ready");
@@ -161,7 +162,7 @@ export default function VaultLibrary({ userEmail }: { userEmail: string }) {
       new_iterations: VAULT_ITERATIONS,
       new_check_value: check_value,
     });
-    if (error) return notify(error.message, true);
+    if (error) return notify(friendlyError(error.message), true);
     setResetting(false);
     setRevealed({});
     await load();
@@ -290,7 +291,7 @@ export default function VaultLibrary({ userEmail }: { userEmail: string }) {
       ? await supabase.from("vault_entries").update(row).eq("id", id).select().single()
       : await supabase.from("vault_entries").insert({ ...row, id }).select().single();
     if (error) {
-      notify(error.message, true);
+      notify(friendlyError(error.message), true);
       return false;
     }
     const saved = data as VaultEntry;
@@ -306,7 +307,7 @@ export default function VaultLibrary({ userEmail }: { userEmail: string }) {
     setEntries((prev) => prev.map((e) => (e.id === id ? { ...e, category_id: categoryId } : e)));
     const { error } = await supabase.from("vault_entries").update({ category_id: categoryId }).eq("id", id);
     if (error) {
-      notify(error.message, true);
+      notify(friendlyError(error.message), true);
       load();
     } else notify(`Moved to ${categoryPath(categoryId) || "Uncategorized"}`);
   }
@@ -316,7 +317,7 @@ export default function VaultLibrary({ userEmail }: { userEmail: string }) {
     setEntries((prev) => prev.filter((e) => e.id !== entry.id));
     const { error } = await supabase.from("vault_entries").delete().eq("id", entry.id);
     if (error) {
-      notify(error.message, true);
+      notify(friendlyError(error.message), true);
       load();
     }
   }
@@ -335,7 +336,7 @@ export default function VaultLibrary({ userEmail }: { userEmail: string }) {
       .insert({ name: name.slice(0, NAME_MAX), parent_id: parentId, position })
       .select()
       .single();
-    if (error) return notify(error.message, true);
+    if (error) return notify(friendlyError(error.message), true);
     setCategories((prev) => [...prev, data as VaultCategory]);
     openView({ kind: "category", id: (data as VaultCategory).id });
   }
@@ -392,7 +393,7 @@ export default function VaultLibrary({ userEmail }: { userEmail: string }) {
     setCategories((prev) => prev.map((c) => (c.id === category.id ? { ...c, parent_id, position } : c)));
     const { error } = await supabase.from("vault_categories").update({ parent_id, position }).eq("id", category.id);
     if (error) {
-      notify(error.message, true);
+      notify(friendlyError(error.message), true);
       load();
       return;
     }
@@ -437,7 +438,7 @@ export default function VaultLibrary({ userEmail }: { userEmail: string }) {
     setCategories((prev) => prev.map((c) => (c.id === category.id ? { ...c, name } : c)));
     const { error } = await supabase.from("vault_categories").update({ name }).eq("id", category.id);
     if (error) {
-      notify(error.message, true);
+      notify(friendlyError(error.message), true);
       load();
     }
   }
@@ -448,7 +449,7 @@ export default function VaultLibrary({ userEmail }: { userEmail: string }) {
     );
     if (!ok) return;
     const { error } = await supabase.from("vault_categories").delete().eq("id", category.id);
-    if (error) return notify(error.message, true);
+    if (error) return notify(friendlyError(error.message), true);
     setView({ kind: "all" });
     load();
   }

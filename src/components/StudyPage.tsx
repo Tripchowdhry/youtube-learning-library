@@ -1,5 +1,7 @@
 "use client";
 
+import { friendlyError } from "@/lib/errors";
+import DeadEnd from "@/components/DeadEnd";
 import StopAiButton from "@/components/StopAiButton";
 import MoreMenu from "@/components/MoreMenu";
 import { Tour, TourButton, useSectionTour } from "@/components/Tour";
@@ -413,7 +415,7 @@ export default function StudyPage({ videoId }: { videoId: string }) {
       else placeImage(image, path, seconds);
       endClip();
     } catch (error) {
-      flash(`Couldn't save the picture: ${error instanceof Error ? error.message : "unknown error"}`);
+      flash(`Couldn't save the picture: ${friendlyError(error instanceof Error ? error.message : "")}`);
     } finally {
       setClipBusy(false);
     }
@@ -577,15 +579,7 @@ export default function StudyPage({ videoId }: { videoId: string }) {
   // ---------- Render ----------
 
   if (missing) {
-    return (
-      <main className="mx-auto max-w-xl px-4 py-16 text-center">
-        <h1 className="mb-2 text-2xl font-bold">Video not found</h1>
-        <p className="mb-6 text-slate-600">It may have been removed from your library.</p>
-        <Link href="/" className="underline">
-          Back to your library
-        </Link>
-      </main>
-    );
+    return <DeadEnd title="Video not found" text="It may have been removed from your library." label="Back to Videos" />;
   }
 
   const toolbar = (

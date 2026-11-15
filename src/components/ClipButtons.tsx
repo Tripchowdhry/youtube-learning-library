@@ -1,5 +1,6 @@
 "use client";
 
+import { friendlyError } from "@/lib/errors";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { Camera, ClipboardPaste, Trash2 } from "lucide-react";
 import { Ico } from "@/components/Icon";
@@ -69,7 +70,7 @@ export function ClipButton({
         onPicture(image, path);
         setWaiting(false);
       } catch (error) {
-        flash(`Couldn't save the picture: ${error instanceof Error ? error.message : "unknown error"}`);
+        flash(`Couldn't save the picture: ${friendlyError(error instanceof Error ? error.message : "")}`);
       } finally {
         setBusy(false);
       }

@@ -1,5 +1,6 @@
 "use client";
 
+import { friendlyError } from "@/lib/errors";
 import { Camera, Trash2 } from "lucide-react";
 import { Ico } from "@/components/Icon";
 import Link from "next/link";
@@ -83,7 +84,7 @@ export default function ClipsManager() {
       );
       setClips(stored);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Couldn't load your clips.");
+      setError(friendlyError(e instanceof Error ? e.message : "Couldn't load your clips."));
     }
   }, [supabase]);
 
@@ -109,7 +110,7 @@ export default function ClipsManager() {
       );
       await load();
     } catch (e) {
-      setError(`Couldn't delete: ${e instanceof Error ? e.message : "unknown error"}`);
+      setError(`Couldn't delete: ${friendlyError(e instanceof Error ? e.message : "")}`);
     } finally {
       setBusy(null);
     }

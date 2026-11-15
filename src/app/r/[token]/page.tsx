@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import DeadEnd from "@/components/DeadEnd";
 import Link from "next/link";
 import { ArrowLeft, Eye } from "lucide-react";
 import BrandLogo from "@/components/BrandLogo";
@@ -36,12 +37,7 @@ export default async function SharedReportPage({
   const { supabase, report } = await load(token);
 
   if (!report || !supabase) {
-    return (
-      <main className="mx-auto max-w-xl px-4 py-16 text-center">
-        <h1 className="mb-2 text-2xl font-bold">Report not found</h1>
-        <p className="text-slate-600">This link may have been turned off by its owner.</p>
-      </main>
-    );
+    return <DeadEnd title="This report isn't shared any more" text="Its owner may have turned sharing off, or the link may be incomplete." />;
   }
 
   // The title is shown above, so a first heading that repeats it is left out.
