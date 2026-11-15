@@ -1,6 +1,7 @@
 "use client";
 
 import { friendlyError } from "@/lib/errors";
+import { fetchAll } from "@/lib/fetch-all";
 import SearchBox from "@/components/SearchBox";
 import ReportWriterLink from "@/components/ReportWriterLink";
 import { Tour, TourButton, useSectionTour } from "@/components/Tour";
@@ -90,8 +91,8 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
 
   const load = useCallback(async () => {
     const [c, s] = await Promise.all([
-      supabase.from("article_categories").select("*").eq("kind", "scrap").order("position").order("name"),
-      supabase.from("scraps").select(LIST_COLUMNS).order("created_at", { ascending: false }),
+      fetchAll((from, to) => supabase.from("article_categories").select("*").eq("kind", "scrap").order("position").order("name").order("id").range(from, to)),
+      fetchAll((from, to) => supabase.from("scraps").select(LIST_COLUMNS).order("created_at", { ascending: false }).order("id").range(from, to)),
     ]);
     const error = c.error ?? s.error;
     if (error) {

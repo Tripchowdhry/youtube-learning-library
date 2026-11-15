@@ -3,6 +3,7 @@
 // (supabase/reports.sql), so nothing here can change the other sections.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { fetchAll } from "@/lib/fetch-all";
 import { clipUrl, splitTypedClips, type TypedClip } from "@/lib/clips";
 import { htmlToText } from "@/lib/html-text";
 import type { NotePage } from "@/lib/types";
@@ -85,13 +86,13 @@ function handwriting(pages: NotePage[] | null | undefined) {
 // Every video, reading and tutorial, with its notes. Read-only.
 export async function loadSources(supabase: SupabaseClient): Promise<ReportSource[]> {
   const [v, n, vc, a, ac, sc] = await Promise.all([
-    supabase.from("videos").select("id, title, channel, url, category_id, created_at"),
-    supabase.from("notes").select("video_id, text, pages"),
-    supabase.from("video_categories").select("id, name"),
+    fetchAll((from, to) => supabase.from("videos").select("id, title, channel, url, category_id, created_at").order("id").range(from, to)),
+    fetchAll((from, to) => supabase.from("notes").select("video_id, text, pages").order("id").range(from, to)),
+    fetchAll((from, to) => supabase.from("video_categories").select("id, name").order("id").range(from, to)),
     // "*" so this still works before the article notes column exists.
-    supabase.from("articles").select("*"),
-    supabase.from("article_categories").select("id, name"),
-    supabase.from("scraps").select("id, title, body, pages, category_id, created_at"),
+    fetchAll((from, to) => supabase.from("articles").select("*").order("id").range(from, to)),
+    fetchAll((from, to) => supabase.from("article_categories").select("id, name").order("id").range(from, to)),
+    fetchAll((from, to) => supabase.from("scraps").select("id, title, body, pages, category_id, created_at").order("id").range(from, to)),
   ]);
   if (v.error) throw new Error(v.error.message);
 

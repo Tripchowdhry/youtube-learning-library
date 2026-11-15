@@ -1,6 +1,7 @@
 "use client";
 
 import { friendlyError } from "@/lib/errors";
+import { fetchAll } from "@/lib/fetch-all";
 import SearchBox from "@/components/SearchBox";
 import ReportWriterLink from "@/components/ReportWriterLink";
 import { Tour, TourButton, useSectionTour } from "@/components/Tour";
@@ -81,8 +82,8 @@ export default function VaultLibrary({ userEmail }: { userEmail: string }) {
 
   const load = useCallback(async () => {
     const [c, e, k] = await Promise.all([
-      supabase.from("vault_categories").select("*").order("position").order("name"),
-      supabase.from("vault_entries").select("*").order("name"),
+      fetchAll((from, to) => supabase.from("vault_categories").select("*").order("position").order("name").order("id").range(from, to)),
+      fetchAll((from, to) => supabase.from("vault_entries").select("*").order("name").order("id").range(from, to)),
       supabase.from("vault_keys").select("*").maybeSingle(),
     ]);
     const error = c.error ?? e.error ?? k.error;

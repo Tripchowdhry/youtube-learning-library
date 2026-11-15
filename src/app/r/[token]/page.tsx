@@ -22,7 +22,10 @@ async function load(token: string) {
 
 export async function generateMetadata({ params }: { params: Promise<{ token: string }> }): Promise<Metadata> {
   const { report } = await load((await params).token);
-  return { title: report ? `${report.title} · BrainShelf` : "Report not found · BrainShelf", robots: { index: false } };
+  if (!report) return { title: "Report not found · BrainShelf", robots: { index: false } };
+  const title = `${report.title} · BrainShelf`;
+  const description = "A report shared from BrainShelf";
+  return { title, description, robots: { index: false }, openGraph: { title, description }, twitter: { title, description } };
 }
 
 export default async function SharedReportPage({

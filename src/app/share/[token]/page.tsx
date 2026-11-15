@@ -1,3 +1,6 @@
+import type { Metadata } from "next";
+import { BRAND } from "@/lib/brand";
+import { shareLinkPreview } from "@/lib/shared-preview";
 import Link from "next/link";
 import DeadEnd from "@/components/DeadEnd";
 import VideoThumb from "@/components/VideoThumb";
@@ -7,6 +10,13 @@ import { ArrowLeft, ExternalLink, Eye, FileText, Folder as FolderIcon, Tag } fro
 import { Ico } from "@/components/Icon";
 
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata({ params }: { params: Promise<{ token: string }> }): Promise<Metadata> {
+  const preview = await shareLinkPreview((await params).token);
+  const title = preview ? `${preview.title} · BrainShelf` : "BrainShelf";
+  const description = preview ? `${preview.detail} shared from BrainShelf` : BRAND.headline;
+  return { title, description, robots: { index: false }, openGraph: { title, description }, twitter: { title, description } };
+}
 
 export default async function SharedFolderPage({
   params,
