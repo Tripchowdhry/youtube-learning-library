@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { fetchAll } from "@/lib/fetch-all";
 import { linkKey } from "@/lib/links";
 import { parseYouTubeId } from "@/lib/youtube";
 
@@ -47,9 +48,10 @@ export async function findSavedElsewhere(
     }
   }
 
-  let query = supabase.from("articles").select("id, url, kind, category_id");
-  if (skip !== "videos") query = query.neq("kind", skip);
-  const { data: articles } = await query;
+  const { data: articles } = await fetchAll((from, to) => {
+    const query = supabase.from("articles").select("id, url, kind, category_id").order("id");
+    return (skip !== "videos" ? query.neq("kind", skip) : query).range(from, to);
+  });
   const match = (articles ?? []).find((a) => {
     const id = parseYouTubeId(a.url);
     return keys.has(linkKey(a.url)) || (id !== null && youtubeIds.has(id));

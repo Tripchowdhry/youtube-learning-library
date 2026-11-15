@@ -1,6 +1,7 @@
 "use client";
 
 import { friendlyError } from "@/lib/errors";
+import { fetchAll } from "@/lib/fetch-all";
 import { Camera, Trash2 } from "lucide-react";
 import { Ico } from "@/components/Icon";
 import Link from "next/link";
@@ -61,14 +62,13 @@ export default function ClipsManager() {
     try {
       const [stored, n, v, a, sc] = await Promise.all([
         listClips(supabase),
-        supabase.from("notes").select("video_id, pages, text"),
-        supabase.from("videos").select("id, title"),
+        fetchAll((from, to) => supabase.from("notes").select("video_id, pages, text").order("id").range(from, to)),
+        fetchAll((from, to) => supabase.from("videos").select("id, title").order("id").range(from, to)),
         // Handwriting in Reading needs supabase/article-pages.sql; without it, read just the typed notes.
-        supabase
-          .from("articles")
-          .select("id, title, notes, pages")
-          .then((r) => (r.error ? supabase.from("articles").select("id, title, notes") : r)),
-        supabase.from("scraps").select("id, title, body, pages"),
+        fetchAll((from, to) => supabase.from("articles").select("id, title, notes, pages").order("id").range(from, to)).then((r) =>
+          r.error ? fetchAll((from, to) => supabase.from("articles").select("id, title, notes").order("id").range(from, to)) : r,
+        ),
+        fetchAll((from, to) => supabase.from("scraps").select("id, title, body, pages").order("id").range(from, to)),
       ]);
       if (n.error) throw new Error(n.error.message);
       // Reading notes or the ScrapBook may not be set up yet (their SQL not run); then they hold no clips.

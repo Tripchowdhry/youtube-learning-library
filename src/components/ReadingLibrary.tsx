@@ -1,6 +1,7 @@
 "use client";
 
 import { friendlyError } from "@/lib/errors";
+import { fetchAll } from "@/lib/fetch-all";
 import SearchBox from "@/components/SearchBox";
 import { revealById } from "@/lib/reveal";
 import StopAiButton from "@/components/StopAiButton";
@@ -117,8 +118,8 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
 
   const load = useCallback(async () => {
     const [c, a] = await Promise.all([
-      supabase.from("article_categories").select("*").eq("kind", kind).order("position").order("name"),
-      supabase.from("articles").select("*").eq("kind", kind).order("created_at", { ascending: false }),
+      fetchAll((from, to) => supabase.from("article_categories").select("*").eq("kind", kind).order("position").order("name").order("id").range(from, to)),
+      fetchAll((from, to) => supabase.from("articles").select("*").eq("kind", kind).order("created_at", { ascending: false }).order("id").range(from, to)),
     ]);
     const error = c.error ?? a.error;
     if (error) {

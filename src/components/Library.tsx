@@ -1,6 +1,7 @@
 "use client";
 
 import { friendlyError } from "@/lib/errors";
+import { fetchAll } from "@/lib/fetch-all";
 import SearchBox from "@/components/SearchBox";
 import { revealById } from "@/lib/reveal";
 import ReportWriterLink from "@/components/ReportWriterLink";
@@ -88,12 +89,12 @@ export default function Library({ userEmail }: { userEmail: string }) {
 
   const load = useCallback(async () => {
     const [f, v, n] = await Promise.all([
-      supabase.from("video_categories").select("*").order("position").order("name"),
-      supabase.from("videos").select("*").order("position"),
-      supabase.from("notes").select("video_id"),
+      fetchAll((from, to) => supabase.from("video_categories").select("*").order("position").order("name").order("id").range(from, to)),
+      fetchAll((from, to) => supabase.from("videos").select("*").order("position").order("id").range(from, to)),
+      fetchAll((from, to) => supabase.from("notes").select("video_id").order("id").range(from, to)),
     ]);
     // Notes are optional: ignore errors so the library still loads before the notes table exists.
-    if (!n.error) setNotedVideoIds(new Set(n.data.map((row) => row.video_id as string)));
+    if (!n.error) setNotedVideoIds(new Set((n.data ?? []).map((row) => row.video_id as string)));
     if (f.error || v.error) {
       notify((f.error ?? v.error)!.message, true);
     } else {
