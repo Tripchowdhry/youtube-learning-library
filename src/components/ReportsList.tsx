@@ -1,5 +1,6 @@
 "use client";
 
+import { friendlyError } from "@/lib/errors";
 import BrandMark from "@/components/BrandMark";
 import { askConfirm } from "@/components/ConfirmDialog";
 import { SetupNotice, formatDate } from "@/components/ReadingLibrary";
@@ -29,7 +30,7 @@ export default function ReportsList({ userEmail }: { userEmail: string }) {
       .order("updated_at", { ascending: false });
     if (error) {
       if (isMissingTable(error.message)) setNeedsSetup(true);
-      else setError(error.message);
+      else setError(friendlyError(error.message));
       setReports([]);
       return;
     }
@@ -46,7 +47,7 @@ export default function ReportsList({ userEmail }: { userEmail: string }) {
     if (error) {
       setCreating(false);
       if (isMissingTable(error.message)) setNeedsSetup(true);
-      else setError(error.message);
+      else setError(friendlyError(error.message));
       return;
     }
     router.push(`/report/${data.id}`);
@@ -62,7 +63,7 @@ export default function ReportsList({ userEmail }: { userEmail: string }) {
     });
     if (!ok) return;
     const { error } = await supabase.from("reports").delete().eq("id", report.id);
-    if (error) setError(error.message);
+    if (error) setError(friendlyError(error.message));
     else setReports((rows) => rows?.filter((r) => r.id !== report.id) ?? rows);
   }
 

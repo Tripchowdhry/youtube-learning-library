@@ -1,5 +1,6 @@
 "use client";
 
+import { friendlyError } from "@/lib/errors";
 import SearchBox from "@/components/SearchBox";
 import { revealById } from "@/lib/reveal";
 import ReportWriterLink from "@/components/ReportWriterLink";
@@ -250,7 +251,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
       .select()
       .single();
     if (error) {
-      notify(error.message, true);
+      notify(friendlyError(error.message), true);
       return false;
     }
     if (newFolder) setFolders((prev) => [...prev, newFolder!]);
@@ -279,7 +280,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
           .eq("id", video.id)
           .eq("note", "")
           .select("id");
-        if (error) return { error: error.message };
+        if (error) return { error: friendlyError(error.message) };
         return data.length ? { result: { videoId: video.id, note: result.text, model: result.model } } : {};
       },
     });
@@ -313,7 +314,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
       .select()
       .single();
     if (error) {
-      notify(error.message, true);
+      notify(friendlyError(error.message), true);
       return null;
     }
     return data as VideoCategory;
@@ -323,7 +324,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
     setVideos((prev) => prev.map((v) => (v.id === id ? { ...v, ...changes } : v)));
     const { error } = await supabase.from("videos").update(changes).eq("id", id);
     if (error) {
-      notify(error.message, true);
+      notify(friendlyError(error.message), true);
       load();
     }
   }
@@ -335,7 +336,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
     const { error } = await supabase.from("videos").update({ watched_at }).eq("id", video.id);
     if (!error) return;
     const missing = /watched_at/.test(error.message);
-    notify(missing ? "One setup step first: run supabase/video-watched.sql in Supabase." : error.message, true);
+    notify(missing ? "One setup step first: run supabase/video-watched.sql in Supabase." : friendlyError(error.message), true);
     load();
   }
 
@@ -414,7 +415,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
     setVideos((prev) => prev.filter((v) => v.id !== video.id));
     const { error } = await supabase.from("videos").delete().eq("id", video.id);
     if (error) {
-      notify(error.message, true);
+      notify(friendlyError(error.message), true);
       load();
     }
   }
@@ -431,7 +432,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
       .insert({ name: name.trim(), parent_id: parentId, position })
       .select()
       .single();
-    if (error) return notify(error.message, true);
+    if (error) return notify(friendlyError(error.message), true);
     setFolders((prev) => [...prev, data as VideoCategory]);
     if (parentId) setExpanded((prev) => new Set(prev).add(parentId));
     setView({ kind: "folder", id: (data as VideoCategory).id });
@@ -490,7 +491,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
     setFolders((prev) => prev.map((f) => (f.id === folder.id ? { ...f, parent_id, position } : f)));
     const { error } = await supabase.from("video_categories").update({ parent_id, position }).eq("id", folder.id);
     if (error) {
-      notify(error.message, true);
+      notify(friendlyError(error.message), true);
       load();
       return;
     }
@@ -527,7 +528,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
     setFolders((prev) => prev.map((f) => (f.id === folder.id ? { ...f, name: name.trim() } : f)));
     const { error } = await supabase.from("video_categories").update({ name: name.trim() }).eq("id", folder.id);
     if (error) {
-      notify(error.message, true);
+      notify(friendlyError(error.message), true);
       load();
     }
   }
@@ -538,7 +539,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
     );
     if (!ok) return;
     const { error } = await supabase.from("video_categories").delete().eq("id", folder.id);
-    if (error) return notify(error.message, true);
+    if (error) return notify(friendlyError(error.message), true);
     setView({ kind: "all" });
     load();
   }
@@ -547,14 +548,14 @@ export default function Library({ userEmail }: { userEmail: string }) {
     if (folder.share_token) {
       if (!window.confirm("Turn off the share link? People with the old link won't be able to see it anymore.")) return;
       const { error } = await supabase.from("video_categories").update({ share_token: null }).eq("id", folder.id);
-      if (error) return notify(error.message, true);
+      if (error) return notify(friendlyError(error.message), true);
       setFolders((prev) => prev.map((f) => (f.id === folder.id ? { ...f, share_token: null } : f)));
       notify("Sharing turned off");
       return;
     }
     const token = crypto.randomUUID();
     const { error } = await supabase.from("video_categories").update({ share_token: token }).eq("id", folder.id);
-    if (error) return notify(error.message, true);
+    if (error) return notify(friendlyError(error.message), true);
     setFolders((prev) => prev.map((f) => (f.id === folder.id ? { ...f, share_token: token } : f)));
     copyShareLink(token);
   }

@@ -1,5 +1,6 @@
 "use client";
 
+import { friendlyError } from "@/lib/errors";
 import SearchBox from "@/components/SearchBox";
 import ReportWriterLink from "@/components/ReportWriterLink";
 import { Tour, TourButton, useSectionTour } from "@/components/Tour";
@@ -96,7 +97,7 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
     if (error) {
       // Before supabase/scrapbook.sql has been run, the table doesn't exist yet.
       if (/does not exist|schema cache/i.test(error.message)) setNeedsSetup(true);
-      else notify(error.message, true);
+      else notify(friendlyError(error.message), true);
     } else {
       setCategories(c.data as ArticleCategory[]);
       setScraps(s.data as ScrapSummary[]);
@@ -178,7 +179,7 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
       .select("id")
       .single();
     if (error) {
-      notify(error.message, true);
+      notify(friendlyError(error.message), true);
       return false;
     }
     router.push(`/scrap/${data.id}`);
@@ -189,7 +190,7 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
     setScraps((prev) => prev.map((s) => (s.id === id ? { ...s, ...changes } : s)));
     const { error } = await supabase.from("scraps").update(changes).eq("id", id);
     if (error) {
-      notify(error.message, true);
+      notify(friendlyError(error.message), true);
       load();
     }
   }
@@ -255,7 +256,7 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
     const { error } = await supabase.from("scraps").delete().eq("id", scrap.id);
     if (!error) await deleteScrapFiles(supabase, paths);
     if (error) {
-      notify(error.message, true);
+      notify(friendlyError(error.message), true);
       load();
     }
   }
@@ -274,7 +275,7 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
       .insert({ name: name.slice(0, 100), parent_id: parentId, position, kind: "scrap" })
       .select()
       .single();
-    if (error) return notify(error.message, true);
+    if (error) return notify(friendlyError(error.message), true);
     setCategories((prev) => [...prev, data as ArticleCategory]);
     openView({ kind: "category", id: (data as ArticleCategory).id });
   }
@@ -331,7 +332,7 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
     setCategories((prev) => prev.map((c) => (c.id === category.id ? { ...c, parent_id, position } : c)));
     const { error } = await supabase.from("article_categories").update({ parent_id, position }).eq("id", category.id);
     if (error) {
-      notify(error.message, true);
+      notify(friendlyError(error.message), true);
       load();
       return;
     }
@@ -383,7 +384,7 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
     setCategories((prev) => prev.map((c) => (c.id === category.id ? { ...c, name } : c)));
     const { error } = await supabase.from("article_categories").update({ name }).eq("id", category.id);
     if (error) {
-      notify(error.message, true);
+      notify(friendlyError(error.message), true);
       load();
     }
   }
@@ -394,7 +395,7 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
     );
     if (!ok) return;
     const { error } = await supabase.from("article_categories").delete().eq("id", category.id);
-    if (error) return notify(error.message, true);
+    if (error) return notify(friendlyError(error.message), true);
     setView({ kind: "all" });
     load();
   }
@@ -402,7 +403,7 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
   // ---------- Sharing a category with a link ----------
 
   const shareError = (message: string) =>
-    /share_token/.test(message) ? "To share categories, run supabase/share-categories.sql in Supabase first." : message;
+    /share_token/.test(message) ? "To share categories, run supabase/share-categories.sql in Supabase first." : friendlyError(message);
 
   async function toggleShare(category: ArticleCategory) {
     if (category.share_token) {

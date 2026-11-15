@@ -1,4 +1,5 @@
 import Link from "next/link";
+import DeadEnd from "@/components/DeadEnd";
 import VideoThumb from "@/components/VideoThumb";
 import { createClient } from "@/lib/supabase/server";
 import type { SharedCategory, SharedVideoCategory } from "@/lib/types";
@@ -27,12 +28,7 @@ export default async function SharedFolderPage({
   if (sharedCategory) return <SharedCategoryPage shared={sharedCategory} preview={preview} />;
 
   if (!shared) {
-    return (
-      <main className="mx-auto max-w-xl px-4 py-16 text-center">
-        <h1 className="mb-2 text-2xl font-bold">Category not found</h1>
-        <p className="text-slate-600">This link may have been turned off by its owner.</p>
-      </main>
-    );
+    return <DeadEnd title="This link isn't shared any more" text="Its owner may have turned sharing off, or the link may be incomplete." />;
   }
 
   return (

@@ -1,5 +1,7 @@
 "use client";
 
+import { friendlyError } from "@/lib/errors";
+import DeadEnd from "@/components/DeadEnd";
 import { markAiQuestions } from "@/lib/notes-format";
 import { revealAdded } from "@/lib/reveal";
 import Link from "next/link";
@@ -402,7 +404,7 @@ export default function ScrapEditor({ scrapId }: { scrapId: string }) {
     if (!window.confirm(`Delete "${title || "Untitled"}" from your ScrapBook?\nThis can't be undone.`)) return;
     const { error } = await supabase.from("scraps").delete().eq("id", scrapId);
     if (error) {
-      showNotice(error.message);
+      showNotice(friendlyError(error.message));
       return;
     }
     await deleteScrapFiles(supabase, files.map((f) => f.path));
@@ -425,12 +427,7 @@ export default function ScrapEditor({ scrapId }: { scrapId: string }) {
 
   if (missing) {
     return (
-      <main className="mx-auto max-w-2xl px-4 py-16 text-center">
-        <p className="mb-4 text-slate-600">This page isn&apos;t in your ScrapBook.</p>
-        <Link href="/scrapbook" className="text-blue-600 underline">
-          ← Back to ScrapBook
-        </Link>
-      </main>
+      <DeadEnd title="Page not found" text="This page isn't in your ScrapBook. It may have been deleted." href="/scrapbook" label="Back to ScrapBook" />
     );
   }
 

@@ -1,5 +1,6 @@
 "use client";
 
+import { friendlyError } from "@/lib/errors";
 import SearchBox from "@/components/SearchBox";
 import { revealById } from "@/lib/reveal";
 import StopAiButton from "@/components/StopAiButton";
@@ -123,7 +124,7 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
     if (error) {
       // Before supabase/articles.sql has been run, the tables don't exist yet.
       if (/does not exist|schema cache/i.test(error.message)) setNeedsSetup(true);
-      else notify(error.message, true);
+      else notify(friendlyError(error.message), true);
     } else {
       setCategories(c.data as ArticleCategory[]);
       setArticles(a.data as Article[]);
@@ -292,7 +293,7 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
       .select()
       .single();
     if (error) {
-      notify(error.message, true);
+      notify(friendlyError(error.message), true);
       return false;
     }
     setArticles((prev) => [data as Article, ...prev]);
@@ -320,7 +321,7 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
           .eq("id", article.id)
           .eq("note", "")
           .select("id");
-        if (error) return { error: error.message };
+        if (error) return { error: friendlyError(error.message) };
         return data.length ? { result: { articleId: article.id, note: result.text, model: result.model } } : {};
       },
     });
@@ -344,7 +345,7 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
     setArticles((prev) => prev.map((a) => (a.id === id ? { ...a, ...changes } : a)));
     const { error } = await supabase.from("articles").update(changes).eq("id", id);
     if (error) {
-      notify(error.message, true);
+      notify(friendlyError(error.message), true);
       load();
     }
   }
@@ -419,7 +420,7 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
     setArticles((prev) => prev.filter((a) => a.id !== article.id));
     const { error } = await supabase.from("articles").delete().eq("id", article.id);
     if (error) {
-      notify(error.message, true);
+      notify(friendlyError(error.message), true);
       load();
     }
   }
@@ -438,7 +439,7 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
       .insert({ name: name.slice(0, 100), parent_id: parentId, position, kind })
       .select()
       .single();
-    if (error) return notify(error.message, true);
+    if (error) return notify(friendlyError(error.message), true);
     setCategories((prev) => [...prev, data as ArticleCategory]);
     openView({ kind: "category", id: (data as ArticleCategory).id });
   }
@@ -495,7 +496,7 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
     setCategories((prev) => prev.map((c) => (c.id === category.id ? { ...c, parent_id, position } : c)));
     const { error } = await supabase.from("article_categories").update({ parent_id, position }).eq("id", category.id);
     if (error) {
-      notify(error.message, true);
+      notify(friendlyError(error.message), true);
       load();
       return;
     }
@@ -547,7 +548,7 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
     setCategories((prev) => prev.map((c) => (c.id === category.id ? { ...c, name } : c)));
     const { error } = await supabase.from("article_categories").update({ name }).eq("id", category.id);
     if (error) {
-      notify(error.message, true);
+      notify(friendlyError(error.message), true);
       load();
     }
   }
@@ -558,7 +559,7 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
     );
     if (!ok) return;
     const { error } = await supabase.from("article_categories").delete().eq("id", category.id);
-    if (error) return notify(error.message, true);
+    if (error) return notify(friendlyError(error.message), true);
     setView({ kind: "all" });
     load();
   }
@@ -566,7 +567,7 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
   // ---------- Sharing a category with a link ----------
 
   const shareError = (message: string) =>
-    /share_token/.test(message) ? "To share categories, run supabase/share-categories.sql in Supabase first." : message;
+    /share_token/.test(message) ? "To share categories, run supabase/share-categories.sql in Supabase first." : friendlyError(message);
 
   async function toggleShare(category: ArticleCategory) {
     if (category.share_token) {

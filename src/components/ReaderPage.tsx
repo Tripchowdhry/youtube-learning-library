@@ -1,5 +1,7 @@
 "use client";
 
+import { friendlyError } from "@/lib/errors";
+import DeadEnd from "@/components/DeadEnd";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ArticleNotes from "@/components/ArticleNotes";
@@ -117,7 +119,7 @@ export default function ReaderPage({ articleId }: { articleId: string }) {
       const read_at = read ? new Date().toISOString() : null;
       setArticle({ ...article, read_at });
       const { error } = await supabase.from("articles").update({ read_at }).eq("id", article.id);
-      if (error) setToast(error.message);
+      if (error) setToast(friendlyError(error.message));
     },
     [article, supabase],
   );
@@ -126,7 +128,7 @@ export default function ReaderPage({ articleId }: { articleId: string }) {
     if (!article) return;
     setArticle({ ...article, note });
     const { error } = await supabase.from("articles").update({ note }).eq("id", article.id);
-    if (error) setToast(error.message);
+    if (error) setToast(friendlyError(error.message));
   }
 
   // Reaching the end marks the article as read (once per visit).
@@ -159,14 +161,7 @@ export default function ReaderPage({ articleId }: { articleId: string }) {
   const section = SECTIONS[article?.kind ?? "reading"] ?? SECTIONS.reading;
 
   if (missing) {
-    return (
-      <main className="mx-auto max-w-2xl px-4 py-16 text-center">
-        <p className="mb-4 text-slate-600">This isn&apos;t in your library.</p>
-        <Link href="/reading" className="text-blue-600 underline">
-          ← Back to Reading
-        </Link>
-      </main>
-    );
+    return <DeadEnd title="Not found" text="This isn't in your library. It may have been deleted." href="/reading" label="Back to Reading" />;
   }
 
   return (

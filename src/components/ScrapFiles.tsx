@@ -5,6 +5,7 @@
 // New files stay on the computer: they open from there, and are sent to Google's AI only when
 // asked about. Files added before that were uploaded to BrainShelf and still work as they did.
 
+import { friendlyError } from "@/lib/errors";
 import StopAiButton from "@/components/StopAiButton";
 import { useEffect, useRef, useState } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -107,7 +108,7 @@ export async function addFiles(files: Chosen[]) {
     try {
       added.push(await rememberLocalFile(f, handle));
     } catch (e) {
-      problem ??= e instanceof Error ? e.message : "A file couldn't be added.";
+      problem ??= friendlyError(e instanceof Error ? e.message : "A file couldn't be added.");
       if (problem === FILES_SETUP) break;
     }
   }
@@ -187,7 +188,7 @@ export default function ScrapFiles(props: {
       if (download) window.location.href = url;
       else window.open(url, "_blank", "noopener");
     } catch (e) {
-      props.onNotice(e instanceof Error ? e.message : "The file couldn't be opened.");
+      props.onNotice(friendlyError(e instanceof Error ? e.message : "The file couldn't be opened."));
     }
   }
 
@@ -208,7 +209,7 @@ export default function ScrapFiles(props: {
     try {
       setViewing({ path: f.path, url: await fileLink(supabase, f.path) });
     } catch (e) {
-      props.onNotice(e instanceof Error ? e.message : "The file couldn't be opened.");
+      props.onNotice(friendlyError(e instanceof Error ? e.message : "The file couldn't be opened."));
     }
   }
 
@@ -517,7 +518,7 @@ async function sendFile(
     });
     if (error) {
       await tidy();
-      return { error: `The file couldn't be sent to the AI: ${error.message}` };
+      return { error: `The file couldn't be sent to the AI: ${friendlyError(error.message)}` };
     }
     parts.push(path);
     onNote(percent(Math.min(1, (from + PIECE_BYTES) / video.size)));

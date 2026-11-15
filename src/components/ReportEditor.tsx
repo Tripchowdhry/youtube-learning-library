@@ -1,5 +1,6 @@
 "use client";
 
+import { friendlyError } from "@/lib/errors";
 import SearchBox from "@/components/SearchBox";
 import { askConfirm } from "@/components/ConfirmDialog";
 import { Ico, type Tone } from "@/components/Icon";
@@ -139,7 +140,7 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
       const error = r.error ?? rs.error;
       if (error) {
         if (isMissingTable(error.message)) setNeedsSetup(true);
-        else setSaveError(error.message);
+        else setSaveError(friendlyError(error.message));
         return;
       }
       if (!r.data) {
@@ -162,7 +163,7 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
     })();
     loadSources(supabase)
       .then(setSources)
-      .catch((e: Error) => setSourcesError(e.message));
+      .catch((e: Error) => setSourcesError(friendlyError(e.message)));
   }, [supabase, reportId]);
 
   const byKey = useMemo(() => new Map((sources ?? []).map((s) => [sourceKey(s), s])), [sources]);
@@ -190,7 +191,7 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
       if (!mounted.current) return;
       if (error) {
         setSaveState("error");
-        setSaveError(error.message);
+        setSaveError(friendlyError(error.message));
       } else {
         lastSaved.current = { title: nextTitle, body: nextBody };
         setSaveState("saved");
@@ -207,6 +208,26 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
     const timer = setTimeout(() => saveText(title, body), 800);
     return () => clearTimeout(timer);
   }, [report, title, body, saveText]);
+
+  // Saves right away if the person leaves the page, switches apps or closes the tab before
+  // the pause above is over, so the last words typed are never lost.
+  const latest = useRef({ title, body, ready: false });
+  latest.current = { title, body, ready: !!report };
+  const flushText = useCallback(() => {
+    const { title: t, body: b, ready } = latest.current;
+    if (!ready || (t === lastSaved.current.title && b === lastSaved.current.body)) return;
+    saveText(t, b);
+  }, [saveText]);
+  useEffect(() => {
+    const onHide = () => {
+      if (document.visibilityState === "hidden") flushText();
+    };
+    document.addEventListener("visibilitychange", onHide);
+    return () => {
+      document.removeEventListener("visibilitychange", onHide);
+      flushText();
+    };
+  }, [flushText]);
 
   // The chosen items are saved one change after another, so they never arrive out of order.
   const sourceSaves = useRef(Promise.resolve());
@@ -225,7 +246,7 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
           notify(
             /source_kind/.test(error.message)
               ? "ScrapBook pages need one setup step: in Supabase, run supabase/report-scrapbook.sql once, then reload."
-              : `Couldn't save the chosen items: ${error.message}`,
+              : `Couldn't save the chosen items: ${friendlyError(error.message)}`,
             true,
           );
         }
@@ -316,7 +337,7 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
     else delete next[key];
     const { error } = await supabase.from("reports").update({ handwriting: next }).eq("id", reportId);
     if (!mounted.current) return;
-    if (error) return notify(`Couldn't save the handwriting text: ${error.message}`, true);
+    if (error) return notify(`Couldn't save the handwriting text: ${friendlyError(error.message)}`, true);
     setHandwriting(next);
     setHandReview(null);
     notify(text.trim() ? "Saved. It's used when you put the report together or draft it with AI." : "Removed the handwriting text.");
@@ -454,7 +475,7 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
     const { error } = await supabase.from("reports").update({ share_token: token }).eq("id", reportId);
     if (!mounted.current) return;
     setShareBusy(false);
-    if (error) return notify(`Couldn't turn on the link: ${error.message}`, true);
+    if (error) return notify(`Couldn't turn on the link: ${friendlyError(error.message)}`, true);
     setShareToken(token);
     setShareOpen(true);
   }
@@ -468,7 +489,7 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
     if (!ok) return;
     const { error } = await supabase.from("reports").update({ share_token: null }).eq("id", reportId);
     if (!mounted.current) return;
-    if (error) return notify(`Couldn't stop sharing: ${error.message}`, true);
+    if (error) return notify(`Couldn't stop sharing: ${friendlyError(error.message)}`, true);
     setShareToken(null);
     setShareOpen(false);
     notify("Stopped sharing. The old link no longer works.");
@@ -782,12 +803,15 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
       <section className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
         <div className="mb-3 flex flex-wrap items-center gap-2">
           <h2 className="mr-auto font-semibold">3. Edit and export</h2>
-          <span
-            className={`text-xs ${saveState === "error" ? "font-medium text-red-600" : "text-slate-500"}`}
-            title="Your report saves itself as you type"
-          >
-            {saveState === "saving" ? "Saving…" : saveState === "error" ? "Not saved" : "Saved"}
-          </span>
+          {saveState === "error" ? (
+            <button onClick={() => saveText(title, body)} className="text-xs text-red-600 underline">
+              Not saved. Tap to retry
+            </button>
+          ) : (
+            <span className="text-xs text-slate-500" title="Your report saves itself as you type">
+              {saveState === "saving" ? "Saving…" : "Saved"}
+            </span>
+          )}
           <button
             onClick={copy}
             disabled={!body.trim()}

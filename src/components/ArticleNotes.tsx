@@ -1,5 +1,6 @@
 "use client";
 
+import { friendlyError } from "@/lib/errors";
 import StopAiButton from "@/components/StopAiButton";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { askConfirm } from "@/components/ConfirmDialog";
@@ -141,7 +142,7 @@ export default function ArticleNotes(props: {
       .eq("id", article.id);
     if (error) {
       setSaveState("error");
-      setSaveError(/pages/.test(error.message) ? PAGES_SETUP : /notes/.test(error.message) ? MISSING_COLUMN : error.message);
+      setSaveError(/pages/.test(error.message) ? PAGES_SETUP : /notes/.test(error.message) ? MISSING_COLUMN : friendlyError(error.message));
     } else {
       setSaveState(revision.current === started ? "saved" : "unsaved");
       setSaveError(null);
