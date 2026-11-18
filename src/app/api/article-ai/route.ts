@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
-import { readArticle } from "@/lib/article-text";
+import { readSavedArticle } from "@/lib/article-cache";
 import { fetchFile, looksLikeFile, type FetchedFile } from "@/lib/fetch-file";
 import { GeminiError, askAboutFile, askAboutPage, geminiConfigured } from "@/lib/gemini";
 import { parseLink } from "@/lib/links";
-import { isSignedIn } from "@/lib/require-user";
+import { createClient } from "@/lib/supabase/server";
 
 export const maxDuration = 300;
 
@@ -14,7 +14,11 @@ const TEXT_MAX = 60_000;
 // task "note" (the default): the short note shown next to an article or tutorial in the library.
 // task "ask": answers the person's request for their study notes on the article.
 export async function POST(request: Request) {
-  if (!(await isSignedIn())) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
     return NextResponse.json({ error: "Please sign in first." }, { status: 401 });
   }
   if (!geminiConfigured()) {
@@ -22,7 +26,8 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json().catch(() => ({}));
-  const url = parseLink(String(body.url ?? ""));
+  const link = String(body.url ?? "").trim();
+  const url = parseLink(link);
   if (!url) return NextResponse.json({ error: "That doesn't look like a web link." }, { status: 400 });
   const title = String(body.title ?? "").slice(0, 300);
   const kind = body.kind === "tutorial" ? "tutorial" : "article";
@@ -36,7 +41,8 @@ export async function POST(request: Request) {
     file = result;
   }
   if (!file) {
-    const content = await readArticle(url);
+    // Kept after the first read, so a second AI request on the same article skips the download.
+    const content = await readSavedArticle(supabase, link, url);
     text = content.kind === "text" ? content.blocks.map((b) => b.text).join("\n").slice(0, TEXT_MAX) : null;
     if (!text) {
       // Some links to a PDF don't end in .pdf.

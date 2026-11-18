@@ -1,15 +1,21 @@
 import { NextResponse } from "next/server";
-import { readArticle } from "@/lib/article-text";
+import { readSavedArticle } from "@/lib/article-cache";
 import { parseLink } from "@/lib/links";
-import { isSignedIn } from "@/lib/require-user";
+import { createClient } from "@/lib/supabase/server";
 
 // Gets an article's main text for the reading page. Only plain text is sent back
 // (no HTML from the other site), so nothing from that site can run inside the app.
+// The text is kept after the first read (see article-cache.ts).
 export async function GET(request: Request) {
-  if (!(await isSignedIn())) return NextResponse.json({ error: "Please sign in again." }, { status: 401 });
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: "Please sign in again." }, { status: 401 });
 
-  const url = parseLink(new URL(request.url).searchParams.get("url") ?? "");
+  const link = (new URL(request.url).searchParams.get("url") ?? "").trim();
+  const url = parseLink(link);
   if (!url) return NextResponse.json({ error: "That doesn't look like a web link." }, { status: 400 });
 
-  return NextResponse.json(await readArticle(url));
+  return NextResponse.json(await readSavedArticle(supabase, link, url));
 }
