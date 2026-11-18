@@ -9,7 +9,7 @@ import BrandMark from "@/components/BrandMark";
 import { WelcomePanel } from "@/components/GettingStarted";
 import { Tour, TourButton, useSectionTour } from "@/components/Tour";
 import { SAMPLE_VIDEO } from "@/lib/onboarding";
-import { Brush, Clapperboard, ExternalLink, FilePen, Folder as FolderIcon, ArrowUp, Copy, Eye, FolderPlus, Images, Inbox, Link2, Link2Off, NotebookText, Pencil, PencilLine, Sparkles, Tag, Trash2, TriangleAlert, X, type LucideIcon } from "lucide-react";
+import { Brush, Clapperboard, ExternalLink, FilePen, Folder as FolderIcon, ArrowUp, Copy, Eye, FolderPlus, Images, Inbox, Link2, Link2Off, NotebookText, Pencil, PencilLine, Sparkles, Tag, Trash2, TriangleAlert, type LucideIcon } from "lucide-react";
 import FilterMenu from "@/components/FilterMenu";
 import { Ico, type Tone } from "@/components/Icon";
 import MoreMenu from "@/components/MoreMenu";
@@ -49,9 +49,8 @@ import { isWithin } from "@/lib/category-tree";
 import { onAiJobDone, runAiJob, useAiJobs } from "@/lib/ai-jobs";
 import { askVideoAi } from "@/lib/video-ai";
 import { askConfirm } from "./ConfirmDialog";
-
-// Each video can carry at most this many tags.
-const MAX_TAGS = 3;
+import TagPills from "./TagPills";
+import { askTags } from "@/lib/tags";
 
 type AiNote = { videoId: string; note: string; model?: string };
 const aiNoteKey = (videoId: string) => `note:${videoId}`;
@@ -399,14 +398,8 @@ export default function Library({ userEmail }: { userEmail: string }) {
   }
 
   function editTags(video: Video) {
-    const answer = window.prompt(`Tags, separated by commas (up to ${MAX_TAGS}):`, video.tags.join(", "));
-    if (answer === null) return;
-    const all = Array.from(new Set(answer.split(",").map((t) => t.trim()).filter(Boolean)));
-    const tags = all.slice(0, MAX_TAGS);
-    if (all.length > MAX_TAGS) {
-      notify(`A video can have up to ${MAX_TAGS} tags, so only the first ${MAX_TAGS} were kept: ${tags.join(", ")}.`, true);
-    }
-    updateVideo(video.id, { tags });
+    const tags = askTags(video.tags, notify);
+    if (tags) updateVideo(video.id, { tags });
   }
 
   function removeTag(video: Video, tag: string) {
@@ -1081,29 +1074,7 @@ function VideoCard(props: {
             {props.aiNoteError}
           </p>
         )}
-        {video.tags.length > 0 && (
-          <div className="flex flex-wrap gap-1">
-            {video.tags.map((tag) => (
-              <span key={tag} className="inline-flex items-center rounded-full bg-slate-100 text-xs text-slate-700">
-                <button
-                  onClick={() => props.onTagClick(tag)}
-                  title={`Show all videos tagged ${tag}`}
-                  className="rounded-l-full py-0.5 pl-2 pr-1 hover:bg-slate-200"
-                >
-                  #{tag}
-                </button>
-                <button
-                  onClick={() => props.onRemoveTag(tag)}
-                  title={`Remove the tag ${tag}`}
-                  aria-label={`Remove the tag ${tag}`}
-                  className="rounded-r-full py-0.5 pl-0.5 pr-1.5 text-slate-400 hover:bg-slate-200 hover:text-red-600"
-                >
-                  <X size={12} aria-hidden />
-                </button>
-              </span>
-            ))}
-          </div>
-        )}
+        <TagPills tags={video.tags} onTagClick={props.onTagClick} onRemove={props.onRemoveTag} />
         <div className="mt-1 flex flex-wrap items-center gap-1">
           <a
             href={`/video/${video.id}`}
