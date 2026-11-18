@@ -107,6 +107,8 @@ export type Article = {
   notes?: string;
   // Handwritten notes on the reading page. Missing until supabase/article-pages.sql is run.
   pages?: NotePage[];
+  // Up to 3 tags. Missing until supabase/tags.sql is run.
+  tags?: string[];
   position: number;
   kind: SectionKind;
   read_at: string | null;
@@ -131,6 +133,8 @@ export type Scrap = {
   pages: NotePage[];
   // Attached files (supabase/files.sql). Missing until that SQL has been run.
   files?: { path: string; name: string; size: number; type: string; added_at: string }[];
+  // Up to 3 tags. Missing until supabase/tags.sql is run.
+  tags?: string[];
   position: number;
   created_at: string;
   updated_at: string;

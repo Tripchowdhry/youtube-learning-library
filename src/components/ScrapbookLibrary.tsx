@@ -39,6 +39,8 @@ import { createClient } from "@/lib/supabase/client";
 import type { ArticleCategory, Scrap } from "@/lib/types";
 import { Images, ArrowUp, Copy, Eye, FileText, Link2, Link2Off, Inbox, NotebookPen, Pencil, PencilLine, Tag, Trash2 } from "lucide-react";
 import MoreMenu from "@/components/MoreMenu";
+import TagPills from "@/components/TagPills";
+import { askTags } from "@/lib/tags";
 import FilterMenu from "@/components/FilterMenu";
 import { Ico } from "@/components/Icon";
 
@@ -90,10 +92,14 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
   }, []);
 
   const load = useCallback(async () => {
-    const [c, s] = await Promise.all([
+    const scrapRows = (columns: string) =>
+      fetchAll((from, to) => supabase.from("scraps").select(columns).order("created_at", { ascending: false }).order("id").range(from, to));
+    const [c, withTags] = await Promise.all([
       fetchAll((from, to) => supabase.from("article_categories").select("*").eq("kind", "scrap").order("position").order("name").order("id").range(from, to)),
-      fetchAll((from, to) => supabase.from("scraps").select(LIST_COLUMNS).order("created_at", { ascending: false }).order("id").range(from, to)),
+      scrapRows(`${LIST_COLUMNS},tags`),
     ]);
+    // Before supabase/tags.sql has been run there is no tags column; load the pages without it.
+    const s = withTags.error && /tags/i.test(withTags.error.message) ? await scrapRows(LIST_COLUMNS) : withTags;
     const error = c.error ?? s.error;
     if (error) {
       // Before supabase/scrapbook.sql has been run, the table doesn't exist yet.
@@ -101,7 +107,7 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
       else notify(friendlyError(error.message), true);
     } else {
       setCategories(c.data as ArticleCategory[]);
-      setScraps(s.data as ScrapSummary[]);
+      setScraps(s.data as unknown as ScrapSummary[]);
     }
     setLoading(false);
   }, [supabase, notify]);
@@ -156,7 +162,7 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
     const since = days ? Date.now() - days * 86_400_000 : 0;
     const shown = scraps.filter((s) => {
       if (since && new Date(s.created_at).getTime() < since) return false;
-      if (q) return [s.title, plainText(s.body), categoryPath(s.category_id)].some((t) => t.toLowerCase().includes(q));
+      if (q) return [s.title, plainText(s.body), categoryPath(s.category_id), ...(s.tags ?? [])].some((t) => t.toLowerCase().includes(q));
       if (view.kind === "uncategorized") return !s.category_id;
       if (view.kind === "category") return inCategory(s, view.id);
       return true;
@@ -240,6 +246,15 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
     }
     updateScrap(scrap.id, { position: neighbor.position });
     updateScrap(neighbor.id, { position: scrap.position });
+  }
+
+  function editScrapTags(scrap: ScrapSummary) {
+    const tags = askTags(scrap.tags ?? [], notify);
+    if (tags) updateScrap(scrap.id, { tags });
+  }
+
+  function removeScrapTag(scrap: ScrapSummary, tag: string) {
+    updateScrap(scrap.id, { tags: (scrap.tags ?? []).filter((t) => t !== tag) });
   }
 
   function renameScrap(scrap: ScrapSummary) {
@@ -666,6 +681,9 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
                         isFirst={index === 0}
                         isLast={index === visibleScraps.length - 1}
                         onRename={() => renameScrap(scrap)}
+                        onEditTags={() => editScrapTags(scrap)}
+                        onTagClick={(tag) => setQuery(tag)}
+                        onRemoveTag={(tag) => removeScrapTag(scrap, tag)}
                         onDelete={() => deleteScrap(scrap)}
                       />
                     ))}
@@ -710,6 +728,9 @@ function ScrapRow(props: {
   isFirst: boolean;
   isLast: boolean;
   onRename: () => void;
+  onEditTags: () => void;
+  onTagClick: (tag: string) => void;
+  onRemoveTag: (tag: string) => void;
   onDelete: () => void;
 }) {
   const { scrap } = props;
@@ -741,6 +762,7 @@ function ScrapRow(props: {
           {edited !== formatDate(scrap.created_at) && ` · Edited ${edited}`}
         </p>
         {preview && <p className="line-clamp-2 text-sm text-slate-600">{preview}</p>}
+        <TagPills tags={scrap.tags} onTagClick={props.onTagClick} onRemove={props.onRemoveTag} />
         <div className="mt-1 flex flex-wrap items-center gap-1">
           <Link
             href={`/scrap/${scrap.id}`}
@@ -763,6 +785,7 @@ function ScrapRow(props: {
             <MoreMenu
               items={[
                 { label: "Edit title", icon: PencilLine, onClick: props.onRename },
+                { label: "Tags", icon: Tag, tone: "amber", onClick: props.onEditTags },
                 { label: "Delete page", icon: Trash2, danger: true, onClick: props.onDelete },
               ]}
               move={{ value: scrap.category_id, options: props.categoryOptions, onMove: props.onMove }}

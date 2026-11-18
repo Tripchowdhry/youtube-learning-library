@@ -38,6 +38,8 @@ import FilterMenu from "@/components/FilterMenu";
 import { Ico, type Tone } from "./Icon";
 import { Images, Brush, FilePen, ExternalLink, FileText, GraduationCap, Inbox, LockKeyhole, NotebookPen, NotebookText, Pencil, PencilLine, Clapperboard, Sparkles, Tag, Trash2, TriangleAlert, type LucideIcon, ArrowUp, Copy, Eye, Link2, Link2Off } from "lucide-react";
 import MoreMenu from "@/components/MoreMenu";
+import TagPills from "@/components/TagPills";
+import { askTags } from "@/lib/tags";
 import { SectionWelcome } from "./GettingStarted";
 
 type AiNote = { articleId: string; note: string; model?: string };
@@ -186,7 +188,7 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
       if (since && new Date(a.created_at).getTime() < since) return false;
       if (readFilter === "read" && !a.read_at) return false;
       if (readFilter === "unread" && a.read_at) return false;
-      if (q) return [a.title, a.site, a.author, a.url, a.note, categoryPath(a.category_id)].some((s) => s?.toLowerCase().includes(q));
+      if (q) return [a.title, a.site, a.author, a.url, a.note, categoryPath(a.category_id), ...(a.tags ?? [])].some((s) => s?.toLowerCase().includes(q));
       if (view.kind === "uncategorized") return !a.category_id;
       if (view.kind === "category") return inCategory(a, view.id);
       return true;
@@ -400,6 +402,15 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
 
   function toggleRead(article: Article) {
     updateArticle(article.id, { read_at: article.read_at ? null : new Date().toISOString() });
+  }
+
+  function editArticleTags(article: Article) {
+    const tags = askTags(article.tags ?? [], notify);
+    if (tags) updateArticle(article.id, { tags });
+  }
+
+  function removeArticleTag(article: Article, tag: string) {
+    updateArticle(article.id, { tags: (article.tags ?? []).filter((t) => t !== tag) });
   }
 
   function renameArticle(article: Article) {
@@ -828,6 +839,9 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
                       isFirst={index === 0}
                       isLast={index === visibleArticles.length - 1}
                       onRename={() => renameArticle(article)}
+                      onEditTags={() => editArticleTags(article)}
+                      onTagClick={(tag) => setQuery(tag)}
+                      onRemoveTag={(tag) => removeArticleTag(article, tag)}
                       onSaveNote={(note) => updateArticle(article.id, { note })}
                       aiNoteStartedAt={aiJobs.running.find((j) => j.key === aiNoteKey(article.id))?.startedAt ?? null}
                       aiNoteError={aiJobs.errors.get(aiNoteKey(article.id)) ?? null}
@@ -910,6 +924,9 @@ function ArticleRow(props: {
   isFirst: boolean;
   isLast: boolean;
   onRename: () => void;
+  onEditTags: () => void;
+  onTagClick: (tag: string) => void;
+  onRemoveTag: (tag: string) => void;
   onSaveNote: (note: string) => void;
   aiNoteStartedAt: number | null;
   aiNoteError: string | null;
@@ -970,6 +987,7 @@ function ArticleRow(props: {
             {props.aiNoteError}
           </p>
         )}
+        <TagPills tags={article.tags} onTagClick={props.onTagClick} onRemove={props.onRemoveTag} />
         <div className="mt-1 flex flex-wrap items-center gap-1">
           <Link
             href={`/read/${article.id}?notes=1`}
@@ -1031,6 +1049,7 @@ function ArticleRow(props: {
             <MoreMenu
               items={[
                 { label: "Edit title", icon: PencilLine, onClick: props.onRename },
+                { label: "Tags", icon: Tag, tone: "amber", onClick: props.onEditTags },
                 { label: "Delete", icon: Trash2, danger: true, onClick: props.onDelete },
               ]}
               move={{ value: article.category_id, options: props.categoryOptions, onMove: props.onMove }}
