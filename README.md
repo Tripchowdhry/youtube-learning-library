@@ -28,6 +28,7 @@ Built with Next.js, Tailwind CSS and Supabase. Hosted on Vercel.
    To attach files (PDFs, slides, documents) to ScrapBook pages, also run [`supabase/files.sql`](supabase/files.sql).
    For handwriting in Reading and Tutorials notes, also run [`supabase/article-pages.sql`](supabase/article-pages.sql).
    For Reports (Report Writer), run [`supabase/reports.sql`](supabase/reports.sql). It only adds its own two tables.
+   To keep each article's text after its first read (less server time on Vercel), also run [`supabase/article-texts.sql`](supabase/article-texts.sql).
 3. Open **Project Settings → API** (or **Data API**) and copy the **Project URL** and the **anon public** key.
 
 ### 2. Turn on Google sign-in
