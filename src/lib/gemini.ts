@@ -2,21 +2,11 @@
 // from its link, so it sees the slides and screen as well as hearing what's said.
 // Needs GEMINI_API_KEY (free from Google AI Studio); GEMINI_MODEL is optional.
 
-// When a model is busy (Google's free tier often is) or missing, the next one is tried.
-const MODELS = [
-  ...(process.env.GEMINI_MODEL ? [process.env.GEMINI_MODEL] : []),
-  // Gemini 4 Hydrogen first: Google's newest everyday model (November 2026), smarter than
-  // 3.8 Flash and free on the free plan. When its daily free uses run out, or it turns a
-  // request down, Google answers 429/400 and the next model is used.
-  "gemini-4-hydrogen",
-  // The newest Flash next. Its free plan allows only about 20 uses a day.
-  "gemini-3.8-flash",
-  "gemini-flash-latest",
-  // The light models last. Gemini 2.5 Flash Lite is closed to new keys and Google points to
-  // 3.5 Flash Lite instead; 2.5 Flash and 3.6 Flash are being retired too, so none are asked for.
-  "gemini-3.5-flash-lite",
-  "gemini-flash-lite-latest",
-].filter((m, i, all) => all.indexOf(m) === i);
+import { geminiModels, looksRetired, modelRetired } from "./gemini-models";
+
+// Which models to try, and in what order, comes from gemini-models.ts: Google's own list,
+// checked once a day, with a fixed list as the backup. When one is busy or missing, the next
+// one is tried.
 
 // Busy (503), over the limit (429), not offered to this key (403, 404), or a request this model
 // turns down even in its simple form (400, e.g. a newer model with different options): worth
@@ -92,7 +82,7 @@ async function generate(body: (full: boolean) => object, what: string) {
   // Every model's failure is kept, so the message shown is the one that matters (a used-up
   // free limit, or why the main model failed) and not just whatever the last backup said.
   const failures: { model: string; status: number; detail: string }[] = [];
-  for (const model of MODELS) {
+  for (const model of await geminiModels()) {
     let { res, data } = await callModel(model, body(true));
     if (res.status === 400) ({ res, data } = await callModel(model, body(false)));
     // Still turned down: try once more without the extra settings (such as low detail per frame).
@@ -105,6 +95,8 @@ async function generate(body: (full: boolean) => object, what: string) {
     }
     const detail = data?.error?.message ?? `error ${res.status}`;
     failures.push({ model, status: res.status, detail });
+    // Retired since the list was last checked: skip it from now on and get a fresh list.
+    if (looksRetired(res.status, detail)) modelRetired(model);
     console.error("Gemini request failed", model, res.status, detail);
     if (!TRY_NEXT.has(res.status)) break;
   }
