@@ -31,6 +31,8 @@ Built with Next.js, Tailwind CSS and Supabase. Hosted on Vercel.
    To keep each article's text after its first read (less server time on Vercel), also run [`supabase/article-texts.sql`](supabase/article-texts.sql).
 3. Open **Project Settings → API** (or **Data API**) and copy the **Project URL** and the **anon public** key.
 
+Supabase pauses a free project after about a week with no activity. The app's `vercel.json` has Vercel call `/api/keep-awake` once a day to prevent that; nothing to set up.
+
 ### 2. Turn on Google sign-in
 1. In [Google Cloud Console](https://console.cloud.google.com/apis/credentials), create an **OAuth client ID** of type **Web application**.
 2. Under **Authorized redirect URIs**, add `https://<your-project-id>.supabase.co/auth/v1/callback`.
