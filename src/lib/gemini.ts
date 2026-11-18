@@ -2,22 +2,11 @@
 // from its link, so it sees the slides and screen as well as hearing what's said.
 // Needs GEMINI_API_KEY (free from Google AI Studio); GEMINI_MODEL is optional.
 
-// When a model is busy (Google's free tier often is) or missing, the next one is tried.
-const MODELS = [
-  ...(process.env.GEMINI_MODEL ? [process.env.GEMINI_MODEL] : []),
-  // Gemini 4 Hydrogen first: Google's newest everyday model (November 2026), smarter than
-  // 3.8 Flash and free on the free plan. When its daily free uses run out, or it turns a
-  // request down, Google answers 429/400 and the next model is used.
-  "gemini-4-hydrogen",
-  // The newest Flash next. Its free plan allows only about 20 uses a day.
-  "gemini-3.8-flash",
-  // Gemini 3.5 Flash is retired and Google sends it to 3.6 Flash, so that's asked for by name.
-  "gemini-3.6-flash",
-  "gemini-flash-latest",
-  "gemini-2.5-flash",
-  "gemini-flash-lite-latest",
-  "gemini-2.5-flash-lite",
-].filter((m, i, all) => all.indexOf(m) === i);
+import { geminiModels, looksRetired, modelRetired } from "./gemini-models";
+
+// Which models to try, and in what order, comes from gemini-models.ts: Google's own list,
+// checked once a day, with a fixed list as the backup. When one is busy or missing, the next
+// one is tried.
 
 // Busy (503), over the limit (429), not offered to this key (403, 404), or a request this model
 // turns down even in its simple form (400, e.g. a newer model with different options): worth
@@ -90,29 +79,43 @@ function modelName(id: string) {
 // Tries each model in turn. `body(true)` is the full request; a model that turns it down
 // (400) is asked again with `body(false)`, a simpler one. `what` finishes "The AI couldn't…".
 async function generate(body: (full: boolean) => object, what: string) {
-  let lastStatus = 0;
-  let lastDetail = "";
-  for (const model of MODELS) {
+  // Every model's failure is kept, so the message shown is the one that matters (a used-up
+  // free limit, or why the main model failed) and not just whatever the last backup said.
+  const failures: { model: string; status: number; detail: string }[] = [];
+  for (const model of await geminiModels()) {
     let { res, data } = await callModel(model, body(true));
     if (res.status === 400) ({ res, data } = await callModel(model, body(false)));
+    // Still turned down: try once more without the extra settings (such as low detail per frame).
+    if (res.status === 400) ({ res, data } = await callModel(model, withoutSettings(body(false))));
     if (res.ok) {
       const parts: { text?: string }[] = data?.candidates?.[0]?.content?.parts ?? [];
       const text = parts.map((p) => p.text ?? "").join("").trim();
       if (!text) throw new GeminiError("The AI didn't send an answer. Try asking a different way.", 502);
       return { text, model: modelName(data?.modelVersion || model) };
     }
-    lastStatus = res.status;
-    lastDetail = data?.error?.message ?? `error ${res.status}`;
-    console.error("Gemini request failed", model, res.status, lastDetail);
+    const detail = data?.error?.message ?? `error ${res.status}`;
+    failures.push({ model, status: res.status, detail });
+    // Retired since the list was last checked: skip it from now on and get a fresh list.
+    if (looksRetired(res.status, detail)) modelRetired(model);
+    console.error("Gemini request failed", model, res.status, detail);
     if (!TRY_NEXT.has(res.status)) break;
   }
-  if (lastStatus === 429) {
+  if (failures.some((f) => f.status === 429)) {
     throw new GeminiError("The free AI limit is used up for now. Try again in a minute, or tomorrow.", 429);
   }
-  if (lastStatus === 503 || lastStatus === 500) {
+  if (failures.some((f) => f.status === 503 || f.status === 500)) {
     throw new GeminiError("Google's free AI is busy right now. Please try again in a minute.", 503);
   }
-  throw new GeminiError(`The AI couldn't ${what} (${lastDetail}).`, 502);
+  // A model that's gone or not offered to this key (404, 403) says little; the first other
+  // failure explains more.
+  const main = failures.find((f) => f.status !== 404 && f.status !== 403) ?? failures[0];
+  throw new GeminiError(`The AI couldn't ${what} (${main ? `${modelName(main.model)}: ${main.detail}` : "no model answered"}).`, 502);
+}
+
+function withoutSettings(body: object) {
+  const rest: Record<string, unknown> = { ...body };
+  delete rest.generationConfig;
+  return rest;
 }
 
 // Returns the answer and the name of the Gemini model that wrote it.
