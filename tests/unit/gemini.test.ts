@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { askAboutVideo } from "@/lib/gemini";
+import { askAboutSources, askAboutVideo } from "@/lib/gemini";
 import { forgetModelList, orderModels } from "@/lib/gemini-models";
 
 type Reply = { status: number; body: unknown };
@@ -123,3 +123,21 @@ describe("Gemini's own model list", () => {
 function unique(list: string[]) {
   return list.filter((m, i) => list.indexOf(m) === i);
 }
+
+describe("askAboutSources", () => {
+  it("sends every video and text in one request, watching videos lightly", async () => {
+    const calls = fakeGoogle(() => ok("An answer [1]"), ["gemini-4-hydrogen"]);
+    const { text } = await askAboutSources(
+      [{ text: "Source [1]" }, { video: "https://www.youtube.com/watch?v=abc" }, { text: "Source [2]" }],
+      "Answer from the sources.",
+      "Question: why?",
+    );
+    expect(text).toBe("An answer [1]");
+    const body = calls[0].body as { contents: { parts: Record<string, unknown>[] }[]; generationConfig?: unknown };
+    const parts = body.contents[0].parts;
+    expect(parts).toHaveLength(4);
+    expect(parts[1]).toEqual({ file_data: { file_uri: "https://www.youtube.com/watch?v=abc" }, video_metadata: { fps: 0.1 } });
+    expect(parts[3]).toEqual({ text: "Question: why?" });
+    expect(body.generationConfig).toEqual({ mediaResolution: "MEDIA_RESOLUTION_LOW" });
+  });
+});

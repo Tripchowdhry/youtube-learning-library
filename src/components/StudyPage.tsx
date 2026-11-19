@@ -183,11 +183,13 @@ export default function StudyPage({ videoId }: { videoId: string }) {
     playerHost.current.appendChild(host);
     loadYouTubeApi().then((YT) => {
       if (cancelled) return;
+      // A link from Ask this category (/video/…?t=252) starts the video at that moment.
+      const start = Math.floor(Number(new URLSearchParams(window.location.search).get("t")));
       player.current = new YT.Player(host, {
         videoId: video.youtube_id,
         width: "100%",
         height: "100%",
-        playerVars: { playsinline: 1, rel: 0 },
+        playerVars: { playsinline: 1, rel: 0, ...(start > 0 ? { start } : {}) },
       });
     });
     return () => {

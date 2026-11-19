@@ -11,6 +11,7 @@ A notebook for all learners. Save videos, articles and tutorials, take notes bes
 - Search across titles, channels, folders and tags
 - Take notes on any video, handwritten (Apple Pencil, mouse, or finger) or typed, with time stamps that jump the video to that moment
 - Optional AI (Google Gemini, free key): new videos get a short note written for them, and on a video's notes page you can ask for a summary, a report or an explanation of any moment. Answers land in your typed notes
+- Ask this category: one question across every video, reading or ScrapBook page in a category. The answer shows which item each part came from, and video sources jump to the exact moment. Each question uses one free AI request
 - Share any folder with a read-only link
 - Keep logins and API keys in the Vault, sorted into categories. Passwords and API keys are encrypted in your browser with a passphrase only you know; web addresses and user IDs stay readable so you can still reset things if you forget it
 - Works on any device with a browser
