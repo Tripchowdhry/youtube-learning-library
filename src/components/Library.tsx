@@ -5,6 +5,7 @@ import { fetchAll } from "@/lib/fetch-all";
 import SearchBox from "@/components/SearchBox";
 import { revealById } from "@/lib/reveal";
 import ReportWriterLink from "@/components/ReportWriterLink";
+import { AskCategoryButton } from "@/components/CategoryChat";
 import BrandMark from "@/components/BrandMark";
 import { WelcomePanel } from "@/components/GettingStarted";
 import { Tour, TourButton, useSectionTour } from "@/components/Tour";
@@ -699,6 +700,16 @@ export default function Library({ userEmail }: { userEmail: string }) {
           <ReportWriterLink />
           <div className="mb-4 flex flex-wrap items-center gap-2">
             <h1 className="mr-auto text-2xl font-bold">{title}</h1>
+            {currentFolder && !searching && (
+              <AskCategoryButton
+                kind="video"
+                categoryName={currentFolder.name}
+                items={[...videos]
+                  .filter((v) => isWithin(folders, v.category_id, currentFolder.id))
+                  .sort((a, b) => a.position - b.position)
+                  .map((v) => ({ id: v.id, title: v.title || "Untitled video" }))}
+              />
+            )}
             <TourButton onClick={tour.start} />
             {currentFolder && !searching && (
               <>

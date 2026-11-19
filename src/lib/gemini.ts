@@ -316,3 +316,29 @@ export async function askAboutFile(file: { bytes: Buffer; mimeType: string }, in
     "read this file",
   );
 }
+
+// One thing to ask about across a category: a YouTube video (watched from its link) or text.
+export type SourcePart = { video: string } | { text: string };
+
+// Videos in a whole-category question are watched more lightly than a single video: one frame
+// every 10 seconds (with all the audio), so several fit into one free request.
+const CATEGORY_FRAMES_PER_SECOND = 1 / 10;
+
+// Asks one question across several videos, articles and notes at once (Ask this category).
+export function askAboutSources(parts: SourcePart[], instructions: string, request: string) {
+  const toParts = (full: boolean) =>
+    parts.map((p) =>
+      "video" in p
+        ? { file_data: { file_uri: p.video }, ...(full ? { video_metadata: { fps: CATEGORY_FRAMES_PER_SECOND } } : {}) }
+        : { text: p.text },
+    );
+  const hasVideo = parts.some((p) => "video" in p);
+  return generate(
+    (full) => ({
+      systemInstruction: { parts: [{ text: instructions }] },
+      contents: [{ role: "user", parts: [...toParts(full), { text: request }] }],
+      ...(hasVideo ? { generationConfig: { mediaResolution: "MEDIA_RESOLUTION_LOW" } } : {}),
+    }),
+    "answer from this category",
+  );
+}

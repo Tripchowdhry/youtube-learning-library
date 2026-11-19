@@ -4,6 +4,7 @@ import { friendlyError } from "@/lib/errors";
 import { fetchAll } from "@/lib/fetch-all";
 import SearchBox from "@/components/SearchBox";
 import ReportWriterLink from "@/components/ReportWriterLink";
+import { AskCategoryButton } from "@/components/CategoryChat";
 import { Tour, TourButton, useSectionTour } from "@/components/Tour";
 import { deleteScrapFiles, type ScrapFile } from "@/lib/files";
 import BrandMark from "@/components/BrandMark";
@@ -586,6 +587,16 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
               <ReportWriterLink />
               <div className="mb-4 flex flex-wrap items-center gap-2">
                 <h1 className="mr-auto text-2xl font-bold">{title}</h1>
+                {currentCategory && !searching && (
+                  <AskCategoryButton
+                    kind="scrap"
+                    categoryName={currentCategory.name}
+                    items={[...scraps]
+                      .filter((p) => isWithin(categories, p.category_id, currentCategory.id))
+                      .sort((a, b) => a.position - b.position)
+                      .map((p) => ({ id: p.id, title: p.title || "Untitled" }))}
+                  />
+                )}
                 <TourButton onClick={tour.start} />
                 {currentCategory && !searching && (
                   <>

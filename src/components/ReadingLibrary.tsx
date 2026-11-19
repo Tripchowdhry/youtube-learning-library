@@ -6,6 +6,7 @@ import SearchBox from "@/components/SearchBox";
 import { revealById } from "@/lib/reveal";
 import StopAiButton from "@/components/StopAiButton";
 import ReportWriterLink from "@/components/ReportWriterLink";
+import { AskCategoryButton } from "@/components/CategoryChat";
 import { Tour, TourButton, useSectionTour } from "@/components/Tour";
 import BrandMark from "@/components/BrandMark";
 import Link from "next/link";
@@ -725,6 +726,16 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
               <ReportWriterLink />
               <div className="mb-4 flex flex-wrap items-center gap-2">
                 <h1 className="mr-auto text-2xl font-bold">{title}</h1>
+                {currentCategory && !searching && (
+                  <AskCategoryButton
+                    kind="article"
+                    categoryName={currentCategory.name}
+                    items={[...articles]
+                      .filter((a) => isWithin(categories, a.category_id, currentCategory.id))
+                      .sort((a, b) => a.position - b.position)
+                      .map((a) => ({ id: a.id, title: a.title || a.url }))}
+                  />
+                )}
                 <TourButton onClick={tour.start} />
                 {currentCategory && !searching && (
                   <>
