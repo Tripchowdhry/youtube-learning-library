@@ -27,7 +27,7 @@ import {
   useFolderSort,
   useItemSort,
 } from "@/components/FolderSort";
-import { onAiJobDone, runAiJob, useAiJobs, useSecondsSince } from "@/lib/ai-jobs";
+import { onAiJobDone, runAiJob, stillWorkingNote, useAiJobs, useSecondsSince } from "@/lib/ai-jobs";
 import { findSavedElsewhere } from "@/lib/find-saved";
 import { linkKey } from "@/lib/links";
 import { createClient } from "@/lib/supabase/client";
@@ -1137,10 +1137,11 @@ export function ToastBox({ toast, onClose }: { toast: Toast; onClose: () => void
 // Shown in place of the AI summary button while the AI writes the note.
 export function AiNoteWorking({ startedAt, jobKey }: { startedAt: number; jobKey: string }) {
   const seconds = useSecondsSince(startedAt);
+  const note = useAiJobs().running.find((j) => j.key === jobKey)?.note;
   return (
     <span className="flex items-center gap-1.5 rounded-md border border-violet-200 bg-violet-50 py-0.5 pl-2 pr-0.5 text-xs text-violet-800">
-      <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-violet-300 border-t-violet-700" />
-      Writing summary… {Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, "0")}
+      <span className="inline-block h-3 w-3 shrink-0 animate-spin rounded-full border-2 border-violet-300 border-t-violet-700" />
+      {stillWorkingNote(seconds, note) ?? "Writing summary…"} {Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, "0")}
       <StopAiButton jobKey={jobKey} />
     </span>
   );

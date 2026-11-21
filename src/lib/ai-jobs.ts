@@ -43,6 +43,19 @@ export function useSecondsSince(startedAt: number) {
   return Math.max(0, Math.floor((now - startedAt) / 1000));
 }
 
+// After this long, a working AI says it's still going, so the spinner doesn't look stuck.
+export const STILL_WORKING_SECONDS = 150;
+
+// The line to show while a job runs: what it's doing now (like trying another model), or
+// after 2.5 minutes that it's still working. Null means the usual words.
+export function stillWorkingNote(seconds: number, note?: string) {
+  if (note && seconds < STILL_WORKING_SECONDS) return note;
+  if (seconds >= STILL_WORKING_SECONDS) {
+    return `${note ? `${note.replace(/…$/, "")}. ` : ""}Still working. Long videos can take up to 5 minutes…`;
+  }
+  return null;
+}
+
 export function setAiJobNote(key: string, note: string) {
   if (!snapshot.running.some((j) => j.key === key && j.note !== note)) return;
   update({ running: snapshot.running.map((j) => (j.key === key ? { ...j, note } : j)) });

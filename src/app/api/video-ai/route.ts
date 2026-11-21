@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { FOCUS_SECONDS, GeminiError, askAboutVideo, geminiConfigured } from "@/lib/gemini";
+import { geminiModels } from "@/lib/gemini-models";
 import { isSignedIn } from "@/lib/require-user";
 import { parseYouTubeId, watchUrl } from "@/lib/youtube";
 
@@ -25,12 +26,25 @@ export async function POST(request: Request) {
   const title = String(body.title ?? "").slice(0, 300);
   const about = title ? `The video is titled "${title}".` : "";
 
+  // attempt: which model to ask (0 is the first). The browser asks again with the next number
+  // when the answer says tryNext, so every model gets its own 5 minutes. Without it, the
+  // models are tried in turn within this one request.
+  const attempt = Number.isInteger(body.attempt) && body.attempt >= 0 ? (body.attempt as number) : null;
+  const models = attempt === null ? [] : await geminiModels();
+  if (attempt !== null && attempt >= models.length) {
+    return NextResponse.json({ error: "No other AI model is free to try right now. Try again in a minute." }, { status: 503 });
+  }
+  const onlyModel = attempt === null ? undefined : models[attempt];
+  const hasNext = attempt !== null && attempt + 1 < models.length;
+
   try {
     if (body.task === "note") {
       const { text, model } = await askAboutVideo(
         watchUrl(youtubeId),
         `You write the short note shown next to a video in someone's learning library. ${about}`,
         `In one or two plain sentences, under ${NOTE_MAX - 30} characters, say what this video teaches and why it's worth watching. No markdown, no quotes, no emojis.`,
+        null,
+        onlyModel,
       );
       return NextResponse.json({ text: text.replace(/\s+/g, " ").slice(0, NOTE_MAX), model });
     }
@@ -57,10 +71,13 @@ export async function POST(request: Request) {
       ].join("\n"),
       ask,
       focus,
+      onlyModel,
     );
     return NextResponse.json({ text, model });
   } catch (error) {
-    if (error instanceof GeminiError) return NextResponse.json({ error: error.message }, { status: error.status });
+    if (error instanceof GeminiError) {
+      return NextResponse.json({ error: error.message, tryNext: error.tryNext && hasNext }, { status: error.status });
+    }
     return NextResponse.json({ error: "The AI couldn't be reached. Try again." }, { status: 502 });
   }
 }
