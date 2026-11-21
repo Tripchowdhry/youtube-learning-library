@@ -42,7 +42,7 @@ function Working({ job, more }: { job: AiJob; more: number }) {
       <span className="truncate">
         Working on {job.label}
         {more > 0 ? ` and ${more} more` : ""}… {formatTime(seconds)}
-        {seconds >= STILL_WORKING_SECONDS && " · still working, long videos can take up to 5 minutes"}
+        {seconds >= STILL_WORKING_SECONDS && " · still working"}
       </span>
       <StopAiButton jobKey={job.key} className="rounded-full" />
     </p>

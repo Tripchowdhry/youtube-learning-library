@@ -4,7 +4,7 @@ import { friendlyError } from "@/lib/errors";
 import StopAiButton from "@/components/StopAiButton";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { askConfirm } from "@/components/ConfirmDialog";
-import { onAiJobDone, runAiJob, useAiJobs, useSecondsSince, wasStopped } from "@/lib/ai-jobs";
+import { onAiJobDone, runAiJob, setAiJobNote, stillWorkingNote, useAiJobs, useSecondsSince, wasStopped } from "@/lib/ai-jobs";
 import { createClient } from "@/lib/supabase/client";
 import type { Article, NotePage } from "@/lib/types";
 import { askArticleAi } from "@/lib/video-ai";
@@ -234,6 +234,7 @@ export default function ArticleNotes(props: {
             prompt,
           },
           signal,
+          (note) => setAiJobNote(aiKey, note),
         );
         if (result.error || !result.text) return { error: result.error ?? "The AI didn't answer." };
         return {
@@ -472,11 +473,13 @@ function AskAi(props: { jobKey: string; word: string; startedAt: number | null; 
 // Counts the seconds while the AI works, so it's clear nothing is stuck.
 function Working({ startedAt, word, jobKey }: { startedAt: number; word: string; jobKey: string }) {
   const s = useSecondsSince(startedAt);
+  // After 2.5 minutes, or when another model is being tried, it says so, so it doesn't look stuck.
+  const note = stillWorkingNote(s, useAiJobs().running.find((j) => j.key === jobKey)?.note);
   return (
     <div className="flex items-start gap-2 rounded-md bg-violet-50 px-2 py-1.5 text-sm text-violet-800 ring-1 ring-violet-200">
       <p className="min-w-0 flex-1">
         <span className="mr-2 inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-violet-300 border-t-violet-700 align-[-2px]" />
-        The AI is reading the {word} ({Math.floor(s / 60)}:{String(s % 60).padStart(2, "0")}). You can leave this page; the answer is still
+        {note ?? `The AI is reading the ${word}`} ({Math.floor(s / 60)}:{String(s % 60).padStart(2, "0")}). You can leave this page; the answer is still
         added to your notes.
       </p>
       <StopAiButton jobKey={jobKey} />

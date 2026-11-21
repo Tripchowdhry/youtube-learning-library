@@ -1,6 +1,8 @@
 "use client";
 
 import { friendlyError } from "@/lib/errors";
+import { postAi } from "@/lib/ai-request";
+import { stillWorkingNote, useSecondsSince } from "@/lib/ai-jobs";
 import SearchBox from "@/components/SearchBox";
 import { askConfirm } from "@/components/ConfirmDialog";
 import { Ico, type Tone } from "@/components/Icon";
@@ -99,6 +101,9 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
   const [focus, setFocus] = useState("");
   const [style, setStyle] = useState<DraftStyle>("summary");
   const [aiBusy, setAiBusy] = useState(false);
+  // While drafting: when it started, and what it's doing now (like trying another model).
+  const [aiStartedAt, setAiStartedAt] = useState(0);
+  const [aiNote, setAiNote] = useState<string | null>(null);
   const [aiError, setAiError] = useState<string | null>(null);
   const [titleIdeas, setTitleIdeas] = useState<{ titles: string[]; model: string | null } | null>(null);
   const [titleBusy, setTitleBusy] = useState(false);
@@ -305,12 +310,8 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
         setHandReading({ key, page: i + 1, total: pages.length });
         const image = pageToPng(pages[i]);
         if (!image) continue;
-        const res = await fetch("/api/report-handwriting", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ image }),
-        });
-        const data = await res.json().catch(() => ({}));
+        const res = await postAi("/api/report-handwriting", { image });
+        const data = res.data;
         if (!mounted.current) return;
         if (!res.ok) {
           setHandError({ key, text: data.error ?? `The AI couldn't read page ${i + 1} (error ${res.status}).` });
@@ -324,7 +325,7 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
       if (!texts.length) setHandError({ key, text: "The AI couldn't find any writing to read on these pages." });
       else setHandReview({ key, text: texts.join("\n\n"), model, fresh: true });
     } catch {
-      if (mounted.current) setHandError({ key, text: "The AI couldn't be reached. Check your connection and try again." });
+      if (mounted.current) setHandError({ key, text: "Couldn't reach the AI. Check your connection." });
     } finally {
       if (mounted.current) setHandReading(null);
     }
@@ -365,17 +366,19 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
     if (!(await okToReplace())) return;
     setAiBusy(true);
     setAiError(null);
+    setAiNote(null);
+    setAiStartedAt(Date.now());
     const reportTitle = title.trim() || UNTITLED;
     try {
-      const res = await fetch("/api/report-ai", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: reportTitle, prompt: focus, style, sources: chosen, handwriting: usedHandwriting() }),
-      });
-      const data = await res.json().catch(() => ({}));
+      const res = await postAi(
+        "/api/report-ai",
+        { title: reportTitle, prompt: focus, style, sources: chosen, handwriting: usedHandwriting() },
+        { onNote: (note) => mounted.current && setAiNote(note) },
+      );
+      const data = res.data as { text?: string; sources?: Parameters<typeof sourcesSection>[0]; model?: string; error?: string };
       if (!res.ok) {
         const message =
-          res.status === 504 ? "The AI took too long. Try fewer items, or try again in a minute." : (data.error ?? `The AI couldn't write the report (error ${res.status}).`);
+          res.status === 504 ? "Took too long. Try fewer items." : (data.error ?? `The AI couldn't write the report (error ${res.status}).`);
         if (mounted.current) setAiError(message);
         return;
       }
@@ -387,7 +390,7 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
             notify(data.model ? `Drafted by ${data.model}. Check it against your notes.` : "Draft ready.");
       }
     } catch {
-      if (mounted.current) setAiError("The AI couldn't be reached. Check your connection and try again.");
+      if (mounted.current) setAiError("Couldn't reach the AI. Check your connection.");
     } finally {
       if (mounted.current) setAiBusy(false);
     }
@@ -405,17 +408,13 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
     setTitleError(null);
     setTitleIdeas(null);
     try {
-      const res = await fetch("/api/report-ai", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mode: "title", sources: chosen, body, handwriting: usedHandwriting() }),
-      });
-      const data = await res.json().catch(() => ({}));
+      const res = await postAi("/api/report-ai", { mode: "title", sources: chosen, body, handwriting: usedHandwriting() });
+      const data = res.data as { titles?: unknown; model?: string; error?: string };
       if (!mounted.current) return;
       if (!res.ok) setTitleError(data.error ?? `The AI couldn't suggest titles (error ${res.status}).`);
       else setTitleIdeas({ titles: Array.isArray(data.titles) ? data.titles : [], model: data.model ? String(data.model) : null });
     } catch {
-      if (mounted.current) setTitleError("The AI couldn't be reached. Check your connection and try again.");
+      if (mounted.current) setTitleError("Couldn't reach the AI. Check your connection.");
     } finally {
       if (mounted.current) setTitleBusy(false);
     }
@@ -433,13 +432,9 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
   // The editor shows the new version and only uses it if Replace is chosen.
   const improvePart = useCallback(
     async (text: string, how: ImproveHow) => {
-      const res = await fetch("/api/report-improve", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, how, report: body }),
-      }).catch(() => null);
-      if (!res) throw new Error("The AI couldn't be reached. Check your connection and try again.");
-      const data = await res.json().catch(() => ({}));
+      const res = await postAi("/api/report-improve", { text, how, report: body }).catch(() => null);
+      if (!res) throw new Error("Couldn't reach the AI. Check your connection.");
+      const data = res.data;
       if (!res.ok) throw new Error(data.error ?? `The AI couldn't improve it (error ${res.status}).`);
       return { text: String(data.text ?? ""), model: data.model ? String(data.model) : null };
     },
@@ -792,7 +787,7 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
               className="flex items-center gap-1.5 rounded-md bg-violet-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-violet-700 disabled:opacity-60"
             >
               <Sparkles size={14} aria-hidden />
-              {aiBusy ? "Writing… (up to a minute or two)" : draftStyle(style).button}
+              {aiBusy ? <DraftingLabel startedAt={aiStartedAt} note={aiNote} /> : draftStyle(style).button}
             </button>
             {aiError && <p className="mt-2 text-sm text-red-700">{aiError}</p>}
           </div>
@@ -1000,4 +995,11 @@ function IconButton({ label, onClick, disabled, Icon }: { label: string; onClick
       <Icon size={14} />
     </button>
   );
+}
+
+// The Draft button's words while the AI writes. After 2.5 minutes, or when another model is
+// being tried, it says so, so it doesn't look stuck.
+function DraftingLabel({ startedAt, note }: { startedAt: number; note: string | null }) {
+  const seconds = useSecondsSince(startedAt);
+  return <>{stillWorkingNote(seconds, note ?? undefined) ?? "Writing… (up to a minute or two)"}</>;
 }

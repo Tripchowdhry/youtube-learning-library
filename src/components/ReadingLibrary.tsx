@@ -27,7 +27,7 @@ import {
   useFolderSort,
   useItemSort,
 } from "@/components/FolderSort";
-import { onAiJobDone, runAiJob, stillWorkingNote, useAiJobs, useSecondsSince } from "@/lib/ai-jobs";
+import { onAiJobDone, runAiJob, setAiJobNote, stillWorkingNote, useAiJobs, useSecondsSince } from "@/lib/ai-jobs";
 import { findSavedElsewhere } from "@/lib/find-saved";
 import { linkKey } from "@/lib/links";
 import { createClient } from "@/lib/supabase/client";
@@ -348,7 +348,9 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
       key: aiNoteKey(article.id),
       label: `AI summary for "${article.title ?? article.site ?? "your link"}"`,
       work: async (signal) => {
-        const result = await askArticleAi({ url: article.url, title: article.title, kind }, signal);
+        const result = await askArticleAi({ url: article.url, title: article.title, kind }, signal, (note) =>
+          setAiJobNote(aiNoteKey(article.id), note),
+        );
         if (signal.aborted) return {};
         if (result.error) return result.code === "no-key" ? {} : { error: result.error };
         if (!result.text) return {};

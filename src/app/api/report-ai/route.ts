@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { splitTypedClips } from "@/lib/clips";
-import { GeminiError, askAboutFile, geminiConfigured } from "@/lib/gemini";
+import { GeminiError, aiRoute, askAboutFile, geminiConfigured } from "@/lib/gemini";
 import { htmlToText } from "@/lib/html-text";
 import { draftStyle } from "@/lib/report-styles";
 import { createClient } from "@/lib/supabase/server";
@@ -19,7 +19,7 @@ const TOTAL_MAX = 600_000;
 
 type Wanted = { kind: "video" | "article" | "scrap"; id: string };
 
-export async function POST(request: Request) {
+async function handle(request: Request) {
   const supabase = await createClient();
   const {
     data: { user },
@@ -117,8 +117,8 @@ export async function POST(request: Request) {
     );
     return NextResponse.json({ text, model, sources: used });
   } catch (error) {
-    if (error instanceof GeminiError) return NextResponse.json({ error: error.message }, { status: error.status });
-    return NextResponse.json({ error: "The AI couldn't be reached. Try again." }, { status: 502 });
+    if (error instanceof GeminiError) return NextResponse.json({ error: error.message, tryNext: error.tryNext }, { status: error.status });
+    return NextResponse.json({ error: "Couldn't reach the AI. Try again." }, { status: 502 });
   }
 }
 
@@ -152,7 +152,10 @@ async function suggestTitles(parts: string[], reportText: string) {
     if (!titles.length) return NextResponse.json({ error: "The AI didn't suggest any titles. Try again." }, { status: 502 });
     return NextResponse.json({ titles, model });
   } catch (error) {
-    if (error instanceof GeminiError) return NextResponse.json({ error: error.message }, { status: error.status });
-    return NextResponse.json({ error: "The AI couldn't be reached. Try again." }, { status: 502 });
+    if (error instanceof GeminiError) return NextResponse.json({ error: error.message, tryNext: error.tryNext }, { status: error.status });
+    return NextResponse.json({ error: "Couldn't reach the AI. Try again." }, { status: 502 });
   }
 }
+
+// body.attempt picks one model per request, so each model gets its own 5 minutes.
+export const POST = aiRoute(handle);

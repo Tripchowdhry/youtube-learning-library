@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { readSavedArticle } from "@/lib/article-cache";
 import { MAX_ITEMS, MAX_WATCHED_VIDEOS, type ChatItemKind, type ChatSource, type ChatTurn } from "@/lib/category-chat";
 import { splitTypedClips } from "@/lib/clips";
-import { GeminiError, askAboutSources, geminiConfigured, type SourcePart } from "@/lib/gemini";
+import { GeminiError, aiRoute, askAboutSources, geminiConfigured, type SourcePart } from "@/lib/gemini";
 import { htmlToText } from "@/lib/html-text";
 import { parseLink } from "@/lib/links";
 import { createClient } from "@/lib/supabase/server";
@@ -26,7 +26,7 @@ const ownNotes = (text: string) => splitTypedClips(text ?? "").text.trim();
 // Ask this category: answers one question from the items the person picked in a category,
 // and says which item each part came from.
 // Body: { kind: "video" | "article" | "scrap", ids: string[], category: string, question: string, history?: ChatTurn[] }
-export async function POST(request: Request) {
+async function handle(request: Request) {
   const supabase = await createClient();
   const {
     data: { user },
@@ -82,13 +82,13 @@ export async function POST(request: Request) {
       // Too much to watch or read in one free request.
       if (/token|too large|exceeds|payload/i.test(error.message)) {
         return NextResponse.json(
-          { error: "That's too much for the free AI in one go. Tap Choose… and pick fewer items, then ask again." },
+          { error: "Too much for the free AI. Tap Choose… and pick fewer items." },
           { status: 413 },
         );
       }
-      return NextResponse.json({ error: error.message }, { status: error.status });
+      return NextResponse.json({ error: error.message, tryNext: error.tryNext }, { status: error.status });
     }
-    return NextResponse.json({ error: "The AI couldn't be reached. Try again." }, { status: 502 });
+    return NextResponse.json({ error: "Couldn't reach the AI. Try again." }, { status: 502 });
   }
 }
 
@@ -169,3 +169,6 @@ async function gather(supabase: Supabase, kind: ChatItemKind, ids: string[]): Pr
     };
   });
 }
+
+// body.attempt picks one model per request, so each model gets its own 5 minutes.
+export const POST = aiRoute(handle);

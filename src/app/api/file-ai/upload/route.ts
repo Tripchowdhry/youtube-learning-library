@@ -28,6 +28,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ uploadUrl: await startBrowserUpload(size, type, user.id, request.headers.get("origin")) });
   } catch (e) {
     if (e instanceof GeminiError) return NextResponse.json({ error: e.message }, { status: e.status });
-    return NextResponse.json({ error: "The AI couldn't be reached. Try again." }, { status: 502 });
+    return NextResponse.json({ error: "Couldn't reach the AI. Try again." }, { status: 502 });
   }
 }

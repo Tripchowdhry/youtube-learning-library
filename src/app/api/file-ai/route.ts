@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { GeminiError, askAboutFile, askAboutUploadedFile, geminiConfigured, uploadVideoInPieces } from "@/lib/gemini";
+import { GeminiError, aiRoute, askAboutFile, askAboutUploadedFile, geminiConfigured, uploadVideoInPieces } from "@/lib/gemini";
 import { FILES_BUCKET, aiReadable, fileType } from "@/lib/files";
 import { createClient } from "@/lib/supabase/server";
 
@@ -9,7 +9,7 @@ export const maxDuration = 300;
 // person's own sign-in, so only their own files can be asked about.
 // A video kept on the computer comes one of two ways: already sent by the browser to the AI's
 // file store (geminiFile), or put in a temporary Supabase folder that is emptied afterwards.
-export async function POST(request: Request) {
+async function handle(request: Request) {
   const supabase = await createClient();
   const {
     data: { user },
@@ -39,8 +39,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "That file isn't yours." }, { status: 403 });
     }
     const size = Number(body.size);
+    let geminiFile: string | null = null;
     try {
-      const geminiFile = await uploadVideoInPieces(size, String(body.type ?? "video/mp4"), user.id, async function* () {
+      geminiFile = await uploadVideoInPieces(size, String(body.type ?? "video/mp4"), user.id, async function* () {
         for (const part of parts) {
           const { data, error } = await supabase.storage.from(FILES_BUCKET).download(part);
           if (error || !data) throw new GeminiError("Part of the video went missing on the way. Try again.", 404);
@@ -53,8 +54,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ text, model, geminiFile });
     } catch (e) {
       await supabase.storage.from(FILES_BUCKET).remove(parts);
-      if (e instanceof GeminiError) return NextResponse.json({ error: e.message }, { status: e.status });
-      return NextResponse.json({ error: "The AI couldn't be reached. Try again." }, { status: 502 });
+      // The next model asks about the copy Google already has, so the pieces aren't needed again.
+      if (e instanceof GeminiError) {
+        return NextResponse.json({ error: e.message, tryNext: e.tryNext && Boolean(geminiFile), geminiFile }, { status: e.status });
+      }
+      return NextResponse.json({ error: "Couldn't reach the AI. Try again." }, { status: 502 });
     }
   }
 
@@ -63,8 +67,8 @@ export async function POST(request: Request) {
       const { text, model } = await askAboutUploadedFile(String(body.geminiFile), user.id, instructions, ask);
       return NextResponse.json({ text, model, geminiFile: body.geminiFile });
     } catch (e) {
-      if (e instanceof GeminiError) return NextResponse.json({ error: e.message }, { status: e.status });
-      return NextResponse.json({ error: "The AI couldn't be reached. Try again." }, { status: 502 });
+      if (e instanceof GeminiError) return NextResponse.json({ error: e.message, tryNext: e.tryNext }, { status: e.status });
+      return NextResponse.json({ error: "Couldn't reach the AI. Try again." }, { status: 502 });
     }
   }
 
@@ -77,15 +81,24 @@ export async function POST(request: Request) {
   }
 
   const { data, error } = await supabase.storage.from(FILES_BUCKET).download(path);
-  if (temporary) await supabase.storage.from(FILES_BUCKET).remove([path]);
-  if (error || !data) return NextResponse.json({ error: "The file couldn't be found. It may have been deleted." }, { status: 404 });
+  if (error || !data) {
+    if (temporary) await supabase.storage.from(FILES_BUCKET).remove([path]);
+    return NextResponse.json({ error: "The file couldn't be found. It may have been deleted." }, { status: 404 });
+  }
   const bytes = Buffer.from(await data.arrayBuffer());
 
   try {
     const { text, model } = await askAboutFile({ bytes, mimeType: type === "text/markdown" ? "text/plain" : type }, instructions, ask);
+    if (temporary) await supabase.storage.from(FILES_BUCKET).remove([path]);
     return NextResponse.json({ text, model });
   } catch (e) {
-    if (e instanceof GeminiError) return NextResponse.json({ error: e.message }, { status: e.status });
-    return NextResponse.json({ error: "The AI couldn't be reached. Try again." }, { status: 502 });
+    // A temporary file stays while the next model may still ask about it.
+    const again = e instanceof GeminiError && e.tryNext;
+    if (temporary && !again) await supabase.storage.from(FILES_BUCKET).remove([path]);
+    if (e instanceof GeminiError) return NextResponse.json({ error: e.message, tryNext: e.tryNext }, { status: e.status });
+    return NextResponse.json({ error: "Couldn't reach the AI. Try again." }, { status: 502 });
   }
 }
+
+// body.attempt picks one model per request, so each model gets its own 5 minutes.
+export const POST = aiRoute(handle);
