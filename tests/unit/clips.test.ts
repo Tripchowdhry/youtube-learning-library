@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { deleteLeftoverClips, joinTypedClips, videoNoteClipPaths } from "@/lib/clips";
+import { deleteLeftoverClips, clipPathsIn, joinTypedClips } from "@/lib/clips";
 import type { NotePage } from "@/lib/types";
 
 const page = (...paths: string[]) => ({ images: paths.map((path) => ({ path })) }) as unknown as NotePage;
@@ -23,11 +23,16 @@ function fakeSupabase(tables: Record<string, unknown[]>) {
   return { client: client as unknown as SupabaseClient, removed };
 }
 
-describe("deleting a video's pictures", () => {
+describe("deleting pictures with their notes", () => {
   it("finds the pictures in typed and handwritten notes", () => {
     const note = { pages: [page("u/a.jpg"), page("u/b.jpg")], text: joinTypedClips("hello", [{ path: "u/c.jpg", t: 5 }, { path: "u/a.jpg", t: null }]) };
-    expect(videoNoteClipPaths(note).sort()).toEqual(["u/a.jpg", "u/b.jpg", "u/c.jpg"]);
-    expect(videoNoteClipPaths(null)).toEqual([]);
+    expect(clipPathsIn(note).sort()).toEqual(["u/a.jpg", "u/b.jpg", "u/c.jpg"]);
+    expect(clipPathsIn(null)).toEqual([]);
+  });
+
+  it("finds the pictures in a ScrapBook page's text", () => {
+    const body = '<p>hi</p><img src="https://x.supabase.co/storage/v1/object/public/clips/u%2Fd.jpg">';
+    expect(clipPathsIn({ body, pages: [page("u/e.jpg")] }).sort()).toEqual(["u/d.jpg", "u/e.jpg"]);
   });
 
   it("deletes them, but keeps one that's also in other notes", async () => {

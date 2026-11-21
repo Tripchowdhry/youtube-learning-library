@@ -1,5 +1,6 @@
 "use client";
 
+import { deleteItem } from "@/lib/delete-item";
 import { friendlyError } from "@/lib/errors";
 import { fetchAll } from "@/lib/fetch-all";
 import SearchBox from "@/components/SearchBox";
@@ -460,16 +461,16 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
     const ok = await askConfirm({
       title: `Delete this from your ${section.list}?`,
       quote: article.title ?? article.url,
-      message: "The link, its summary and your notes will be gone for good.\n\nOnly want to remove the summary? Choose Keep it, then use Clear summary.",
+      message: "The link, its summary and all your notes (typed, handwritten and pictures) will be gone for good.\n\nOnly want to remove the summary? Choose Keep it, then use Clear summary.",
       confirmLabel: "Yes, delete",
       cancelLabel: "Keep it",
       danger: true,
     });
     if (!ok) return;
     setArticles((prev) => prev.filter((a) => a.id !== article.id));
-    const { error } = await supabase.from("articles").delete().eq("id", article.id);
+    const error = await deleteItem(supabase, "article", article.id);
     if (error) {
-      notify(friendlyError(error.message), true);
+      notify(friendlyError(error), true);
       load();
     }
   }
