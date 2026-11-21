@@ -1,5 +1,6 @@
 "use client";
 
+import { deleteItem } from "@/lib/delete-item";
 import { friendlyError } from "@/lib/errors";
 import DeadEnd from "@/components/DeadEnd";
 import { markAiQuestions } from "@/lib/notes-format";
@@ -19,7 +20,7 @@ import { Bold, Eraser, Highlighter, Italic, Keyboard, List, ListOrdered, PenLine
 import { Divider, ToolButton, editorToReport } from "@/components/ReportRichEditor";
 import NotesExport from "@/components/NotesExport";
 import ScrapFiles, { AttachFileButton, addFiles, type Chosen } from "@/components/ScrapFiles";
-import { FILES_SETUP, deleteScrapFiles, type ScrapFile } from "@/lib/files";
+import { FILES_SETUP, type ScrapFile } from "@/lib/files";
 import { pictureUrl } from "@/lib/report";
 import { Ico } from "@/components/Icon";
 import { HIGHLIGHT_COLORS, InkTools, PEN_COLORS, SIZES, emptyPage, withPicture } from "@/components/Handwriting";
@@ -402,12 +403,12 @@ export default function ScrapEditor({ scrapId }: { scrapId: string }) {
 
   async function deleteScrap() {
     if (!window.confirm(`Delete "${title || "Untitled"}" from your ScrapBook?\nThis can't be undone.`)) return;
-    const { error } = await supabase.from("scraps").delete().eq("id", scrapId);
+    // Its pictures and attached files go too.
+    const error = await deleteItem(supabase, "scrap", scrapId);
     if (error) {
-      showNotice(friendlyError(error.message));
+      showNotice(friendlyError(error));
       return;
     }
-    await deleteScrapFiles(supabase, files.map((f) => f.path));
     router.push("/scrapbook");
   }
 

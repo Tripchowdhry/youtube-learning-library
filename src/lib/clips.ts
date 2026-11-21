@@ -162,17 +162,19 @@ export async function loadClipHomes(supabase: SupabaseClient): Promise<ClipHomes
   };
 }
 
-// The pictures in one video's notes: pasted into the typed notes or onto handwriting pages.
-export function videoNoteClipPaths(note: { pages: NotePage[] | null; text: string | null } | null) {
-  if (!note) return [];
+// The pictures in one set of notes: on handwriting pages, in typed notes (videos, Reading) or
+// in a ScrapBook page's text.
+export function clipPathsIn(notes: { pages?: NotePage[] | null; text?: string | null; body?: string | null } | null) {
+  if (!notes) return [];
   const paths = [
-    ...(note.pages ?? []).flatMap((p) => (p.images ?? []).map((im) => im.path)),
-    ...splitTypedClips(note.text ?? "").clips.map((c) => c.path),
+    ...(notes.pages ?? []).flatMap((p) => (p.images ?? []).map((im) => im.path)),
+    ...splitTypedClips(notes.text ?? "").clips.map((c) => c.path),
+    ...bodyClipPaths(notes.body ?? ""),
   ];
   return [...new Set(paths)];
 }
 
-// After a video and its notes are deleted, deletes their pictures too. A picture that is also
+// After something and its notes are deleted, deletes their pictures too. A picture that is also
 // in other notes stays.
 export async function deleteLeftoverClips(supabase: SupabaseClient, paths: string[]) {
   if (!paths.length) return;
