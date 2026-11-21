@@ -2,7 +2,7 @@
 // are asked one request at a time (body.attempt 0, 1, 2…): each model gets its own 5 minutes,
 // and when one is busy, out of free uses or too slow, the next one is asked.
 
-export const SLOW_MESSAGE = "The AI took too long (over 5 minutes). Very long or big requests can be too much for the free plan.";
+export const SLOW_MESSAGE = "The AI took over 5 minutes. Try something smaller.";
 
 export type AiResponse = { ok: boolean; status: number; data: Record<string, unknown> & { error?: string } };
 
@@ -32,7 +32,7 @@ export async function postAi(
     const cutOff = res.status === 504 && !data.error;
     tries.push({ ok: false, status: res.status, data: cutOff ? { ...data, error: SLOW_MESSAGE } : data });
     if (options.signal?.aborted || !(data.tryNext || (cutOff && attempt < 4))) break;
-    options.onNote?.(res.status === 504 ? "That AI model was slow, trying another one…" : "Trying another AI model…");
+    options.onNote?.(res.status === 504 ? "Too slow, trying another model…" : "Trying another model…");
     if (options.nextBody) request = { ...request, ...options.nextBody(data) };
   }
   // The answer that matters most: a used-up free limit, then slowness, then the last reason.

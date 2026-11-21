@@ -51,7 +51,7 @@ export const STILL_WORKING_SECONDS = 150;
 export function stillWorkingNote(seconds: number, note?: string) {
   if (note && seconds < STILL_WORKING_SECONDS) return note;
   if (seconds >= STILL_WORKING_SECONDS) {
-    return `${note ? `${note.replace(/…$/, "")}. ` : ""}Still working, this can take a few minutes…`;
+    return "Still working…";
   }
   return null;
 }

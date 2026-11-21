@@ -125,7 +125,7 @@ async function generate(body: (full: boolean) => object, what: string) {
   let models = await geminiModels();
   let hasNext = true;
   if (attempt !== undefined) {
-    if (attempt >= models.length) throw new GeminiError("No other AI model is free to try right now. Try again in a minute.", 503);
+    if (attempt >= models.length) throw new GeminiError("No other AI model is free. Try again in a minute.", 503);
     hasNext = attempt + 1 < models.length;
     models = [models[attempt]];
   }
@@ -151,13 +151,13 @@ async function generate(body: (full: boolean) => object, what: string) {
   // Worth asking another model, if the caller goes through them one at a time.
   const tryNext = hasNext && failures.length > 0 && failures.every((f) => TRY_NEXT.has(f.status) || f.status === SLOW);
   if (failures.some((f) => f.status === 429)) {
-    throw new GeminiError("The free AI limit is used up for now. Try again in a minute, or tomorrow.", 429, tryNext);
+    throw new GeminiError("The free AI limit is used up. Try again later.", 429, tryNext);
   }
   if (failures.some((f) => f.status === 503 || f.status === 500)) {
-    throw new GeminiError("Google's free AI is busy right now. Please try again in a minute.", 503, tryNext);
+    throw new GeminiError("The AI is busy. Try again in a minute.", 503, tryNext);
   }
   if (failures.some((f) => f.status === SLOW)) {
-    throw new GeminiError("The AI took too long (over 5 minutes). Very long videos can be too much for the free plan.", SLOW, tryNext);
+    throw new GeminiError("The AI took over 5 minutes. Try something shorter.", SLOW, tryNext);
   }
   // A model that's gone or not offered to this key (404, 403) says little; the first other
   // failure explains more.

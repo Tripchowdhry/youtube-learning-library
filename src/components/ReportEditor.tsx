@@ -325,7 +325,7 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
       if (!texts.length) setHandError({ key, text: "The AI couldn't find any writing to read on these pages." });
       else setHandReview({ key, text: texts.join("\n\n"), model, fresh: true });
     } catch {
-      if (mounted.current) setHandError({ key, text: "The AI couldn't be reached. Check your connection and try again." });
+      if (mounted.current) setHandError({ key, text: "Couldn't reach the AI. Check your connection." });
     } finally {
       if (mounted.current) setHandReading(null);
     }
@@ -378,7 +378,7 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
       const data = res.data as { text?: string; sources?: Parameters<typeof sourcesSection>[0]; model?: string; error?: string };
       if (!res.ok) {
         const message =
-          res.status === 504 ? "The AI took too long. Try fewer items, or try again in a minute." : (data.error ?? `The AI couldn't write the report (error ${res.status}).`);
+          res.status === 504 ? "Took too long. Try fewer items." : (data.error ?? `The AI couldn't write the report (error ${res.status}).`);
         if (mounted.current) setAiError(message);
         return;
       }
@@ -390,7 +390,7 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
             notify(data.model ? `Drafted by ${data.model}. Check it against your notes.` : "Draft ready.");
       }
     } catch {
-      if (mounted.current) setAiError("The AI couldn't be reached. Check your connection and try again.");
+      if (mounted.current) setAiError("Couldn't reach the AI. Check your connection.");
     } finally {
       if (mounted.current) setAiBusy(false);
     }
@@ -414,7 +414,7 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
       if (!res.ok) setTitleError(data.error ?? `The AI couldn't suggest titles (error ${res.status}).`);
       else setTitleIdeas({ titles: Array.isArray(data.titles) ? data.titles : [], model: data.model ? String(data.model) : null });
     } catch {
-      if (mounted.current) setTitleError("The AI couldn't be reached. Check your connection and try again.");
+      if (mounted.current) setTitleError("Couldn't reach the AI. Check your connection.");
     } finally {
       if (mounted.current) setTitleBusy(false);
     }
@@ -433,7 +433,7 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
   const improvePart = useCallback(
     async (text: string, how: ImproveHow) => {
       const res = await postAi("/api/report-improve", { text, how, report: body }).catch(() => null);
-      if (!res) throw new Error("The AI couldn't be reached. Check your connection and try again.");
+      if (!res) throw new Error("Couldn't reach the AI. Check your connection.");
       const data = res.data;
       if (!res.ok) throw new Error(data.error ?? `The AI couldn't improve it (error ${res.status}).`);
       return { text: String(data.text ?? ""), model: data.model ? String(data.model) : null };

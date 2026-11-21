@@ -106,11 +106,11 @@ export default function CategoryChat({
       );
       const data = res.data as { text?: string; sources?: ChatSource[]; error?: string };
       if (res.ok) result = { q, a: data.text ?? "", sources: data.sources };
-      else if (res.status === 504) result = { q, error: "The AI took too long. Tap Choose… and pick fewer items, then try again." };
+      else if (res.status === 504) result = { q, error: "Took too long. Tap Choose… and pick fewer items." };
       else result = { q, error: data.error ?? `The AI couldn't answer (error ${res.status}).` };
     } catch {
       if (controller.signal.aborted) return;
-      result = { q, error: "The AI couldn't be reached. Check your connection and try again." };
+      result = { q, error: "Couldn't reach the AI. Check your connection." };
     }
     setTurns((all) => [...all.slice(0, -1), result]);
     setBusy(false);

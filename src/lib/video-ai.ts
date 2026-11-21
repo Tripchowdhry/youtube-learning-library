@@ -5,7 +5,7 @@ import { postAi } from "@/lib/ai-request";
 
 export type VideoAiResult = { text?: string; model?: string; error?: string; code?: string };
 
-const UNREACHABLE = { error: "The AI couldn't be reached. Check your connection and try again." };
+const UNREACHABLE = { error: "Couldn't reach the AI. Check your connection." };
 
 async function ask(url: string, body: Record<string, unknown>, signal?: AbortSignal, onNote?: (note: string) => void): Promise<VideoAiResult> {
   try {

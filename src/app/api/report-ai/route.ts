@@ -118,7 +118,7 @@ async function handle(request: Request) {
     return NextResponse.json({ text, model, sources: used });
   } catch (error) {
     if (error instanceof GeminiError) return NextResponse.json({ error: error.message, tryNext: error.tryNext }, { status: error.status });
-    return NextResponse.json({ error: "The AI couldn't be reached. Try again." }, { status: 502 });
+    return NextResponse.json({ error: "Couldn't reach the AI. Try again." }, { status: 502 });
   }
 }
 
@@ -153,7 +153,7 @@ async function suggestTitles(parts: string[], reportText: string) {
     return NextResponse.json({ titles, model });
   } catch (error) {
     if (error instanceof GeminiError) return NextResponse.json({ error: error.message, tryNext: error.tryNext }, { status: error.status });
-    return NextResponse.json({ error: "The AI couldn't be reached. Try again." }, { status: 502 });
+    return NextResponse.json({ error: "Couldn't reach the AI. Try again." }, { status: 502 });
   }
 }
 

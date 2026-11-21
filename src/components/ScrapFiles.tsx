@@ -278,13 +278,13 @@ export default function ScrapFiles(props: {
           }
           if (isLocalFile(f) && res.ok && data.geminiFile) rememberSent(f.path, data.geminiFile);
           if (!res.ok || !data.text) {
-            return { error: res.status === 504 ? "The AI took too long. Try a smaller file." : (data.error ?? `The AI couldn't answer (error ${res.status}).`) };
+            return { error: res.status === 504 ? "Took too long. Try a smaller file." : (data.error ?? `The AI couldn't answer (error ${res.status}).`) };
           }
           return { result: answerHtml(clean, f.name, data.text) };
         } catch {
           // Stopped or failed before the AI got it: tidy away the temporary pieces.
           if (target.parts?.length) await supabase.storage.from(FILES_BUCKET).remove(target.parts);
-          return { error: "The AI couldn't be reached. Check your connection and try again." };
+          return { error: "Couldn't reach the AI. Check your connection." };
         }
       },
       fallback: async (html) => {

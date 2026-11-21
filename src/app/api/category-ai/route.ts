@@ -82,13 +82,13 @@ async function handle(request: Request) {
       // Too much to watch or read in one free request.
       if (/token|too large|exceeds|payload/i.test(error.message)) {
         return NextResponse.json(
-          { error: "That's too much for the free AI in one go. Tap Choose… and pick fewer items, then ask again." },
+          { error: "Too much for the free AI. Tap Choose… and pick fewer items." },
           { status: 413 },
         );
       }
       return NextResponse.json({ error: error.message, tryNext: error.tryNext }, { status: error.status });
     }
-    return NextResponse.json({ error: "The AI couldn't be reached. Try again." }, { status: 502 });
+    return NextResponse.json({ error: "Couldn't reach the AI. Try again." }, { status: 502 });
   }
 }
 

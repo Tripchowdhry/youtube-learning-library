@@ -58,7 +58,7 @@ async function handle(request: Request) {
       if (e instanceof GeminiError) {
         return NextResponse.json({ error: e.message, tryNext: e.tryNext && Boolean(geminiFile), geminiFile }, { status: e.status });
       }
-      return NextResponse.json({ error: "The AI couldn't be reached. Try again." }, { status: 502 });
+      return NextResponse.json({ error: "Couldn't reach the AI. Try again." }, { status: 502 });
     }
   }
 
@@ -68,7 +68,7 @@ async function handle(request: Request) {
       return NextResponse.json({ text, model, geminiFile: body.geminiFile });
     } catch (e) {
       if (e instanceof GeminiError) return NextResponse.json({ error: e.message, tryNext: e.tryNext }, { status: e.status });
-      return NextResponse.json({ error: "The AI couldn't be reached. Try again." }, { status: 502 });
+      return NextResponse.json({ error: "Couldn't reach the AI. Try again." }, { status: 502 });
     }
   }
 
@@ -96,7 +96,7 @@ async function handle(request: Request) {
     const again = e instanceof GeminiError && e.tryNext;
     if (temporary && !again) await supabase.storage.from(FILES_BUCKET).remove([path]);
     if (e instanceof GeminiError) return NextResponse.json({ error: e.message, tryNext: e.tryNext }, { status: e.status });
-    return NextResponse.json({ error: "The AI couldn't be reached. Try again." }, { status: 502 });
+    return NextResponse.json({ error: "Couldn't reach the AI. Try again." }, { status: 502 });
   }
 }
 
