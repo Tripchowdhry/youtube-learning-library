@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { readSavedArticle } from "@/lib/article-cache";
 import { fetchFile, looksLikeFile, type FetchedFile } from "@/lib/fetch-file";
-import { GeminiError, askAboutFile, askAboutPage, geminiConfigured } from "@/lib/gemini";
+import { GeminiError, aiRoute, askAboutFile, askAboutPage, geminiConfigured } from "@/lib/gemini";
 import { parseLink } from "@/lib/links";
 import { createClient } from "@/lib/supabase/server";
 
@@ -13,7 +13,7 @@ const TEXT_MAX = 60_000;
 
 // task "note" (the default): the short note shown next to an article or tutorial in the library.
 // task "ask": answers the person's request for their study notes on the article.
-export async function POST(request: Request) {
+async function handle(request: Request) {
   const supabase = await createClient();
   const {
     data: { user },
@@ -75,7 +75,10 @@ export async function POST(request: Request) {
     );
     return NextResponse.json({ text: note.replace(/\s+/g, " ").slice(0, NOTE_MAX), model });
   } catch (error) {
-    if (error instanceof GeminiError) return NextResponse.json({ error: error.message }, { status: error.status });
+    if (error instanceof GeminiError) return NextResponse.json({ error: error.message, tryNext: error.tryNext }, { status: error.status });
     return NextResponse.json({ error: "The AI couldn't be reached. Try again." }, { status: 502 });
   }
 }
+
+// body.attempt picks one model per request, so each model gets its own 5 minutes.
+export const POST = aiRoute(handle);

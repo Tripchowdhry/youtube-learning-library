@@ -21,6 +21,8 @@ import {
   type ChatItemKind,
   type ChatSource,
 } from "@/lib/category-chat";
+import { postAi } from "@/lib/ai-request";
+import { stillWorkingNote, useSecondsSince } from "@/lib/ai-jobs";
 import { friendlyError } from "@/lib/errors";
 import { createClient } from "@/lib/supabase/client";
 import { formatTime } from "@/lib/youtube-player";
@@ -52,6 +54,9 @@ export default function CategoryChat({
   const [turns, setTurns] = useState<Turn[]>([]);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
+  // While asking: when it started, and what it's doing now (like trying another model).
+  const [askedAt, setAskedAt] = useState(0);
+  const [note, setNote] = useState<string | null>(null);
   const bottom = useRef<HTMLDivElement>(null);
   const box = useRef<HTMLTextAreaElement>(null);
   const abort = useRef<AbortController | null>(null);
@@ -86,20 +91,21 @@ export default function CategoryChat({
     }
     setDraft("");
     setBusy(true);
+    setNote(null);
+    setAskedAt(Date.now());
     const history = turns.filter((t) => t.a).map((t) => ({ q: t.q, a: t.a! }));
     setTurns((all) => [...all, { q }]);
     const controller = new AbortController();
     abort.current = controller;
     let result: Turn = { q };
     try {
-      const res = await fetch("/api/category-ai", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ kind, ids: picked.map((i) => i.id), category: categoryName, question: q, history }),
-        signal: controller.signal,
-      });
-      const data = await res.json().catch(() => ({}));
-      if (res.ok) result = { q, a: data.text, sources: data.sources };
+      const res = await postAi(
+        "/api/category-ai",
+        { kind, ids: picked.map((i) => i.id), category: categoryName, question: q, history },
+        { signal: controller.signal, onNote: setNote },
+      );
+      const data = res.data as { text?: string; sources?: ChatSource[]; error?: string };
+      if (res.ok) result = { q, a: data.text ?? "", sources: data.sources };
       else if (res.status === 504) result = { q, error: "The AI took too long. Tap Choose… and pick fewer items, then try again." };
       else result = { q, error: data.error ?? `The AI couldn't answer (error ${res.status}).` };
     } catch {
@@ -175,10 +181,11 @@ export default function CategoryChat({
                   ) : t.error ? (
                     <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{t.error}</div>
                   ) : (
-                    <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-500">
-                      <Loader2 size={15} className="animate-spin" color={PURPLE} aria-hidden />
-                      {kind === "video" ? "Watching your videos and writing an answer…" : "Reading this category and writing an answer…"}
-                    </div>
+                    <Thinking
+                      startedAt={askedAt}
+                      note={note}
+                      words={kind === "video" ? "Watching your videos and writing an answer…" : "Reading this category and writing an answer…"}
+                    />
                   )}
                 </div>
               ))}
@@ -234,6 +241,18 @@ export default function CategoryChat({
           }}
         />
       )}
+    </div>
+  );
+}
+
+// The spinner while an answer is written. After 2.5 minutes, or when another model is being
+// tried, it says so, so it doesn't look stuck.
+function Thinking({ startedAt, note, words }: { startedAt: number; note: string | null; words: string }) {
+  const seconds = useSecondsSince(startedAt);
+  return (
+    <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-500">
+      <Loader2 size={15} className="shrink-0 animate-spin" color={PURPLE} aria-hidden />
+      {stillWorkingNote(seconds, note ?? undefined) ?? words}
     </div>
   );
 }

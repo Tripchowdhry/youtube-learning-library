@@ -2,7 +2,28 @@
 // from its link, so it sees the slides and screen as well as hearing what's said.
 // Needs GEMINI_API_KEY (free from Google AI Studio); GEMINI_MODEL is optional.
 
+import { AsyncLocalStorage } from "node:async_hooks";
 import { geminiModels, looksRetired, modelRetired } from "./gemini-models";
+
+// Which model this request should ask, when the browser goes through the models one request
+// at a time (so each one gets its own 5 minutes). Set by withModelAttempt; without it, every
+// model is tried in turn within the one request.
+const attemptStore = new AsyncLocalStorage<{ attempt: number }>();
+
+// Runs a route's work for one model attempt: body.attempt 0 is the first model, 1 the next…
+// An answer that says tryNext means the browser should ask again with the next number.
+export function withModelAttempt<T>(attempt: unknown, work: () => Promise<T>): Promise<T> {
+  if (!Number.isInteger(attempt) || (attempt as number) < 0) return work();
+  return attemptStore.run({ attempt: attempt as number }, work);
+}
+
+// Wraps a POST route so it takes part in model attempts (see withModelAttempt).
+export function aiRoute(handler: (request: Request) => Promise<Response>) {
+  return async (request: Request) => {
+    const body = await request.clone().json().catch(() => ({}));
+    return withModelAttempt((body as { attempt?: unknown })?.attempt, () => handler(request));
+  };
+}
 
 // Which models to try, and in what order, comes from gemini-models.ts: Google's own list,
 // checked once a day, with a fixed list as the backup. When one is busy or missing, the next
@@ -92,14 +113,23 @@ function modelName(id: string) {
     .join(" ");
 }
 
-// Tries each model in turn (or only `onlyModel`). `body(true)` is the full request; a model
+// Tries each model in turn (or one, see withModelAttempt). `body(true)` is the full request; a model
 // that turns it down (400) is asked again with `body(false)`, a simpler one. `what` finishes
 // "The AI couldn't…". Each model has up to MODEL_TIME_LIMIT_MS to answer.
-async function generate(body: (full: boolean) => object, what: string, onlyModel?: string) {
+async function generate(body: (full: boolean) => object, what: string) {
   // Every model's failure is kept, so the message shown is the one that matters (a used-up
   // free limit, or why the main model failed) and not just whatever the last backup said.
   const failures: { model: string; status: number; detail: string }[] = [];
-  for (const model of onlyModel ? [onlyModel] : await geminiModels()) {
+  // One attempt of several: only that model is asked, and tryNext says if there's another.
+  const attempt = attemptStore.getStore()?.attempt;
+  let models = await geminiModels();
+  let hasNext = true;
+  if (attempt !== undefined) {
+    if (attempt >= models.length) throw new GeminiError("No other AI model is free to try right now. Try again in a minute.", 503);
+    hasNext = attempt + 1 < models.length;
+    models = [models[attempt]];
+  }
+  for (const model of models) {
     const deadline = Date.now() + MODEL_TIME_LIMIT_MS;
     let { res, data } = await callModel(model, body(true), deadline);
     if (res.status === 400) ({ res, data } = await callModel(model, body(false), deadline));
@@ -119,7 +149,7 @@ async function generate(body: (full: boolean) => object, what: string, onlyModel
     if (!TRY_NEXT.has(res.status) && res.status !== SLOW) break;
   }
   // Worth asking another model, if the caller goes through them one at a time.
-  const tryNext = failures.length > 0 && failures.every((f) => TRY_NEXT.has(f.status) || f.status === SLOW);
+  const tryNext = hasNext && failures.length > 0 && failures.every((f) => TRY_NEXT.has(f.status) || f.status === SLOW);
   if (failures.some((f) => f.status === 429)) {
     throw new GeminiError("The free AI limit is used up for now. Try again in a minute, or tomorrow.", 429, tryNext);
   }
@@ -143,10 +173,8 @@ function withoutSettings(body: object) {
 
 // Returns the answer and the name of the Gemini model that wrote it.
 // A model that doesn't accept a custom frame rate or clip gets the plain request instead.
-// With `onlyModel`, only that model is asked (the browser then goes through the list itself,
-// one request per model, so each model can have its full 5 minutes).
-export function askAboutVideo(videoUrl: string, instructions: string, request: string, focus: Focus = null, onlyModel?: string) {
-  return generate((full) => videoRequest(videoUrl, instructions, request, focus, full), "watch this video", onlyModel);
+export function askAboutVideo(videoUrl: string, instructions: string, request: string, focus: Focus = null) {
+  return generate((full) => videoRequest(videoUrl, instructions, request, focus, full), "watch this video");
 }
 
 // Asks about an article. With its text, the text is sent; without (a login wall, an X post),

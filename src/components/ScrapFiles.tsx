@@ -13,7 +13,7 @@ import { Download, Eye, EyeOff, File as FileIcon, FileText, Film, Image as Image
 import { Ico, type Tone } from "@/components/Icon";
 import { askConfirm } from "@/components/ConfirmDialog";
 import { editorHtml } from "@/components/ReportRichEditor";
-import { onAiJobDone, runAiJob, setAiJobNote, useAiJobs, useSecondsSince, wasStopped } from "@/lib/ai-jobs";
+import { onAiJobDone, runAiJob, setAiJobNote, stillWorkingNote, useAiJobs, useSecondsSince, wasStopped } from "@/lib/ai-jobs";
 import {
   ADD_MAX_BYTES,
   ADD_MAX_MB,
@@ -28,6 +28,7 @@ import {
 } from "@/lib/files";
 import { findLocalFile as findOnComputer, forgetLocalFile, isLocalFile, rememberLocalFile, type FileHandle, type PickerWindow } from "@/lib/local-files";
 import { parseReport } from "@/lib/report";
+import { postAi } from "@/lib/ai-request";
 import { docSections, hasExtractableText, hasTextView, textForAi, type DocSection } from "@/lib/doc-text";
 
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -264,13 +265,13 @@ export default function ScrapFiles(props: {
             target = { geminiFile: sent.geminiFile, parts: sent.parts, size: sent.size };
           }
           if (isLocalFile(f)) setAiJobNote(aiKey, f.type.startsWith("video/") ? "The AI is watching the video…" : "The AI is reading the file…");
-          const res = await fetch("/api/file-ai", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ ...target, name: f.name, type: sendType, prompt: clean }),
+          const res = await postAi("/api/file-ai", { ...target, name: f.name, type: sendType, prompt: clean }, {
             signal,
+            onNote: (note) => setAiJobNote(aiKey, note),
+            // A video sent in pieces is now with Google: the next model asks about that copy.
+            nextBody: (data) => (data.geminiFile ? { geminiFile: data.geminiFile, parts: undefined } : {}),
           });
-          const data = await res.json().catch(() => ({}));
+          const data = res.data as { text?: string; error?: string; geminiFile?: string };
           if (sentBefore && res.status === 403) {
             forgetSent(f.path);
             return { error: "Google no longer has this file. Ask again and it will be sent again." };
@@ -594,7 +595,7 @@ function Working({ startedAt, jobKey, note }: { startedAt: number; jobKey: strin
       <div className="min-w-0 flex-1">
         <p>
           <span className="mr-2 inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-violet-300 border-t-violet-700 align-[-2px]" />
-          {note ?? "The AI is reading the file…"} ({time})
+          {(sending ? note : stillWorkingNote(s, note)) ?? "The AI is reading the file…"} ({time})
         </p>
         {sending && (
           <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-violet-200" role="progressbar" aria-valuenow={Number(sending[1])}>

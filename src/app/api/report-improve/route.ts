@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { GeminiError, askAboutFile, geminiConfigured } from "@/lib/gemini";
+import { GeminiError, aiRoute, askAboutFile, geminiConfigured } from "@/lib/gemini";
 import { createClient } from "@/lib/supabase/server";
 
 export const maxDuration = 120;
@@ -14,7 +14,7 @@ const HOW = {
     "Expand this part: explain its points more fully, and add a short example where it helps. Use only what this part and the rest of the report say; don't add new facts.",
 } as const;
 
-export async function POST(request: Request) {
+async function handle(request: Request) {
   const supabase = await createClient();
   const {
     data: { user },
@@ -45,7 +45,10 @@ export async function POST(request: Request) {
     if (!out) return NextResponse.json({ error: "The AI didn't send anything back. Try again." }, { status: 502 });
     return NextResponse.json({ text: out, model });
   } catch (error) {
-    if (error instanceof GeminiError) return NextResponse.json({ error: error.message }, { status: error.status });
+    if (error instanceof GeminiError) return NextResponse.json({ error: error.message, tryNext: error.tryNext }, { status: error.status });
     return NextResponse.json({ error: "The AI couldn't be reached. Try again." }, { status: 502 });
   }
 }
+
+// body.attempt picks one model per request, so each model gets its own 5 minutes.
+export const POST = aiRoute(handle);

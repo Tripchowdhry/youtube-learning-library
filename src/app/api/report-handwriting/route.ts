@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { GeminiError, askAboutFile, geminiConfigured } from "@/lib/gemini";
+import { GeminiError, aiRoute, askAboutFile, geminiConfigured } from "@/lib/gemini";
 import { createClient } from "@/lib/supabase/server";
 
 export const maxDuration = 120;
@@ -11,7 +11,7 @@ export const maxDuration = 120;
 // About 3 MB of picture, sent as base64.
 const MAX_BASE64 = 4_000_000;
 
-export async function POST(request: Request) {
+async function handle(request: Request) {
   const supabase = await createClient();
   const {
     data: { user },
@@ -43,7 +43,10 @@ export async function POST(request: Request) {
     );
     return NextResponse.json({ text: String(text ?? "").trim(), model });
   } catch (error) {
-    if (error instanceof GeminiError) return NextResponse.json({ error: error.message }, { status: error.status });
+    if (error instanceof GeminiError) return NextResponse.json({ error: error.message, tryNext: error.tryNext }, { status: error.status });
     return NextResponse.json({ error: "The AI couldn't be reached. Try again." }, { status: 502 });
   }
 }
+
+// body.attempt picks one model per request, so each model gets its own 5 minutes.
+export const POST = aiRoute(handle);

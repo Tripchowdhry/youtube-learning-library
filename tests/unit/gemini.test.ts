@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { askAboutSources, askAboutVideo } from "@/lib/gemini";
+import { askAboutSources, askAboutVideo, withModelAttempt } from "@/lib/gemini";
 import { forgetModelList, orderModels } from "@/lib/gemini-models";
 
 type Reply = { status: number; body: unknown };
@@ -143,12 +143,23 @@ describe("askAboutSources", () => {
 });
 
 describe("one model at a time", () => {
-  it("asks only the named model and says when another one is worth trying", async () => {
+  it("asks only the model for this attempt and says when another one is worth trying", async () => {
     const calls = fakeGoogle(() => fail(429, "quota"), ["gemini-4-hydrogen", "gemini-3.8-flash"]);
-    const error = await askAboutVideo("https://youtu.be/x", "i", "r", null, "gemini-4-hydrogen").catch((e) => e);
+    const first = await withModelAttempt(0, () => askAboutVideo("https://youtu.be/x", "i", "r")).catch((e) => e);
     expect(new Set(calls.map((c) => c.model))).toEqual(new Set(["gemini-4-hydrogen"]));
-    expect(error.status).toBe(429);
-    expect(error.tryNext).toBe(true);
+    expect(first.status).toBe(429);
+    expect(first.tryNext).toBe(true);
+
+    calls.length = 0;
+    const second = await withModelAttempt(1, () => askAboutVideo("https://youtu.be/x", "i", "r")).catch((e) => e);
+    expect(new Set(calls.map((c) => c.model))).toEqual(new Set(["gemini-3.8-flash"]));
+    expect(second.tryNext).toBe(true);
+
+    // The list is hydrogen, 3.8 Flash and the two "-latest" names: the last one has no next.
+    const last = await withModelAttempt(3, () => askAboutVideo("https://youtu.be/x", "i", "r")).catch((e) => e);
+    expect(last.tryNext).toBe(false);
+    const past = await withModelAttempt(4, () => askAboutVideo("https://youtu.be/x", "i", "r")).catch((e) => e);
+    expect(past.status).toBe(503);
   });
 
   it("moves on from a model that runs out of time", async () => {
