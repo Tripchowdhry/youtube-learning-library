@@ -285,9 +285,9 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
 
     // With a category picked, the link goes there. Otherwise it goes into its author's
     // category (like Videos does with YouTube channels), made the first time. A page that
-    // doesn't name its author goes under its website instead.
+    // doesn't name its author goes under its company or publication, or else its website.
     let newCategory: ArticleCategory | null = null;
-    const autoName: string | null = info.author || info.site || null;
+    const autoName: string | null = info.author || info.publisher || info.site || null;
     const autoSorted = !categoryId && Boolean(autoName);
     if (autoSorted) {
       const picked = await autoCategory(autoName!);
