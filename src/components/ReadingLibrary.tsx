@@ -283,12 +283,14 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
       if (!title) return false;
     }
 
-    // With a category picked, the link goes there. Otherwise it goes into its website's
-    // category (like Videos does with YouTube channels), made the first time.
+    // With a category picked, the link goes there. Otherwise it goes into its author's
+    // category (like Videos does with YouTube channels), made the first time. A page that
+    // doesn't name its author goes under its website instead.
     let newCategory: ArticleCategory | null = null;
-    const autoSorted = !categoryId && Boolean(info.site);
+    const autoName: string | null = info.author || info.site || null;
+    const autoSorted = !categoryId && Boolean(autoName);
     if (autoSorted) {
-      const picked = await siteCategory(info.site);
+      const picked = await autoCategory(autoName!);
       if (!picked) return false;
       categoryId = picked.id;
       if (!categories.some((c) => c.id === picked.id)) newCategory = picked;
@@ -313,14 +315,14 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
     }
     if (newCategory) setCategories((prev) => [...prev, newCategory!]);
     setArticles((prev) => [data as Article, ...prev]);
-    notify(autoSorted ? `Saved to ${info.site}` : `Saved "${title}"`);
+    notify(autoSorted ? `Saved to ${autoName}` : `Saved "${title}"`);
     writeAiNote(data as Article);
     return true;
   }
 
-  // Finds the top-level category named after a website (like "medium.com"), creating it the first time.
-  async function siteCategory(site: string): Promise<ArticleCategory | null> {
-    const name = site.trim().slice(0, 100);
+  // Finds the top-level category named after an author (or a website), creating it the first time.
+  async function autoCategory(label: string): Promise<ArticleCategory | null> {
+    const name = label.trim().slice(0, 100);
     const existing = categories.find((c) => c.parent_id === null && c.name.toLowerCase() === name.toLowerCase());
     if (existing) return existing;
 
@@ -1265,7 +1267,7 @@ function AddArticleForm(props: {
         className="rounded-md border border-slate-300 bg-white px-2 py-2 text-sm sm:max-w-48"
         aria-label="Save to category"
       >
-        <option value="">Sort by website</option>
+        <option value="">Sort by author</option>
         {props.categoryOptions.map((c) => (
           <option key={c.id} value={c.id}>
             {c.label}
