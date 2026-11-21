@@ -6,14 +6,12 @@ import { Camera, Trash2 } from "lucide-react";
 import { Ico } from "@/components/Icon";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { clipOwners, clipUrl, deleteClips, listClips, type ArticleRow, type ClipHomes, type ClipOwner, type ScrapRow, type StoredClip } from "@/lib/clips";
+import { clipOwners, clipUrl, deleteClips, listClips, loadClipHomes, type ClipHomes, type ClipOwner, type StoredClip } from "@/lib/clips";
 import { createClient } from "@/lib/supabase/client";
-import type { NotePage } from "@/lib/types";
 
 // The free Supabase plan includes 1 GB of file storage.
 const FREE_STORAGE = 1024 ** 3;
 
-type NoteRow = { video_id: string; pages: NotePage[] | null; text: string | null };
 type Month = { key: string; label: string; clips: StoredClip[]; size: number };
 type Year = { year: string; months: Month[]; count: number; size: number };
 
@@ -60,21 +58,13 @@ export default function ClipsManager() {
 
   const load = useCallback(async () => {
     try {
-      const [stored, n, v, a, sc] = await Promise.all([
+      const [stored, loaded, v] = await Promise.all([
         listClips(supabase),
-        fetchAll((from, to) => supabase.from("notes").select("video_id, pages, text").order("id").range(from, to)),
+        loadClipHomes(supabase),
         fetchAll((from, to) => supabase.from("videos").select("id, title").order("id").range(from, to)),
-        // Handwriting in Reading needs supabase/article-pages.sql; without it, read just the typed notes.
-        fetchAll((from, to) => supabase.from("articles").select("id, title, notes, pages").order("id").range(from, to)).then((r) =>
-          r.error ? fetchAll((from, to) => supabase.from("articles").select("id, title, notes").order("id").range(from, to)) : r,
-        ),
-        fetchAll((from, to) => supabase.from("scraps").select("id, title, body, pages").order("id").range(from, to)),
       ]);
-      if (n.error) throw new Error(n.error.message);
-      // Reading notes or the ScrapBook may not be set up yet (their SQL not run); then they hold no clips.
-      const articles = (a.error ? [] : (a.data ?? [])) as ArticleRow[];
-      const scraps = (sc.error ? [] : (sc.data ?? [])) as ScrapRow[];
-      setHomes({ notes: (n.data ?? []) as NoteRow[], articles, scraps });
+      const { articles, scraps } = loaded;
+      setHomes(loaded);
       setTitles(
         new Map([
           ...(v.data ?? []).map((x) => [`video:${x.id}`, (x.title as string) || "Untitled video"] as const),

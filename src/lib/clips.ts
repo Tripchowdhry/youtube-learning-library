@@ -2,6 +2,7 @@
 // Stored in the public "clips" Supabase Storage bucket under the owner's user id.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { fetchAll } from "@/lib/fetch-all";
 import type { NotePage } from "@/lib/types";
 import { formatTime } from "@/lib/youtube-player";
 
@@ -140,6 +141,47 @@ export function clipOwners(homes: ClipHomes) {
     for (const path of bodyClipPaths(sc.body ?? "")) where.set(path, owner);
   }
   return where;
+}
+
+// Every note that can hold clips: video notes, Reading notes and ScrapBook pages.
+export async function loadClipHomes(supabase: SupabaseClient): Promise<ClipHomes> {
+  const [n, a, sc] = await Promise.all([
+    fetchAll((from, to) => supabase.from("notes").select("video_id, pages, text").order("id").range(from, to)),
+    // Handwriting in Reading needs supabase/article-pages.sql; without it, read just the typed notes.
+    fetchAll((from, to) => supabase.from("articles").select("id, title, notes, pages").order("id").range(from, to)).then((r) =>
+      r.error ? fetchAll((from, to) => supabase.from("articles").select("id, title, notes").order("id").range(from, to)) : r,
+    ),
+    fetchAll((from, to) => supabase.from("scraps").select("id, title, body, pages").order("id").range(from, to)),
+  ]);
+  if (n.error) throw new Error(n.error.message);
+  // Reading notes or the ScrapBook may not be set up yet (their SQL not run); then they hold no clips.
+  return {
+    notes: (n.data ?? []) as NoteRow[],
+    articles: (a.error ? [] : (a.data ?? [])) as ArticleRow[],
+    scraps: (sc.error ? [] : (sc.data ?? [])) as ScrapRow[],
+  };
+}
+
+// The pictures in one video's notes: pasted into the typed notes or onto handwriting pages.
+export function videoNoteClipPaths(note: { pages: NotePage[] | null; text: string | null } | null) {
+  if (!note) return [];
+  const paths = [
+    ...(note.pages ?? []).flatMap((p) => (p.images ?? []).map((im) => im.path)),
+    ...splitTypedClips(note.text ?? "").clips.map((c) => c.path),
+  ];
+  return [...new Set(paths)];
+}
+
+// After a video and its notes are deleted, deletes their pictures too. A picture that is also
+// in other notes stays.
+export async function deleteLeftoverClips(supabase: SupabaseClient, paths: string[]) {
+  if (!paths.length) return;
+  const stillUsed = clipOwners(await loadClipHomes(supabase));
+  const gone = paths.filter((p) => !stillUsed.has(p));
+  for (let i = 0; i < gone.length; i += 100) {
+    const { error } = await supabase.storage.from(CLIPS_BUCKET).remove(gone.slice(i, i + 100));
+    if (error) throw new Error(error.message);
+  }
 }
 
 const withoutImages = (pages: NotePage[], gone: Set<string>) =>

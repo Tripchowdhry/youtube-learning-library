@@ -49,6 +49,7 @@ import type { VideoCategory, Video } from "@/lib/types";
 import { isWithin } from "@/lib/category-tree";
 import { onAiJobDone, runAiJob, setAiJobNote, useAiJobs } from "@/lib/ai-jobs";
 import { askVideoAi } from "@/lib/video-ai";
+import { deleteLeftoverClips, videoNoteClipPaths } from "@/lib/clips";
 import { askConfirm } from "./ConfirmDialog";
 import TagPills from "./TagPills";
 import { askTags } from "@/lib/tags";
@@ -414,18 +415,23 @@ export default function Library({ userEmail }: { userEmail: string }) {
       title: "Delete this whole video?",
       quote: video.title ?? undefined,
       message:
-        "The video, its summary and all its notes will be gone for good.\n\nOnly want to remove the summary? Choose Keep the video, then use Clear summary.",
+        "The video, its summary and all its notes (typed, handwritten and pictures) will be gone for good.\n\nOnly want to remove the summary? Choose Keep the video, then use Clear summary.",
       confirmLabel: "Yes, delete video",
       cancelLabel: "Keep the video",
       danger: true,
     });
     if (!ok) return;
     setVideos((prev) => prev.filter((v) => v.id !== video.id));
+    // Its pictures are read first: deleting the video deletes its notes (typed and handwritten) with it.
+    const { data: note } = await supabase.from("notes").select("pages, text").eq("video_id", video.id).maybeSingle();
     const { error } = await supabase.from("videos").delete().eq("id", video.id);
     if (error) {
       notify(friendlyError(error.message), true);
       load();
+      return;
     }
+    // A picture that couldn't be deleted now shows as unused in Manage clips, where it can be deleted.
+    deleteLeftoverClips(supabase, videoNoteClipPaths(note)).catch(() => {});
   }
 
   // ---------- Category actions ----------
