@@ -141,3 +141,31 @@ describe("askAboutSources", () => {
     expect(body.generationConfig).toEqual({ mediaResolution: "MEDIA_RESOLUTION_LOW" });
   });
 });
+
+describe("one model at a time", () => {
+  it("asks only the named model and says when another one is worth trying", async () => {
+    const calls = fakeGoogle(() => fail(429, "quota"), ["gemini-4-hydrogen", "gemini-3.8-flash"]);
+    const error = await askAboutVideo("https://youtu.be/x", "i", "r", null, "gemini-4-hydrogen").catch((e) => e);
+    expect(new Set(calls.map((c) => c.model))).toEqual(new Set(["gemini-4-hydrogen"]));
+    expect(error.status).toBe(429);
+    expect(error.tryNext).toBe(true);
+  });
+
+  it("moves on from a model that runs out of time", async () => {
+    const models: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        if (url.includes("/models?")) return new Response("{}", { status: 500 });
+        const model = url.match(/models\/([^:]+):/)![1];
+        models.push(model);
+        if (models.length === 1) throw new DOMException("timed out", "TimeoutError");
+        return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: "ok" }] } }] }), { status: 200 });
+      }),
+    );
+    const { text } = await askAboutVideo("https://youtu.be/x", "i", "r");
+    expect(text).toBe("ok");
+    expect(models.length).toBe(2);
+    expect(models[0]).not.toBe(models[1]);
+  });
+});

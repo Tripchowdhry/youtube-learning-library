@@ -47,7 +47,7 @@ import { findSavedElsewhere } from "@/lib/find-saved";
 import { createClient } from "@/lib/supabase/client";
 import type { VideoCategory, Video } from "@/lib/types";
 import { isWithin } from "@/lib/category-tree";
-import { onAiJobDone, runAiJob, useAiJobs } from "@/lib/ai-jobs";
+import { onAiJobDone, runAiJob, setAiJobNote, useAiJobs } from "@/lib/ai-jobs";
 import { askVideoAi } from "@/lib/video-ai";
 import { askConfirm } from "./ConfirmDialog";
 import TagPills from "./TagPills";
@@ -273,7 +273,9 @@ export default function Library({ userEmail }: { userEmail: string }) {
       key: aiNoteKey(video.id),
       label: `AI summary for "${video.title ?? "your video"}"`,
       work: async (signal) => {
-        const result = await askVideoAi({ youtubeId: video.youtube_id, title: video.title, task: "note" }, signal);
+        const result = await askVideoAi({ youtubeId: video.youtube_id, title: video.title, task: "note" }, signal, (note) =>
+          setAiJobNote(aiNoteKey(video.id), note),
+        );
         if (signal.aborted) return {};
         if (result.error) return result.code === "no-key" ? {} : { error: result.error };
         if (!result.text) return {};

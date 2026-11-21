@@ -17,10 +17,17 @@ export class GeminiError extends Error {
   constructor(
     message: string,
     public status: number,
+    // True when another model might still answer (this one was busy, out of uses, slow…).
+    public tryNext = false,
   ) {
     super(message);
   }
 }
+
+// Each model gets up to 5 minutes to answer before the next one is tried. Vercel ends a
+// request after 5 minutes, so the wait is a little shorter, leaving time to answer cleanly.
+export const MODEL_TIME_LIMIT_MS = 285_000;
+const SLOW = 504;
 
 export function geminiConfigured() {
   return Boolean(process.env.GEMINI_API_KEY);
@@ -59,13 +66,22 @@ function videoRequest(videoUrl: string, instructions: string, request: string, f
   };
 }
 
-async function callModel(model: string, body: object) {
-  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "x-goog-api-key": process.env.GEMINI_API_KEY ?? "" },
-    body: JSON.stringify(body),
-  });
-  return { res, data: await res.json().catch(() => null) };
+async function callModel(model: string, body: object, deadline: number) {
+  try {
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-goog-api-key": process.env.GEMINI_API_KEY ?? "" },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(Math.max(1000, deadline - Date.now())),
+    });
+    return { res, data: await res.json().catch(() => null) };
+  } catch (error) {
+    // Out of time: this model is too slow today, so the next one gets a turn.
+    if (error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError")) {
+      return { res: new Response(null, { status: SLOW }), data: { error: { message: "took too long" } } };
+    }
+    throw error;
+  }
 }
 
 // "gemini-3.8-flash" -> "Gemini 3.8 Flash"
@@ -76,17 +92,19 @@ function modelName(id: string) {
     .join(" ");
 }
 
-// Tries each model in turn. `body(true)` is the full request; a model that turns it down
-// (400) is asked again with `body(false)`, a simpler one. `what` finishes "The AI couldn't…".
-async function generate(body: (full: boolean) => object, what: string) {
+// Tries each model in turn (or only `onlyModel`). `body(true)` is the full request; a model
+// that turns it down (400) is asked again with `body(false)`, a simpler one. `what` finishes
+// "The AI couldn't…". Each model has up to MODEL_TIME_LIMIT_MS to answer.
+async function generate(body: (full: boolean) => object, what: string, onlyModel?: string) {
   // Every model's failure is kept, so the message shown is the one that matters (a used-up
   // free limit, or why the main model failed) and not just whatever the last backup said.
   const failures: { model: string; status: number; detail: string }[] = [];
-  for (const model of await geminiModels()) {
-    let { res, data } = await callModel(model, body(true));
-    if (res.status === 400) ({ res, data } = await callModel(model, body(false)));
+  for (const model of onlyModel ? [onlyModel] : await geminiModels()) {
+    const deadline = Date.now() + MODEL_TIME_LIMIT_MS;
+    let { res, data } = await callModel(model, body(true), deadline);
+    if (res.status === 400) ({ res, data } = await callModel(model, body(false), deadline));
     // Still turned down: try once more without the extra settings (such as low detail per frame).
-    if (res.status === 400) ({ res, data } = await callModel(model, withoutSettings(body(false))));
+    if (res.status === 400) ({ res, data } = await callModel(model, withoutSettings(body(false)), deadline));
     if (res.ok) {
       const parts: { text?: string }[] = data?.candidates?.[0]?.content?.parts ?? [];
       const text = parts.map((p) => p.text ?? "").join("").trim();
@@ -98,18 +116,23 @@ async function generate(body: (full: boolean) => object, what: string) {
     // Retired since the list was last checked: skip it from now on and get a fresh list.
     if (looksRetired(res.status, detail)) modelRetired(model);
     console.error("Gemini request failed", model, res.status, detail);
-    if (!TRY_NEXT.has(res.status)) break;
+    if (!TRY_NEXT.has(res.status) && res.status !== SLOW) break;
   }
+  // Worth asking another model, if the caller goes through them one at a time.
+  const tryNext = failures.length > 0 && failures.every((f) => TRY_NEXT.has(f.status) || f.status === SLOW);
   if (failures.some((f) => f.status === 429)) {
-    throw new GeminiError("The free AI limit is used up for now. Try again in a minute, or tomorrow.", 429);
+    throw new GeminiError("The free AI limit is used up for now. Try again in a minute, or tomorrow.", 429, tryNext);
   }
   if (failures.some((f) => f.status === 503 || f.status === 500)) {
-    throw new GeminiError("Google's free AI is busy right now. Please try again in a minute.", 503);
+    throw new GeminiError("Google's free AI is busy right now. Please try again in a minute.", 503, tryNext);
+  }
+  if (failures.some((f) => f.status === SLOW)) {
+    throw new GeminiError("The AI took too long (over 5 minutes). Very long videos can be too much for the free plan.", SLOW, tryNext);
   }
   // A model that's gone or not offered to this key (404, 403) says little; the first other
   // failure explains more.
   const main = failures.find((f) => f.status !== 404 && f.status !== 403) ?? failures[0];
-  throw new GeminiError(`The AI couldn't ${what} (${main ? `${modelName(main.model)}: ${main.detail}` : "no model answered"}).`, 502);
+  throw new GeminiError(`The AI couldn't ${what} (${main ? `${modelName(main.model)}: ${main.detail}` : "no model answered"}).`, 502, tryNext);
 }
 
 function withoutSettings(body: object) {
@@ -120,8 +143,10 @@ function withoutSettings(body: object) {
 
 // Returns the answer and the name of the Gemini model that wrote it.
 // A model that doesn't accept a custom frame rate or clip gets the plain request instead.
-export function askAboutVideo(videoUrl: string, instructions: string, request: string, focus: Focus = null) {
-  return generate((full) => videoRequest(videoUrl, instructions, request, focus, full), "watch this video");
+// With `onlyModel`, only that model is asked (the browser then goes through the list itself,
+// one request per model, so each model can have its full 5 minutes).
+export function askAboutVideo(videoUrl: string, instructions: string, request: string, focus: Focus = null, onlyModel?: string) {
+  return generate((full) => videoRequest(videoUrl, instructions, request, focus, full), "watch this video", onlyModel);
 }
 
 // Asks about an article. With its text, the text is sent; without (a login wall, an X post),

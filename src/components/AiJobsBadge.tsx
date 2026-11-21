@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { type AiJob, useAiJobs, useSecondsSince } from "@/lib/ai-jobs";
+import { type AiJob, STILL_WORKING_SECONDS, useAiJobs, useSecondsSince } from "@/lib/ai-jobs";
 import { formatTime } from "@/lib/youtube-player";
 import { CircleCheck } from "lucide-react";
 import { Ico } from "@/components/Icon";
@@ -42,6 +42,7 @@ function Working({ job, more }: { job: AiJob; more: number }) {
       <span className="truncate">
         Working on {job.label}
         {more > 0 ? ` and ${more} more` : ""}… {formatTime(seconds)}
+        {seconds >= STILL_WORKING_SECONDS && " · still working, long videos can take up to 5 minutes"}
       </span>
       <StopAiButton jobKey={job.key} className="rounded-full" />
     </p>
