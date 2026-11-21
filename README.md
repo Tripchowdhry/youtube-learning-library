@@ -6,6 +6,7 @@ A notebook for all learners. Save videos, articles and tutorials, take notes bes
 
 - Paste a YouTube link and the title, channel and thumbnail fill in automatically
 - Videos added outside a folder are sorted into a folder named after their YouTube channel
+- Readings and tutorials added without a category are sorted into one named after their website (like medium.com)
 - Organize videos into folders and subfolders, and add tags
 - Drag videos to reorder them, or drop them onto a folder to move them (on phones, use the "Move to" menu on each video)
 - Search across titles, channels, folders and tags
