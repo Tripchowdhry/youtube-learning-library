@@ -283,6 +283,19 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
       if (!title) return false;
     }
 
+    // With a category picked, the link goes there. Otherwise it goes into its author's
+    // category (like Videos does with YouTube channels), made the first time. A page that
+    // doesn't name its author goes under its company or publication, or else its website.
+    let newCategory: ArticleCategory | null = null;
+    const autoName: string | null = info.author || info.publisher || info.site || null;
+    const autoSorted = !categoryId && Boolean(autoName);
+    if (autoSorted) {
+      const picked = await autoCategory(autoName!);
+      if (!picked) return false;
+      categoryId = picked.id;
+      if (!categories.some((c) => c.id === picked.id)) newCategory = picked;
+    }
+
     const { data, error } = await supabase
       .from("articles")
       .insert({
@@ -300,10 +313,31 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
       notify(friendlyError(error.message), true);
       return false;
     }
+    if (newCategory) setCategories((prev) => [...prev, newCategory!]);
     setArticles((prev) => [data as Article, ...prev]);
-    notify(`Saved "${title}"`);
+    notify(autoSorted ? `Saved to ${autoName}` : `Saved "${title}"`);
     writeAiNote(data as Article);
     return true;
+  }
+
+  // Finds the top-level category named after an author (or a website), creating it the first time.
+  async function autoCategory(label: string): Promise<ArticleCategory | null> {
+    const name = label.trim().slice(0, 100);
+    const existing = categories.find((c) => c.parent_id === null && c.name.toLowerCase() === name.toLowerCase());
+    if (existing) return existing;
+
+    const topLevel = categories.filter((c) => c.parent_id === null);
+    const position = topLevel.length ? Math.max(...topLevel.map((c) => c.position)) + 1 : 0;
+    const { data, error } = await supabase
+      .from("article_categories")
+      .insert({ name, parent_id: null, position, kind })
+      .select()
+      .single();
+    if (error) {
+      notify(friendlyError(error.message), true);
+      return null;
+    }
+    return data as ArticleCategory;
   }
 
   // Asks the AI to read the page and fill in its note. New links do this on their own; if it
@@ -1233,7 +1267,7 @@ function AddArticleForm(props: {
         className="rounded-md border border-slate-300 bg-white px-2 py-2 text-sm sm:max-w-48"
         aria-label="Save to category"
       >
-        <option value="">Uncategorized</option>
+        <option value="">Sort by author</option>
         {props.categoryOptions.map((c) => (
           <option key={c.id} value={c.id}>
             {c.label}

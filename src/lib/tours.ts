@@ -63,7 +63,7 @@ export const TOURS = {
     {
       target: "add-article",
       title: "Save anything you read",
-      text: "Paste a link to an article, an X post or any web page, and pick a category so it's easy to find again.",
+      text: "Paste a link to an article, an X post or any web page. BrainShelf sorts it into a category named after its author (or its company), or pick a category yourself.",
     },
     {
       target: "read-filter",
