@@ -110,7 +110,7 @@ export default function ClipsManager() {
     <div className="min-h-screen bg-slate-50">
       <header className="sticky top-0 z-20 flex items-center gap-3 border-b border-slate-200 bg-white px-4 py-3">
         <Link href="/" className="rounded-md px-2 py-1 text-sm hover:bg-slate-100">
-          ← Library
+          ← Videos
         </Link>
         <h1 className="text-lg font-bold">Manage clips</h1>
       </header>

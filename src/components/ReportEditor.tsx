@@ -1,5 +1,6 @@
 "use client";
 
+import HomeLink from "@/components/HomeLink";
 import { friendlyError } from "@/lib/errors";
 import { postAi } from "@/lib/ai-request";
 import { stillWorkingNote, useSecondsSince } from "@/lib/ai-jobs";
@@ -883,6 +884,7 @@ function Shell({ title, children }: { title: React.ReactNode; children: React.Re
   return (
     <div className="flex min-h-screen flex-col">
       <header className="sticky top-0 z-20 flex items-center gap-2 border-b border-slate-200 bg-white px-4 py-3">
+        <HomeLink />
         <Link href="/reports" className="flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-sm text-slate-600 hover:bg-slate-100">
           <ArrowLeft size={16} aria-hidden /> <ReportIcon size={20} /> <span className="font-medium text-slate-800">Report Writer</span>
         </Link>

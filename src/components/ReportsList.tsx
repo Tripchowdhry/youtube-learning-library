@@ -1,5 +1,6 @@
 "use client";
 
+import HomeLink from "@/components/HomeLink";
 import { friendlyError } from "@/lib/errors";
 import BrandMark from "@/components/BrandMark";
 import { askConfirm } from "@/components/ConfirmDialog";
@@ -7,7 +8,7 @@ import { SetupNotice, formatDate } from "@/components/ReadingLibrary";
 import { isMissingTable, type Report } from "@/lib/report";
 import { createClient } from "@/lib/supabase/client";
 import { ReportIcon } from "@/components/ReportWriterLink";
-import { ArrowLeft, FilePlus2, Trash2 } from "lucide-react";
+import { FilePlus2, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -77,9 +78,8 @@ export default function ReportsList({ userEmail }: { userEmail: string }) {
     <div className="flex min-h-screen flex-col">
       <header className="sticky top-0 z-20 flex items-center gap-3 border-b border-slate-200 bg-white px-4 py-3">
         <BrandMark />
-        <Link href="/" className="flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-sm text-slate-600 hover:bg-slate-100">
-          <ArrowLeft size={16} aria-hidden /> My library
-        </Link>
+        {/* The logo already goes Home on wider screens; phones hide it. */}
+        <HomeLink className="sm:hidden" />
         <div className="ml-auto hidden items-center gap-2 text-sm text-slate-500 sm:flex">
           <span className="max-w-40 truncate">{userEmail}</span>
           <button onClick={signOut} className="rounded-md px-2 py-1 hover:bg-slate-100">

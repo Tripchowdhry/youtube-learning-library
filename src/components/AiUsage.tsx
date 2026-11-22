@@ -1,7 +1,8 @@
 "use client";
 
+import BackLink from "@/components/BackLink";
+import HomeLink from "@/components/HomeLink";
 import { Activity, CircleCheck, Clock, Coins, Repeat } from "lucide-react";
-import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Ico, type Tone } from "@/components/Icon";
 import StorageUsage from "@/components/StorageUsage";
@@ -66,9 +67,8 @@ export default function AiUsage() {
   return (
     <div className="min-h-screen bg-slate-50">
       <header className="sticky top-0 z-20 flex items-center gap-3 border-b border-slate-200 bg-white px-4 py-3">
-        <Link href="/" className="rounded-md px-2 py-1 text-sm hover:bg-slate-100">
-          ← Library
-        </Link>
+        <HomeLink />
+        <BackLink />
         <h1 className="text-lg font-bold">AI usage</h1>
       </header>
 
