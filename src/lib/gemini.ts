@@ -5,23 +5,44 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import { geminiModels, looksRetired, modelRetired } from "./gemini-models";
 
-// Which model this request should ask, when the browser goes through the models one request
-// at a time (so each one gets its own 5 minutes). Set by withModelAttempt; without it, every
-// model is tried in turn within the one request.
-const attemptStore = new AsyncLocalStorage<{ attempt: number }>();
+// One AI request's details: which model to ask, when the browser goes through the models one
+// request at a time (so each one gets its own 5 minutes), and a log of every model asked, for the
+// AI usage page. Set by withModelAttempt or aiRoute; without an attempt, every model is tried in
+// turn within the one request.
+export type UsageRow = {
+  feature: string;
+  model: string;
+  status: number;
+  ok: boolean;
+  ms: number;
+  input_tokens: number;
+  output_tokens: number;
+  handed_off: boolean;
+};
+type RequestStore = { attempt?: number; feature: string; usage: UsageRow[] };
+const requestStore = new AsyncLocalStorage<RequestStore>();
+
+const asAttempt = (attempt: unknown) => (Number.isInteger(attempt) && (attempt as number) >= 0 ? (attempt as number) : undefined);
 
 // Runs a route's work for one model attempt: body.attempt 0 is the first model, 1 the next…
 // An answer that says tryNext means the browser should ask again with the next number.
-export function withModelAttempt<T>(attempt: unknown, work: () => Promise<T>): Promise<T> {
-  if (!Number.isInteger(attempt) || (attempt as number) < 0) return work();
-  return attemptStore.run({ attempt: attempt as number }, work);
+export function withModelAttempt<T>(attempt: unknown, work: () => Promise<T>, usage: UsageRow[] = [], feature = "other"): Promise<T> {
+  return requestStore.run({ attempt: asAttempt(attempt), feature, usage }, work);
 }
 
-// Wraps a POST route so it takes part in model attempts (see withModelAttempt).
-export function aiRoute(handler: (request: Request) => Promise<Response>) {
+// Wraps a POST route so it takes part in model attempts (see withModelAttempt), and saves which
+// models it asked, how long they took and how many tokens they used (see ai-usage.ts).
+// `feature` names it on the AI usage page, e.g. "video".
+export function aiRoute(handler: (request: Request) => Promise<Response>, feature: string) {
   return async (request: Request) => {
     const body = await request.clone().json().catch(() => ({}));
-    return withModelAttempt((body as { attempt?: unknown })?.attempt, () => handler(request));
+    const usage: UsageRow[] = [];
+    const response = await withModelAttempt((body as { attempt?: unknown })?.attempt, () => handler(request), usage, feature);
+    if (usage.length) {
+      const { saveUsage } = await import("./ai-usage");
+      await saveUsage(usage);
+    }
+    return response;
   };
 }
 
@@ -106,7 +127,7 @@ async function callModel(model: string, body: object, deadline: number) {
 }
 
 // "gemini-3.8-flash" -> "Gemini 3.8 Flash"
-function modelName(id: string) {
+export function modelName(id: string) {
   return id
     .split("-")
     .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
@@ -121,7 +142,8 @@ async function generate(body: (full: boolean) => object, what: string) {
   // free limit, or why the main model failed) and not just whatever the last backup said.
   const failures: { model: string; status: number; detail: string }[] = [];
   // One attempt of several: only that model is asked, and tryNext says if there's another.
-  const attempt = attemptStore.getStore()?.attempt;
+  const store = requestStore.getStore();
+  const attempt = store?.attempt;
   let models = await geminiModels();
   let hasNext = true;
   if (attempt !== undefined) {
@@ -130,14 +152,16 @@ async function generate(body: (full: boolean) => object, what: string) {
     models = [models[attempt]];
   }
   for (const model of models) {
-    const deadline = Date.now() + MODEL_TIME_LIMIT_MS;
+    const started = Date.now();
+    const deadline = started + MODEL_TIME_LIMIT_MS;
     let { res, data } = await callModel(model, body(true), deadline);
     if (res.status === 400) ({ res, data } = await callModel(model, body(false), deadline));
     // Still turned down: try once more without the extra settings (such as low detail per frame).
     if (res.status === 400) ({ res, data } = await callModel(model, withoutSettings(body(false)), deadline));
+    const parts: { text?: string }[] = res.ok ? (data?.candidates?.[0]?.content?.parts ?? []) : [];
+    const text = parts.map((p) => p.text ?? "").join("").trim();
+    store?.usage.push(usageRow(store.feature, model, res.ok && !text ? 502 : res.status, started, data?.usageMetadata));
     if (res.ok) {
-      const parts: { text?: string }[] = data?.candidates?.[0]?.content?.parts ?? [];
-      const text = parts.map((p) => p.text ?? "").join("").trim();
       if (!text) throw new GeminiError("The AI didn't send an answer. Try asking a different way.", 502);
       return { text, model: modelName(data?.modelVersion || model) };
     }
@@ -150,6 +174,8 @@ async function generate(body: (full: boolean) => object, what: string) {
   }
   // Worth asking another model, if the caller goes through them one at a time.
   const tryNext = hasNext && failures.length > 0 && failures.every((f) => TRY_NEXT.has(f.status) || f.status === SLOW);
+  const last = store?.usage[store.usage.length - 1];
+  if (last && tryNext) last.handed_off = true;
   if (failures.some((f) => f.status === 429)) {
     throw new GeminiError("The free AI limit is used up. Try again later.", 429, tryNext);
   }
@@ -163,6 +189,22 @@ async function generate(body: (full: boolean) => object, what: string) {
   // failure explains more.
   const main = failures.find((f) => f.status !== 404 && f.status !== 403) ?? failures[0];
   throw new GeminiError(`The AI couldn't ${what} (${main ? `${modelName(main.model)}: ${main.detail}` : "no model answered"}).`, 502, tryNext);
+}
+
+type UsageMetadata = { promptTokenCount?: number; candidatesTokenCount?: number; thoughtsTokenCount?: number };
+
+function usageRow(feature: string, model: string, status: number, started: number, meta?: UsageMetadata): UsageRow {
+  return {
+    feature,
+    model: modelName(model),
+    status,
+    ok: status >= 200 && status < 300,
+    ms: Date.now() - started,
+    input_tokens: meta?.promptTokenCount ?? 0,
+    // The answer, plus the thinking a model does before it answers (also counted by Google).
+    output_tokens: (meta?.candidatesTokenCount ?? 0) + (meta?.thoughtsTokenCount ?? 0),
+    handed_off: false,
+  };
 }
 
 function withoutSettings(body: object) {

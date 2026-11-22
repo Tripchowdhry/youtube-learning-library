@@ -1,5 +1,6 @@
 "use client";
 
+import AiUsageLink from "@/components/AiUsageLink";
 import { friendlyError } from "@/lib/errors";
 import { fetchAll } from "@/lib/fetch-all";
 import SearchBox from "@/components/SearchBox";
@@ -47,7 +48,7 @@ import { findSavedElsewhere } from "@/lib/find-saved";
 import { createClient } from "@/lib/supabase/client";
 import type { VideoCategory, Video } from "@/lib/types";
 import { isWithin } from "@/lib/category-tree";
-import { onAiJobDone, runAiJob, setAiJobNote, useAiJobs } from "@/lib/ai-jobs";
+import { aiJobHooks, onAiJobDone, runAiJob, useAiJobs } from "@/lib/ai-jobs";
 import { askVideoAi } from "@/lib/video-ai";
 import { deleteItem } from "@/lib/delete-item";
 import { askConfirm } from "./ConfirmDialog";
@@ -274,9 +275,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
       key: aiNoteKey(video.id),
       label: `AI summary for "${video.title ?? "your video"}"`,
       work: async (signal) => {
-        const result = await askVideoAi({ youtubeId: video.youtube_id, title: video.title, task: "note" }, signal, (note) =>
-          setAiJobNote(aiNoteKey(video.id), note),
-        );
+        const result = await askVideoAi({ youtubeId: video.youtube_id, title: video.title, task: "note" }, signal, aiJobHooks(aiNoteKey(video.id)));
         if (signal.aborted) return {};
         if (result.error) return result.code === "no-key" ? {} : { error: result.error };
         if (!result.text) return {};
@@ -628,6 +627,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
           <Ico icon={Images} tone="violet" />
           <span className="hidden sm:inline">Clips</span>
         </Link>
+        <AiUsageLink />
         <div className="hidden items-center gap-2 text-sm text-slate-500 sm:flex">
           <span className="hidden max-w-40 truncate lg:inline">{userEmail}</span>
           <button onClick={signOut} className="rounded-md px-2 py-1 whitespace-nowrap hover:bg-slate-100">
@@ -694,7 +694,8 @@ export default function Library({ userEmail }: { userEmail: string }) {
             <p className="mt-3 px-2 text-xs text-slate-400">{sortHint(folderSort, "categories")}</p>
           )}
 
-          <button onClick={signOut} className="mt-6 px-2 text-sm text-slate-500 underline sm:hidden">
+          <AiUsageLink phoneMenu />
+          <button onClick={signOut} className="mt-3 px-2 text-sm text-slate-500 underline sm:hidden">
             Sign out
           </button>
         </aside>

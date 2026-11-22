@@ -104,6 +104,7 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
   // While drafting: when it started, and what it's doing now (like trying another model).
   const [aiStartedAt, setAiStartedAt] = useState(0);
   const [aiNote, setAiNote] = useState<string | null>(null);
+  const [aiModel, setAiModel] = useState<string | null>(null);
   const [aiError, setAiError] = useState<string | null>(null);
   const [titleIdeas, setTitleIdeas] = useState<{ titles: string[]; model: string | null } | null>(null);
   const [titleBusy, setTitleBusy] = useState(false);
@@ -367,13 +368,14 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
     setAiBusy(true);
     setAiError(null);
     setAiNote(null);
+    setAiModel(null);
     setAiStartedAt(Date.now());
     const reportTitle = title.trim() || UNTITLED;
     try {
       const res = await postAi(
         "/api/report-ai",
         { title: reportTitle, prompt: focus, style, sources: chosen, handwriting: usedHandwriting() },
-        { onNote: (note) => mounted.current && setAiNote(note) },
+        { onNote: (note) => mounted.current && setAiNote(note), onModel: (model) => mounted.current && setAiModel(model) },
       );
       const data = res.data as { text?: string; sources?: Parameters<typeof sourcesSection>[0]; model?: string; error?: string };
       if (!res.ok) {
@@ -787,7 +789,7 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
               className="flex items-center gap-1.5 rounded-md bg-violet-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-violet-700 disabled:opacity-60"
             >
               <Sparkles size={14} aria-hidden />
-              {aiBusy ? <DraftingLabel startedAt={aiStartedAt} note={aiNote} /> : draftStyle(style).button}
+              {aiBusy ? <DraftingLabel startedAt={aiStartedAt} note={aiNote} model={aiModel} /> : draftStyle(style).button}
             </button>
             {aiError && <p className="mt-2 text-sm text-red-700">{aiError}</p>}
           </div>
@@ -999,7 +1001,12 @@ function IconButton({ label, onClick, disabled, Icon }: { label: string; onClick
 
 // The Draft button's words while the AI writes. After 2.5 minutes, or when another model is
 // being tried, it says so, so it doesn't look stuck.
-function DraftingLabel({ startedAt, note }: { startedAt: number; note: string | null }) {
+function DraftingLabel({ startedAt, note, model }: { startedAt: number; note: string | null; model: string | null }) {
   const seconds = useSecondsSince(startedAt);
-  return <>{stillWorkingNote(seconds, note ?? undefined) ?? "Writing… (up to a minute or two)"}</>;
+  return (
+    <>
+      {stillWorkingNote(seconds, note ?? undefined) ?? "Writing… (up to a minute or two)"}
+      {model && ` · ${model} · ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`}
+    </>
+  );
 }

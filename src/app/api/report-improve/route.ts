@@ -51,4 +51,4 @@ async function handle(request: Request) {
 }
 
 // body.attempt picks one model per request, so each model gets its own 5 minutes.
-export const POST = aiRoute(handle);
+export const POST = aiRoute(handle, "improve");

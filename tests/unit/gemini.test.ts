@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { askAboutSources, askAboutVideo, withModelAttempt } from "@/lib/gemini";
+import { askAboutSources, askAboutVideo, withModelAttempt, type UsageRow } from "@/lib/gemini";
 import { forgetModelList, orderModels } from "@/lib/gemini-models";
 
 type Reply = { status: number; body: unknown };
@@ -139,6 +139,19 @@ describe("askAboutSources", () => {
     expect(parts[1]).toEqual({ file_data: { file_uri: "https://www.youtube.com/watch?v=abc" }, video_metadata: { fps: 0.1 } });
     expect(parts[3]).toEqual({ text: "Question: why?" });
     expect(body.generationConfig).toEqual({ mediaResolution: "MEDIA_RESOLUTION_LOW" });
+  });
+});
+
+describe("AI usage log", () => {
+  it("logs each model asked, with its time, tokens and whether the next one was tried", async () => {
+    fakeGoogle((model) => (model === "gemini-4-hydrogen" ? fail(429, "quota") : ok("hi")), ["gemini-4-hydrogen", "gemini-3.8-flash"]);
+    const usage: UsageRow[] = [];
+    await withModelAttempt(0, () => askAboutVideo("https://youtu.be/x", "i", "r"), usage, "video").catch(() => null);
+    await withModelAttempt(1, () => askAboutVideo("https://youtu.be/x", "i", "r"), usage, "video");
+    expect(usage.map((row) => ({ ...row, ms: 0 }))).toEqual([
+      { feature: "video", model: "Gemini 4 Hydrogen", status: 429, ok: false, ms: 0, input_tokens: 0, output_tokens: 0, handed_off: true },
+      { feature: "video", model: "Gemini 3.8 Flash", status: 200, ok: true, ms: 0, input_tokens: 0, output_tokens: 0, handed_off: false },
+    ]);
   });
 });
 

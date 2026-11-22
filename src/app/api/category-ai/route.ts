@@ -171,4 +171,4 @@ async function gather(supabase: Supabase, kind: ChatItemKind, ids: string[]): Pr
 }
 
 // body.attempt picks one model per request, so each model gets its own 5 minutes.
-export const POST = aiRoute(handle);
+export const POST = aiRoute(handle, "category");

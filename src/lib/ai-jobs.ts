@@ -5,8 +5,8 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 // AI requests that keep running when the person moves to another tab of the app.
 // They live outside the page components, so leaving a page doesn't stop them.
 
-// note: what the job is doing now, e.g. "Sending the video… 40%".
-export type AiJob = { key: string; label: string; startedAt: number; note?: string };
+// note: what the job is doing now, e.g. "Sending the video… 40%". model: the AI model working on it.
+export type AiJob = { key: string; label: string; startedAt: number; note?: string; model?: string };
 type Snapshot = { running: AiJob[]; errors: Map<string, string>; finished: { label: string; at: number } | null };
 // A page that is open when its job finishes can take the result; return true if it did.
 type Taker = (key: string, result: unknown) => boolean;
@@ -59,6 +59,16 @@ export function stillWorkingNote(seconds: number, note?: string) {
 export function setAiJobNote(key: string, note: string) {
   if (!snapshot.running.some((j) => j.key === key && j.note !== note)) return;
   update({ running: snapshot.running.map((j) => (j.key === key ? { ...j, note } : j)) });
+}
+
+export function setAiJobModel(key: string, model: string) {
+  if (!snapshot.running.some((j) => j.key === key && j.model !== model)) return;
+  update({ running: snapshot.running.map((j) => (j.key === key ? { ...j, model } : j)) });
+}
+
+// What a job's AI request reports back: notes and the model working on it.
+export function aiJobHooks(key: string) {
+  return { onNote: (note: string) => setAiJobNote(key, note), onModel: (model: string) => setAiJobModel(key, model) };
 }
 
 export function isAiJobRunning(key: string) {

@@ -1,5 +1,6 @@
 "use client";
 
+import AiModelTag from "@/components/AiModelTag";
 import { friendlyError } from "@/lib/errors";
 import DeadEnd from "@/components/DeadEnd";
 import StopAiButton from "@/components/StopAiButton";
@@ -23,7 +24,7 @@ import { createClient } from "@/lib/supabase/client";
 import { formatTime, loadYouTubeApi, type YouTubePlayer } from "@/lib/youtube-player";
 import type { NoteImage, NotePage, NoteStroke, Video } from "@/lib/types";
 import { hasWriting, openingMode } from "@/lib/note-mode";
-import { onAiJobDone, runAiJob, setAiJobNote, stillWorkingNote, useAiJobs, useSecondsSince, wasStopped } from "@/lib/ai-jobs";
+import { aiJobHooks, onAiJobDone, runAiJob, stillWorkingNote, useAiJobs, useSecondsSince, wasStopped } from "@/lib/ai-jobs";
 import { askVideoAi } from "@/lib/video-ai";
 import { askConfirm } from "./ConfirmDialog";
 import ReportRichEditor, { type RichEditorHandle } from "@/components/ReportRichEditor";
@@ -520,7 +521,7 @@ export default function StudyPage({ videoId }: { videoId: string }) {
           task: "ask",
           prompt,
           focusAt: shotAt ?? undefined,
-        }, signal, (note) => setAiJobNote(aiKey, note));
+        }, signal, aiJobHooks(aiKey));
         if (result.error || !result.text) return { error: result.error ?? "The AI didn't answer." };
         return { result: `${answerHeading(prompt, result.model)}\n${result.text}\n` };
       },
@@ -949,13 +950,14 @@ function AskAi(props: {
 function AskAiWorking({ startedAt, jobKey }: { startedAt: number; jobKey: string }) {
   const elapsed = useSecondsSince(startedAt);
   // After 2.5 minutes, or when another model is being tried, it says so, so it doesn't look stuck.
-  const note = stillWorkingNote(elapsed, useAiJobs().running.find((j) => j.key === jobKey)?.note);
+  const job = useAiJobs().running.find((j) => j.key === jobKey);
+  const note = stillWorkingNote(elapsed, job?.note);
   return (
     <div className="flex items-start gap-2 rounded-md bg-violet-50 px-2 py-1.5 text-sm text-violet-800 ring-1 ring-violet-200">
       <p className="min-w-0 flex-1">
         <span className="mr-2 inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-violet-300 border-t-violet-700 align-[-2px]" />
-        {note ? `${note} (${formatTime(elapsed)})` : `The AI is watching the video (${formatTime(elapsed)}). Long videos can take a few minutes.`} You can leave this
-        page; the answer is still added to your notes.
+        {note ? `${note} (${formatTime(elapsed)})` : `The AI is watching the video (${formatTime(elapsed)}). Long videos can take a few minutes.`}{" "}
+        <AiModelTag model={job?.model} /> You can leave this page; the answer is still added to your notes.
       </p>
       <StopAiButton jobKey={jobKey} />
     </div>

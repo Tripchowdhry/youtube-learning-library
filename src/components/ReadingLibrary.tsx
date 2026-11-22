@@ -1,5 +1,7 @@
 "use client";
 
+import AiUsageLink from "@/components/AiUsageLink";
+import AiModelTag from "@/components/AiModelTag";
 import { deleteItem } from "@/lib/delete-item";
 import { friendlyError } from "@/lib/errors";
 import { fetchAll } from "@/lib/fetch-all";
@@ -28,7 +30,7 @@ import {
   useFolderSort,
   useItemSort,
 } from "@/components/FolderSort";
-import { onAiJobDone, runAiJob, setAiJobNote, stillWorkingNote, useAiJobs, useSecondsSince } from "@/lib/ai-jobs";
+import { aiJobHooks, onAiJobDone, runAiJob, stillWorkingNote, useAiJobs, useSecondsSince } from "@/lib/ai-jobs";
 import { findSavedElsewhere } from "@/lib/find-saved";
 import { linkKey } from "@/lib/links";
 import { createClient } from "@/lib/supabase/client";
@@ -349,9 +351,7 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
       key: aiNoteKey(article.id),
       label: `AI summary for "${article.title ?? article.site ?? "your link"}"`,
       work: async (signal) => {
-        const result = await askArticleAi({ url: article.url, title: article.title, kind }, signal, (note) =>
-          setAiJobNote(aiNoteKey(article.id), note),
-        );
+        const result = await askArticleAi({ url: article.url, title: article.title, kind }, signal, aiJobHooks(aiNoteKey(article.id)));
         if (signal.aborted) return {};
         if (result.error) return result.code === "no-key" ? {} : { error: result.error };
         if (!result.text) return {};
@@ -695,6 +695,7 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
           <Ico icon={Images} tone="violet" />
           <span className="hidden sm:inline">Clips</span>
         </Link>
+        <AiUsageLink />
         <div className="hidden items-center gap-2 text-sm text-slate-500 sm:flex">
           <span className="hidden max-w-40 truncate lg:inline">{userEmail}</span>
           <button onClick={signOut} className="rounded-md px-2 py-1 whitespace-nowrap hover:bg-slate-100">
@@ -750,7 +751,8 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
             <p className="mt-3 px-2 text-xs text-slate-400">{sortHint(folderSort, "categories")}</p>
           )}
 
-          <button onClick={signOut} className="mt-6 px-2 text-sm text-slate-500 underline sm:hidden">
+          <AiUsageLink phoneMenu />
+          <button onClick={signOut} className="mt-3 px-2 text-sm text-slate-500 underline sm:hidden">
             Sign out
           </button>
         </aside>
@@ -1140,11 +1142,12 @@ export function ToastBox({ toast, onClose }: { toast: Toast; onClose: () => void
 // Shown in place of the AI summary button while the AI writes the note.
 export function AiNoteWorking({ startedAt, jobKey }: { startedAt: number; jobKey: string }) {
   const seconds = useSecondsSince(startedAt);
-  const note = useAiJobs().running.find((j) => j.key === jobKey)?.note;
+  const job = useAiJobs().running.find((j) => j.key === jobKey);
   return (
     <span className="flex items-center gap-1.5 rounded-md border border-violet-200 bg-violet-50 py-0.5 pl-2 pr-0.5 text-xs text-violet-800">
       <span className="inline-block h-3 w-3 shrink-0 animate-spin rounded-full border-2 border-violet-300 border-t-violet-700" />
-      {stillWorkingNote(seconds, note) ?? "Writing summary…"} {Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, "0")}
+      {stillWorkingNote(seconds, job?.note) ?? "Writing summary…"} {Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, "0")}
+      <AiModelTag model={job?.model} className="hidden sm:inline-block" />
       <StopAiButton jobKey={jobKey} />
     </span>
   );
