@@ -4,6 +4,7 @@ import { Activity, CircleCheck, Clock, Coins, Repeat } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Ico, type Tone } from "@/components/Icon";
+import StorageUsage from "@/components/StorageUsage";
 import { friendlyError } from "@/lib/errors";
 import { fetchAll } from "@/lib/fetch-all";
 import { featureName, formatDuration, formatTokens, outcome, summarise, type Group, type UsageLogRow } from "@/lib/ai-usage-stats";
@@ -24,7 +25,8 @@ function since(range: Range) {
   return start.toISOString();
 }
 
-// How BrainShelf's AI has been doing: answers, speed, tokens and which models did the work.
+// How BrainShelf's AI has been doing: answers, speed, tokens and which models did the work,
+// and how much room it takes in Supabase.
 export default function AiUsage() {
   const supabase = useMemo(() => createClient(), []);
   const [range, setRange] = useState<Range>("today");
@@ -147,6 +149,7 @@ export default function AiUsage() {
             </p>
           </>
         )}
+        <StorageUsage supabase={supabase} />
       </main>
     </div>
   );
