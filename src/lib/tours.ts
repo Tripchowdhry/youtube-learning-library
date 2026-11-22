@@ -21,6 +21,11 @@ export const TOURS = {
       text: "Search everything you've saved, including your notes. Open any video to take notes beside it and Ask AI.",
     },
     {
+      target: "ask-category",
+      title: "Ask a whole category",
+      text: "Open a category and tap Ask this category to ask one question across all its videos. Each answer says which video it came from, and tapping a time jumps to that moment.",
+    },
+    {
       target: "report-writer",
       title: "Turn notes into a report",
       text: "Report Writer pulls your notes from videos, readings and tutorials into one report you can edit, copy or download for Word.",
@@ -75,6 +80,11 @@ export const TOURS = {
       text: "While reading, open My notes to type with headings, bold and lists, or switch to Handwriting for Apple Pencil. Ask AI for a summary and add clips. Copy or Download Word takes typed notes anywhere.",
     },
     {
+      target: "ask-category",
+      title: "Ask a whole category",
+      text: "Open a category and tap Ask this category to ask one question across everything in it. Each answer says which item it came from.",
+    },
+    {
       target: "report-writer",
       title: "Turn notes into a report",
       text: "Report Writer pulls your notes from readings, tutorials and videos into one report you can edit, copy or download for Word.",
@@ -89,6 +99,11 @@ export const TOURS = {
     {
       title: "Type like in Word",
       text: "When typing on a page, use the toolbar for headings, bold, lists and highlight, add clips, then Copy it or Download Word. Add file puts PDFs, slides, documents, pictures and videos on the page. They stay on your computer, and Ask AI can read or watch them for you.",
+    },
+    {
+      target: "ask-category",
+      title: "Ask a whole category",
+      text: "Open a category and tap Ask this category to ask one question across all its pages. Each answer says which page it came from.",
     },
   ],
   vault: [
