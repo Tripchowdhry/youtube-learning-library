@@ -1,5 +1,6 @@
 "use client";
 
+import { askConfirm, askText } from "@/components/ConfirmDialog";
 import AiUsageLink from "@/components/AiUsageLink";
 import { friendlyError } from "@/lib/errors";
 import { fetchAll } from "@/lib/fetch-all";
@@ -315,7 +316,15 @@ export default function VaultLibrary({ userEmail }: { userEmail: string }) {
   }
 
   async function deleteEntry(entry: VaultEntry) {
-    if (!window.confirm(`Delete "${entry.name}" from your vault?\nThis can't be undone.`)) return;
+    if (
+      !(await askConfirm({
+        title: `Delete "${entry.name}" from your vault?`,
+        message: "This can't be undone.",
+        confirmLabel: "Delete",
+        danger: true,
+      }))
+    )
+      return;
     setEntries((prev) => prev.filter((e) => e.id !== entry.id));
     const { error } = await supabase.from("vault_entries").delete().eq("id", entry.id);
     if (error) {
@@ -435,7 +444,7 @@ export default function VaultLibrary({ userEmail }: { userEmail: string }) {
   };
 
   async function renameCategory(category: VaultCategory) {
-    const name = window.prompt("Rename:", category.name)?.trim().slice(0, NAME_MAX);
+    const name = (await askText({ title: "Rename", value: category.name, confirmLabel: "Rename" }))?.slice(0, NAME_MAX);
     if (!name || name === category.name) return;
     setCategories((prev) => prev.map((c) => (c.id === category.id ? { ...c, name } : c)));
     const { error } = await supabase.from("vault_categories").update({ name }).eq("id", category.id);
@@ -446,9 +455,12 @@ export default function VaultLibrary({ userEmail }: { userEmail: string }) {
   }
 
   async function deleteCategory(category: VaultCategory) {
-    const ok = window.confirm(
-      `Delete "${category.name}" and any categories inside it?\nThe entries inside will move to Uncategorized, not be deleted.`,
-    );
+    const ok = await askConfirm({
+      title: `Delete "${category.name}" and any categories inside it?`,
+      message: "The entries inside will move to Uncategorized, not be deleted.",
+      confirmLabel: "Delete",
+      danger: true,
+    });
     if (!ok) return;
     const { error } = await supabase.from("vault_categories").delete().eq("id", category.id);
     if (error) return notify(friendlyError(error.message), true);

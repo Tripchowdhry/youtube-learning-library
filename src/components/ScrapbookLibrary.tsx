@@ -1,5 +1,6 @@
 "use client";
 
+import { askConfirm, askText } from "@/components/ConfirmDialog";
 import AiUsageLink from "@/components/AiUsageLink";
 import { deleteItem } from "@/lib/delete-item";
 import { friendlyError } from "@/lib/errors";
@@ -250,8 +251,8 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
     updateScrap(neighbor.id, { position: scrap.position });
   }
 
-  function editScrapTags(scrap: ScrapSummary) {
-    const tags = askTags(scrap.tags ?? [], notify);
+  async function editScrapTags(scrap: ScrapSummary) {
+    const tags = await askTags(scrap.tags ?? [], notify);
     if (tags) updateScrap(scrap.id, { tags });
   }
 
@@ -259,14 +260,22 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
     updateScrap(scrap.id, { tags: (scrap.tags ?? []).filter((t) => t !== tag) });
   }
 
-  function renameScrap(scrap: ScrapSummary) {
-    const title = window.prompt("Title:", scrap.title)?.trim().slice(0, 200);
+  async function renameScrap(scrap: ScrapSummary) {
+    const title = (await askText({ title: "Title", value: scrap.title, confirmLabel: "Save" }))?.slice(0, 200);
     if (!title || title === scrap.title) return;
     updateScrap(scrap.id, { title });
   }
 
   async function deleteScrap(scrap: ScrapSummary) {
-    if (!window.confirm(`Delete "${scrap.title}" from your ScrapBook?\nThis can't be undone.`)) return;
+    if (
+      !(await askConfirm({
+        title: `Delete "${scrap.title}" from your ScrapBook?`,
+        message: "This can't be undone.",
+        confirmLabel: "Delete",
+        danger: true,
+      }))
+    )
+      return;
     setScraps((prev) => prev.filter((s) => s.id !== scrap.id));
     // Its pictures and attached files go too.
     const error = await deleteItem(supabase, "scrap", scrap.id);
@@ -394,7 +403,7 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
   };
 
   async function renameCategory(category: ArticleCategory) {
-    const name = window.prompt("Rename:", category.name)?.trim();
+    const name = (await askText({ title: "Rename", value: category.name, confirmLabel: "Rename" }));
     if (!name || name === category.name) return;
     setCategories((prev) => prev.map((c) => (c.id === category.id ? { ...c, name } : c)));
     const { error } = await supabase.from("article_categories").update({ name }).eq("id", category.id);
@@ -405,9 +414,12 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
   }
 
   async function deleteCategory(category: ArticleCategory) {
-    const ok = window.confirm(
-      `Delete "${category.name}" and any categories inside it?\nThe pages inside will move to Uncategorized, not be deleted.`,
-    );
+    const ok = await askConfirm({
+      title: `Delete "${category.name}" and any categories inside it?`,
+      message: "The pages inside will move to Uncategorized, not be deleted.",
+      confirmLabel: "Delete",
+      danger: true,
+    });
     if (!ok) return;
     const { error } = await supabase.from("article_categories").delete().eq("id", category.id);
     if (error) return notify(friendlyError(error.message), true);
@@ -422,7 +434,14 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
 
   async function toggleShare(category: ArticleCategory) {
     if (category.share_token) {
-      if (!window.confirm("Turn off the share link? People with the old link won't be able to see it anymore.")) return;
+      if (
+        !(await askConfirm({
+          title: "Turn off the share link?",
+          message: "People with the old link won't be able to see it anymore.",
+          confirmLabel: "Turn off",
+        }))
+      )
+        return;
       const { error } = await supabase.from("article_categories").update({ share_token: null }).eq("id", category.id);
       if (error) return notify(shareError(error.message), true);
       setCategories((prev) => prev.map((c) => (c.id === category.id ? { ...c, share_token: null } : c)));
@@ -447,7 +466,7 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
       await navigator.clipboard.writeText(link);
       notify("Share link copied. Anyone with it can view this category.");
     } catch {
-      window.prompt("Copy this share link:", link);
+      await askText({ title: "Copy this share link", value: link, confirmLabel: "Done" });
     }
   }
 

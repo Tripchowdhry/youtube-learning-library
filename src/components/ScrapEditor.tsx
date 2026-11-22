@@ -1,5 +1,6 @@
 "use client";
 
+import { askConfirm } from "@/components/ConfirmDialog";
 import HomeLink from "@/components/HomeLink";
 import { deleteItem } from "@/lib/delete-item";
 import { friendlyError } from "@/lib/errors";
@@ -237,10 +238,18 @@ export default function ScrapEditor({ scrapId }: { scrapId: string }) {
   }
 
   // Empties the typed page. Done as one edit, so Ctrl/Cmd+Z brings it back.
-  function clearTyped() {
+  async function clearTyped() {
     const el = editor.current;
     if (!el || isEmpty) return;
-    if (!window.confirm("Erase everything typed on this page?\nCtrl/Cmd+Z right after brings it back.")) return;
+    if (
+      !(await askConfirm({
+        title: "Erase everything typed on this page?",
+        message: "Ctrl/Cmd+Z right after brings it back.",
+        confirmLabel: "Erase",
+        danger: true,
+      }))
+    )
+      return;
     el.focus();
     document.execCommand("selectAll");
     document.execCommand("delete");
@@ -306,8 +315,8 @@ export default function ScrapEditor({ scrapId }: { scrapId: string }) {
     change(withPicture(pagesRef.current, image, path));
   }
 
-  function deleteImage(pageIndex: number, imageId: string) {
-    if (!window.confirm("Delete this picture from the page?")) return;
+  async function deleteImage(pageIndex: number, imageId: string) {
+    if (!(await askConfirm({ title: "Delete this picture from the page?", message: "", confirmLabel: "Delete", danger: true }))) return;
     change(
       pagesRef.current.map((p, i) => (i === pageIndex ? { ...p, images: (p.images ?? []).filter((im) => im.id !== imageId) } : p)),
     );
@@ -340,8 +349,8 @@ export default function ScrapEditor({ scrapId }: { scrapId: string }) {
     change(pages.map((p, i) => (i === pageIndex ? { ...p, strokes: p.strokes.filter((_, j) => !gone.has(j)) } : p)));
   }
 
-  function clearPage(pageIndex: number) {
-    if (!window.confirm(`Erase everything on sheet ${pageIndex + 1}?`)) return;
+  async function clearPage(pageIndex: number) {
+    if (!(await askConfirm({ title: `Erase everything on sheet ${pageIndex + 1}?`, message: "", confirmLabel: "Erase", danger: true }))) return;
     change(
       pages.length > 1 && pageIndex === pages.length - 1
         ? pages.slice(0, -1)
@@ -403,7 +412,15 @@ export default function ScrapEditor({ scrapId }: { scrapId: string }) {
   // ---------- Page actions ----------
 
   async function deleteScrap() {
-    if (!window.confirm(`Delete "${title || "Untitled"}" from your ScrapBook?\nThis can't be undone.`)) return;
+    if (
+      !(await askConfirm({
+        title: `Delete "${title || "Untitled"}" from your ScrapBook?`,
+        message: "This can't be undone.",
+        confirmLabel: "Delete",
+        danger: true,
+      }))
+    )
+      return;
     // Its pictures and attached files go too.
     const error = await deleteItem(supabase, "scrap", scrapId);
     if (error) {
