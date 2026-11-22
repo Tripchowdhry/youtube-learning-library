@@ -127,38 +127,47 @@ export default function ClipsManager() {
           !error && <p className="text-slate-500">Loading your clips…</p>
         ) : (
           <>
-            <section className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
-              <p className="text-sm text-slate-600">
-                <span className="font-semibold text-slate-900">
-                  {clips.length} {clips.length === 1 ? "clip" : "clips"}
-                </span>{" "}
-                using {formatSize(used)} of your 1 GB free space
-              </p>
-              <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100">
-                <div
-                  className="h-full rounded-full bg-slate-700"
-                  style={{ width: `${Math.min(100, Math.max(used ? 1 : 0, (used / FREE_STORAGE) * 100))}%` }}
-                />
-              </div>
-              {unused.length > 0 && (
-                <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
-                  <span className="text-slate-600">
-                    {unused.length} {unused.length === 1 ? "clip isn't" : "clips aren't"} in any notes anymore (
-                    {formatSize(unused.reduce((t, c) => t + c.size, 0))}).
-                  </span>
-                  <button
-                    onClick={() => remove("unused clips", unused)}
-                    disabled={!!busy}
-                    className="rounded-md px-2.5 py-1 text-red-700 ring-1 ring-slate-300 hover:bg-red-50 disabled:opacity-50"
-                  >
-                    Delete unused clips
-                  </button>
+            {/* The space used only means something once there are clips. */}
+            {clips.length > 0 && (
+              <section className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
+                <p className="text-sm text-slate-600">
+                  <span className="font-semibold text-slate-900">
+                    {clips.length} {clips.length === 1 ? "clip" : "clips"}
+                  </span>{" "}
+                  using {formatSize(used)} of your 1 GB free space
+                </p>
+                <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100">
+                  <div
+                    className="h-full rounded-full bg-slate-700"
+                    style={{ width: `${Math.min(100, Math.max(used ? 1 : 0, (used / FREE_STORAGE) * 100))}%` }}
+                  />
                 </div>
-              )}
-            </section>
+                {unused.length > 0 && (
+                  <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
+                    <span className="text-slate-600">
+                      {unused.length} {unused.length === 1 ? "clip isn't" : "clips aren't"} in any notes anymore (
+                      {formatSize(unused.reduce((t, c) => t + c.size, 0))}).
+                    </span>
+                    <button
+                      onClick={() => remove("unused clips", unused)}
+                      disabled={!!busy}
+                      className="rounded-md px-2.5 py-1 text-red-700 ring-1 ring-slate-300 hover:bg-red-50 disabled:opacity-50"
+                    >
+                      Delete unused clips
+                    </button>
+                  </div>
+                )}
+              </section>
+            )}
 
             {clips.length === 0 ? (
-              <p className="text-slate-500">No clips yet. Press <Ico icon={Camera} tone="slate" size={14} className="inline align-[-2px]" /> Clip in the notes of a video, an article or a ScrapBook page to add one.</p>
+              <div className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center text-slate-600">
+                <Ico icon={Camera} tone="violet" size={32} className="mx-auto mb-2" />
+                <p className="font-medium text-slate-900">No clips yet</p>
+                <p className="mt-1 text-sm">
+                  Press <Ico icon={Camera} tone="slate" size={14} className="inline align-[-2px]" /> Clip in the notes of a video, an article or a ScrapBook page to add one.
+                </p>
+              </div>
             ) : (
               <>
                 <div className="flex items-center gap-2 text-sm">
