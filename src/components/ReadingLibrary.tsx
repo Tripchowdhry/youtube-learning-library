@@ -929,7 +929,8 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
 // ---------- Pieces ----------
 
 // The Videos | Reading | Tutorials | ScrapBook switch in the header of every section.
-export function SectionSwitch({ active }: { active: "videos" | SectionKind | "scrap" | "vault" }) {
+// "reports" highlights no tab: Report Writer sits beside the sections, not in them.
+export function SectionSwitch({ active }: { active: "videos" | SectionKind | "scrap" | "vault" | "reports" }) {
   const tab = (on: boolean) =>
     `flex items-center gap-1.5 rounded-md px-1.5 py-1 text-sm font-medium sm:px-2.5 ${on ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:text-slate-900"}`;
   const items: { key: string; href: string; name: string; Icon: LucideIcon; tone: Tone }[] = [

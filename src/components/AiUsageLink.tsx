@@ -4,7 +4,8 @@ import { Ico } from "@/components/Icon";
 
 // The AI usage page, always in view: at the top of the sidebar on tablets and laptops, where the
 // sidebar is always open, and as an icon in the header on phones, where the sidebar is tucked away.
-export default function AiUsageLink({ sidebar }: { sidebar?: boolean }) {
+// Pages without a sidebar (Report Writer) pass noSidebar to keep it in the header on every screen.
+export default function AiUsageLink({ sidebar, noSidebar }: { sidebar?: boolean; noSidebar?: boolean }) {
   const title = "AI usage: answers, speed, tokens, models and storage";
   if (sidebar)
     return (
@@ -20,8 +21,14 @@ export default function AiUsageLink({ sidebar }: { sidebar?: boolean }) {
       </div>
     );
   return (
-    <Link href="/ai-usage" title={title} aria-label="AI usage" className="flex shrink-0 items-center rounded-md px-1.5 py-1 hover:bg-slate-100 md:hidden">
+    <Link
+      href="/ai-usage"
+      title={title}
+      aria-label="AI usage"
+      className={`flex shrink-0 items-center gap-1.5 rounded-md px-1.5 py-1 text-sm text-slate-600 hover:bg-slate-100 ${noSidebar ? "" : "md:hidden"}`}
+    >
       <Ico icon={ChartColumn} tone="blue" />
+      {noSidebar && <span className="hidden 2xl:inline">AI usage</span>}
     </Link>
   );
 }
