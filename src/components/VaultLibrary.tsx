@@ -1,5 +1,7 @@
 "use client";
 
+import AccountMenu from "@/components/AccountMenu";
+import AiUsageLink from "@/components/AiUsageLink";
 import { friendlyError } from "@/lib/errors";
 import { fetchAll } from "@/lib/fetch-all";
 import SearchBox from "@/components/SearchBox";
@@ -497,12 +499,7 @@ export default function VaultLibrary({ userEmail }: { userEmail: string }) {
         <BrandMark />
         <SectionSwitch active="vault" />
         <SearchBox value={query} onChange={setQuery} placeholder="Search names, web addresses, user IDs…" className="ml-auto w-auto sm:w-full sm:max-w-xs" collapse />
-        <div className="hidden items-center gap-2 text-sm text-slate-500 sm:flex">
-          <span className="hidden max-w-40 truncate lg:inline">{userEmail}</span>
-          <button onClick={signOut} className="rounded-md px-2 py-1 whitespace-nowrap hover:bg-slate-100">
-            Sign out
-          </button>
-        </div>
+        <AccountMenu email={userEmail} onSignOut={signOut} />
       </header>
       <Tour open={tour.open} steps={tour.steps} onClose={tour.close} />
 
@@ -562,6 +559,7 @@ export default function VaultLibrary({ userEmail }: { userEmail: string }) {
               Reset vault…
             </button>
           )}
+          <AiUsageLink />
           <button onClick={signOut} className="mt-3 px-2 text-sm text-slate-500 underline sm:hidden">
             Sign out
           </button>
