@@ -1,6 +1,5 @@
 "use client";
 
-import AccountMenu from "@/components/AccountMenu";
 import AiUsageLink from "@/components/AiUsageLink";
 import { friendlyError } from "@/lib/errors";
 import { fetchAll } from "@/lib/fetch-all";
@@ -628,7 +627,13 @@ export default function Library({ userEmail }: { userEmail: string }) {
           <Ico icon={Images} tone="violet" />
           <span className="hidden sm:inline">Clips</span>
         </Link>
-        <AccountMenu email={userEmail} onSignOut={signOut} />
+        <AiUsageLink />
+        <div className="hidden items-center gap-2 text-sm text-slate-500 sm:flex">
+          <span className="hidden max-w-40 truncate lg:inline">{userEmail}</span>
+          <button onClick={signOut} className="rounded-md px-2 py-1 whitespace-nowrap hover:bg-slate-100">
+            Sign out
+          </button>
+        </div>
       </header>
 
       <div className="flex flex-1">
@@ -689,7 +694,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
             <p className="mt-3 px-2 text-xs text-slate-400">{sortHint(folderSort, "categories")}</p>
           )}
 
-          <AiUsageLink />
+          <AiUsageLink phoneMenu />
           <button onClick={signOut} className="mt-3 px-2 text-sm text-slate-500 underline sm:hidden">
             Sign out
           </button>
