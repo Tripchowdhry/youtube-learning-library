@@ -1,5 +1,6 @@
 "use client";
 
+import AiUsageLink from "@/components/AiUsageLink";
 import { friendlyError } from "@/lib/errors";
 import { fetchAll } from "@/lib/fetch-all";
 import SearchBox from "@/components/SearchBox";
@@ -487,7 +488,7 @@ export default function VaultLibrary({ userEmail }: { userEmail: string }) {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="sticky top-0 z-20 flex items-center gap-3 border-b border-slate-200 bg-white px-4 py-3">
+      <header className="sticky top-0 z-20 flex items-center gap-2 border-b border-slate-200 bg-white px-4 py-3 sm:gap-3">
         <button
           className="rounded-md border border-slate-300 px-2 py-1 text-sm md:hidden"
           onClick={() => setShowCategories((s) => !s)}
@@ -497,8 +498,9 @@ export default function VaultLibrary({ userEmail }: { userEmail: string }) {
         <BrandMark />
         <SectionSwitch active="vault" />
         <SearchBox value={query} onChange={setQuery} placeholder="Search names, web addresses, user IDs…" className="ml-auto w-auto sm:w-full sm:max-w-xs" collapse />
+        <AiUsageLink />
         <div className="hidden items-center gap-2 text-sm text-slate-500 sm:flex">
-          <span className="hidden max-w-40 truncate lg:inline">{userEmail}</span>
+          <span className="hidden max-w-40 truncate 2xl:inline">{userEmail}</span>
           <button onClick={signOut} className="rounded-md px-2 py-1 whitespace-nowrap hover:bg-slate-100">
             Sign out
           </button>

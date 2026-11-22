@@ -2,17 +2,18 @@ import { ChartColumn } from "lucide-react";
 import Link from "next/link";
 import { Ico } from "@/components/Icon";
 
-// The link to the AI usage page: in the header on wide screens, and in the Categories
-// sidebar on laptops, tablets and phones, where the header has no room for it.
-export default function AiUsageLink({ phoneMenu }: { phoneMenu?: boolean }) {
+// The AI usage page, always one click away in the header on every tab and screen size: an icon,
+// with its name beside it on laptops and wider.
+export default function AiUsageLink() {
   return (
     <Link
       href="/ai-usage"
-      className={`${phoneMenu ? "mt-6 flex 2xl:hidden" : "hidden 2xl:flex"} shrink-0 items-center gap-1.5 rounded-md px-2 py-1 text-sm text-slate-600 hover:bg-slate-100`}
-      title="How the AI is doing: answers, speed, tokens and models"
+      className="flex shrink-0 items-center gap-1.5 rounded-md px-1.5 py-1 text-sm text-slate-600 hover:bg-slate-100 sm:px-2"
+      title="AI usage: answers, speed, tokens, models and storage"
+      aria-label="AI usage"
     >
       <Ico icon={ChartColumn} tone="blue" />
-      <span>AI usage</span>
+      <span className="hidden xl:inline">AI usage</span>
     </Link>
   );
 }
