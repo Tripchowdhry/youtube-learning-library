@@ -1,5 +1,6 @@
 "use client";
 
+import HomeLink from "@/components/HomeLink";
 import { deleteItem } from "@/lib/delete-item";
 import { friendlyError } from "@/lib/errors";
 import DeadEnd from "@/components/DeadEnd";
@@ -435,6 +436,7 @@ export default function ScrapEditor({ scrapId }: { scrapId: string }) {
   return (
     <div className="min-h-screen bg-slate-100">
       <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-slate-200 bg-white px-4">
+        <HomeLink />
         <Link href="/scrapbook" className="shrink-0 rounded-md px-2 py-1 text-sm text-slate-600 hover:bg-slate-100">
           ← ScrapBook
         </Link>

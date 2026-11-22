@@ -1,5 +1,6 @@
 "use client";
 
+import HomeLink from "@/components/HomeLink";
 import { friendlyError } from "@/lib/errors";
 import DeadEnd from "@/components/DeadEnd";
 import Link from "next/link";
@@ -167,6 +168,7 @@ export default function ReaderPage({ articleId }: { articleId: string }) {
   return (
     <div className="min-h-screen bg-slate-50">
       <header className="sticky top-0 z-20 flex items-center gap-3 border-b border-slate-200 bg-white px-4 py-3">
+        <HomeLink />
         <Link href={section.path} className="shrink-0 rounded-md px-2 py-1 text-sm text-slate-600 hover:bg-slate-100">
           ← {section.name}
         </Link>
