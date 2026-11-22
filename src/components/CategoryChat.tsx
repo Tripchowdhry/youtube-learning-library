@@ -4,6 +4,7 @@
 // shows where each part of the answer came from. Video sources jump to the moment cited.
 // Each question is one request to the free Gemini AI.
 
+import AiModelTag from "@/components/AiModelTag";
 import { ArrowLeft, Check, CircleHelp, Compass, Copy, FilePen, Loader2, Sparkles, X } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -57,6 +58,7 @@ export default function CategoryChat({
   // While asking: when it started, and what it's doing now (like trying another model).
   const [askedAt, setAskedAt] = useState(0);
   const [note, setNote] = useState<string | null>(null);
+  const [model, setModel] = useState<string | null>(null);
   const bottom = useRef<HTMLDivElement>(null);
   const box = useRef<HTMLTextAreaElement>(null);
   const abort = useRef<AbortController | null>(null);
@@ -92,6 +94,7 @@ export default function CategoryChat({
     setDraft("");
     setBusy(true);
     setNote(null);
+    setModel(null);
     setAskedAt(Date.now());
     const history = turns.filter((t) => t.a).map((t) => ({ q: t.q, a: t.a! }));
     setTurns((all) => [...all, { q }]);
@@ -102,7 +105,7 @@ export default function CategoryChat({
       const res = await postAi(
         "/api/category-ai",
         { kind, ids: picked.map((i) => i.id), category: categoryName, question: q, history },
-        { signal: controller.signal, onNote: setNote },
+        { signal: controller.signal, onNote: setNote, onModel: setModel },
       );
       const data = res.data as { text?: string; sources?: ChatSource[]; error?: string };
       if (res.ok) result = { q, a: data.text ?? "", sources: data.sources };
@@ -184,6 +187,7 @@ export default function CategoryChat({
                     <Thinking
                       startedAt={askedAt}
                       note={note}
+                      model={model}
                       words={kind === "video" ? "Watching your videos and writing an answer…" : "Reading this category and writing an answer…"}
                     />
                   )}
@@ -247,12 +251,13 @@ export default function CategoryChat({
 
 // The spinner while an answer is written. After 2.5 minutes, or when another model is being
 // tried, it says so, so it doesn't look stuck.
-function Thinking({ startedAt, note, words }: { startedAt: number; note: string | null; words: string }) {
+function Thinking({ startedAt, note, model, words }: { startedAt: number; note: string | null; model: string | null; words: string }) {
   const seconds = useSecondsSince(startedAt);
   return (
     <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-500">
       <Loader2 size={15} className="shrink-0 animate-spin" color={PURPLE} aria-hidden />
-      {stillWorkingNote(seconds, note ?? undefined) ?? words}
+      {stillWorkingNote(seconds, note ?? undefined) ?? words} {Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, "0")}
+      <AiModelTag model={model} />
     </div>
   );
 }

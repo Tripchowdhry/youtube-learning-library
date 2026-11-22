@@ -1,15 +1,15 @@
 // Browser side of /api/video-ai and /api/article-ai. Each model gets its own 5 minutes
-// (see postAi); `onNote` hears when the next model is being tried.
+// (see postAi); `hooks` hear which model is working and when the next one is tried.
 
-import { postAi } from "@/lib/ai-request";
+import { postAi, type AiHooks } from "@/lib/ai-request";
 
 export type VideoAiResult = { text?: string; model?: string; error?: string; code?: string };
 
 const UNREACHABLE = { error: "Couldn't reach the AI. Check your connection." };
 
-async function ask(url: string, body: Record<string, unknown>, signal?: AbortSignal, onNote?: (note: string) => void): Promise<VideoAiResult> {
+async function ask(url: string, body: Record<string, unknown>, signal?: AbortSignal, hooks?: AiHooks): Promise<VideoAiResult> {
   try {
-    const { ok, status, data } = await postAi(url, body, { signal, onNote });
+    const { ok, status, data } = await postAi(url, body, { signal, ...hooks });
     if (ok) return { text: data.text as string | undefined, model: data.model as string | undefined };
     return { error: data.error ?? `The AI couldn't answer (error ${status}).`, code: data.code as string | undefined };
   } catch {
@@ -26,9 +26,9 @@ export function askVideoAi(
     focusAt?: number;
   },
   signal?: AbortSignal,
-  onNote?: (note: string) => void,
+  hooks?: AiHooks,
 ): Promise<VideoAiResult> {
-  return ask("/api/video-ai", body, signal, onNote);
+  return ask("/api/video-ai", body, signal, hooks);
 }
 
 // A short note for an article or tutorial in the library.
@@ -42,7 +42,7 @@ export function askArticleAi(
     prompt?: string;
   },
   signal?: AbortSignal,
-  onNote?: (note: string) => void,
+  hooks?: AiHooks,
 ): Promise<VideoAiResult> {
-  return ask("/api/article-ai", body, signal, onNote);
+  return ask("/api/article-ai", body, signal, hooks);
 }

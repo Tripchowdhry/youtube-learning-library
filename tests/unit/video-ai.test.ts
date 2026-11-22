@@ -7,7 +7,9 @@ function replies(list: { status: number; body: object }[]) {
   const attempts: number[] = [];
   vi.stubGlobal(
     "fetch",
-    vi.fn(async (_url: string, init: { body: string }) => {
+    vi.fn(async (url: string, init?: { body: string }) => {
+      if (url === "/api/ai-models") return new Response(JSON.stringify({ models: ["Gemini A", "Gemini B", "Gemini C"] }));
+      if (!init) throw new Error("unexpected request");
       attempts.push(JSON.parse(init.body).attempt);
       const r = list[attempts.length - 1];
       return new Response(JSON.stringify(r.body), { status: r.status });
@@ -24,10 +26,16 @@ describe("askVideoAi", () => {
       { status: 200, body: { text: "answer", model: "Gemini 3.5 Flash Lite" } },
     ]);
     const notes: string[] = [];
-    const result = await askVideoAi({ youtubeId: "x", task: "note" }, undefined, (n) => notes.push(n));
+    const models: string[] = [];
+    const result = await askVideoAi({ youtubeId: "x", task: "note" }, undefined, {
+      onNote: (n) => notes.push(n),
+      onModel: (m) => models.push(m),
+    });
     expect(attempts).toEqual([0, 1, 2]);
     expect(result).toEqual({ text: "answer", model: "Gemini 3.5 Flash Lite" });
     expect(notes).toHaveLength(2);
+    // The model working now is named before each request.
+    expect(models).toEqual(["Gemini A", "Gemini B", "Gemini C"]);
   });
 
   it("stops when no other model is worth trying, showing the used-up limit first", async () => {

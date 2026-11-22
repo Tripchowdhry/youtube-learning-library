@@ -1,5 +1,6 @@
 "use client";
 
+import AiModelTag from "@/components/AiModelTag";
 import { useEffect, useState } from "react";
 import { type AiJob, STILL_WORKING_SECONDS, useAiJobs, useSecondsSince } from "@/lib/ai-jobs";
 import { formatTime } from "@/lib/youtube-player";
@@ -44,6 +45,7 @@ function Working({ job, more }: { job: AiJob; more: number }) {
         {more > 0 ? ` and ${more} more` : ""}… {formatTime(seconds)}
         {seconds >= STILL_WORKING_SECONDS && " · still working"}
       </span>
+      <AiModelTag model={job.model} className="hidden sm:inline-block" />
       <StopAiButton jobKey={job.key} className="rounded-full" />
     </p>
   );

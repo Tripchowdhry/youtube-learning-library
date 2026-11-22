@@ -5,6 +5,7 @@
 // New files stay on the computer: they open from there, and are sent to Google's AI only when
 // asked about. Files added before that were uploaded to BrainShelf and still work as they did.
 
+import AiModelTag from "@/components/AiModelTag";
 import { friendlyError } from "@/lib/errors";
 import StopAiButton from "@/components/StopAiButton";
 import { useEffect, useRef, useState } from "react";
@@ -13,7 +14,7 @@ import { Download, Eye, EyeOff, File as FileIcon, FileText, Film, Image as Image
 import { Ico, type Tone } from "@/components/Icon";
 import { askConfirm } from "@/components/ConfirmDialog";
 import { editorHtml } from "@/components/ReportRichEditor";
-import { onAiJobDone, runAiJob, setAiJobNote, stillWorkingNote, useAiJobs, useSecondsSince, wasStopped } from "@/lib/ai-jobs";
+import { aiJobHooks, onAiJobDone, runAiJob, setAiJobNote, stillWorkingNote, useAiJobs, useSecondsSince, wasStopped } from "@/lib/ai-jobs";
 import {
   ADD_MAX_BYTES,
   ADD_MAX_MB,
@@ -267,7 +268,7 @@ export default function ScrapFiles(props: {
           if (isLocalFile(f)) setAiJobNote(aiKey, f.type.startsWith("video/") ? "The AI is watching the video…" : "The AI is reading the file…");
           const res = await postAi("/api/file-ai", { ...target, name: f.name, type: sendType, prompt: clean }, {
             signal,
-            onNote: (note) => setAiJobNote(aiKey, note),
+            ...aiJobHooks(aiKey),
             // A video sent in pieces is now with Google: the next model asks about that copy.
             nextBody: (data) => (data.geminiFile ? { geminiFile: data.geminiFile, parts: undefined } : {}),
           });
@@ -590,12 +591,13 @@ function Working({ startedAt, jobKey, note }: { startedAt: number; jobKey: strin
   const s = useSecondsSince(startedAt);
   const time = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
   const sending = note?.match(/(\d+)%$/);
+  const model = useAiJobs().running.find((j) => j.key === jobKey)?.model;
   return (
     <div className="flex items-start gap-2 rounded-md bg-violet-50 px-2 py-1.5 text-sm text-violet-800 ring-1 ring-violet-200">
       <div className="min-w-0 flex-1">
         <p>
           <span className="mr-2 inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-violet-300 border-t-violet-700 align-[-2px]" />
-          {(sending ? note : stillWorkingNote(s, note)) ?? "The AI is reading the file…"} ({time})
+          {(sending ? note : stillWorkingNote(s, note)) ?? "The AI is reading the file…"} ({time}) {!sending && <AiModelTag model={model} />}
         </p>
         {sending && (
           <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-violet-200" role="progressbar" aria-valuenow={Number(sending[1])}>

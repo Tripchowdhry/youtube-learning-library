@@ -6,13 +6,29 @@ export const SLOW_MESSAGE = "The AI took over 5 minutes. Try something smaller."
 
 export type AiResponse = { ok: boolean; status: number; data: Record<string, unknown> & { error?: string } };
 
+// Hears what an AI request is doing: `onNote` when the next model is being tried, `onModel`
+// with the name of the model working on it now (e.g. "Gemini 4 Hydrogen").
+export type AiHooks = { onNote?: (note: string) => void; onModel?: (model: string) => void };
+
+// The models in the order they're asked, by name. Read once per visit.
+let modelNames: Promise<string[]> | null = null;
+function aiModelNames() {
+  modelNames ??= fetch("/api/ai-models")
+    .then((res) => (res.ok ? res.json() : {}))
+    .then((data: { models?: string[] }) => data.models ?? [])
+    .catch(() => []);
+  return modelNames.then((names) => {
+    // Couldn't be read: ask again next time.
+    if (!names.length) modelNames = null;
+    return names;
+  });
+}
+
 export async function postAi(
   url: string,
   body: Record<string, unknown>,
-  options: {
+  options: AiHooks & {
     signal?: AbortSignal;
-    // Hears when the next model is being tried, e.g. to show it next to the spinner.
-    onNote?: (note: string) => void;
     // Changes to the request before the next model is asked, from the last answer.
     nextBody?: (data: Record<string, unknown>) => Record<string, unknown>;
   } = {},
@@ -20,6 +36,10 @@ export async function postAi(
   const tries: AiResponse[] = [];
   let request = body;
   for (let attempt = 0; attempt < 10; attempt++) {
+    if (options.onModel) {
+      const name = (await aiModelNames())[attempt];
+      if (name) options.onModel(name);
+    }
     const res = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
