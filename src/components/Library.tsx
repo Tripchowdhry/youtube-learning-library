@@ -1,7 +1,7 @@
 "use client";
 
 import AiUsageLink from "@/components/AiUsageLink";
-import { friendlyError, notSetUp } from "@/lib/errors";
+import { friendlyError } from "@/lib/errors";
 import { fetchAll } from "@/lib/fetch-all";
 import SearchBox from "@/components/SearchBox";
 import { revealById } from "@/lib/reveal";
@@ -342,7 +342,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
     const { error } = await supabase.from("videos").update({ watched_at }).eq("id", video.id);
     if (!error) return;
     const missing = /watched_at/.test(error.message);
-    notify(missing ? notSetUp("video-watched.sql", "Marking videos as watched isn't available yet.") : friendlyError(error.message), true);
+    notify(missing ? "One setup step first: run supabase/video-watched.sql in Supabase." : friendlyError(error.message), true);
     load();
   }
 

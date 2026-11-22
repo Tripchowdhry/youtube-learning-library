@@ -3,7 +3,7 @@
 import AiUsageLink from "@/components/AiUsageLink";
 import AiModelTag from "@/components/AiModelTag";
 import { deleteItem } from "@/lib/delete-item";
-import { friendlyError, notSetUp } from "@/lib/errors";
+import { friendlyError } from "@/lib/errors";
 import { fetchAll } from "@/lib/fetch-all";
 import SearchBox from "@/components/SearchBox";
 import { revealById } from "@/lib/reveal";
@@ -617,7 +617,7 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
   // ---------- Sharing a category with a link ----------
 
   const shareError = (message: string) =>
-    /share_token/.test(message) ? notSetUp("share-categories.sql", "Sharing isn't available yet.") : friendlyError(message);
+    /share_token/.test(message) ? "To share categories, run supabase/share-categories.sql in Supabase first." : friendlyError(message);
 
   async function toggleShare(category: ArticleCategory) {
     if (category.share_token) {
