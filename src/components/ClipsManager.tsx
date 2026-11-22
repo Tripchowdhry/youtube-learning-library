@@ -1,5 +1,6 @@
 "use client";
 
+import { askConfirm } from "@/components/ConfirmDialog";
 import { friendlyError } from "@/lib/errors";
 import { fetchAll } from "@/lib/fetch-all";
 import { Camera, Trash2 } from "lucide-react";
@@ -88,8 +89,13 @@ export default function ClipsManager() {
   const unused = (clips ?? []).filter((c) => !where.has(c.path));
 
   async function remove(label: string, list: StoredClip[]) {
-    const message = `Delete ${list.length} ${list.length === 1 ? "clip" : "clips"} from ${label}? They will also disappear from your notes. This can't be undone.`;
-    if (!window.confirm(message)) return;
+    const ok = await askConfirm({
+      title: `Delete ${list.length} ${list.length === 1 ? "clip" : "clips"} from ${label}?`,
+      message: "They will also disappear from your notes. This can't be undone.",
+      confirmLabel: "Delete",
+      danger: true,
+    });
+    if (!ok) return;
     setBusy(label);
     setError(null);
     try {

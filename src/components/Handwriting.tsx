@@ -3,6 +3,7 @@
 // Handwriting sheets with pen, highlighter and eraser, shared by ScrapBook pages and
 // Reading and Tutorials notes. Works with Apple Pencil, and with a finger when that's switched on.
 
+import { askConfirm } from "@/components/ConfirmDialog";
 import { useRef, useState } from "react";
 import NotePageCanvas, { PAGE_HEIGHT, type Tool } from "@/components/NotePageCanvas";
 import type { ClipImage } from "@/lib/clips";
@@ -74,8 +75,8 @@ export function HandwritingPad(props: {
     change(pages.map((p, i) => (i === pageIndex ? { ...p, strokes: p.strokes.filter((_, j) => !gone.has(j)) } : p)));
   }
 
-  function clearPage(pageIndex: number) {
-    if (!window.confirm(`Erase everything on sheet ${pageIndex + 1}?`)) return;
+  async function clearPage(pageIndex: number) {
+    if (!(await askConfirm({ title: `Erase everything on sheet ${pageIndex + 1}?`, message: "", confirmLabel: "Erase", danger: true }))) return;
     change(
       pages.length > 1 && pageIndex === pages.length - 1
         ? pages.slice(0, -1)
@@ -83,8 +84,8 @@ export function HandwritingPad(props: {
     );
   }
 
-  function deleteImage(pageIndex: number, imageId: string) {
-    if (!window.confirm("Delete this picture from the sheet?")) return;
+  async function deleteImage(pageIndex: number, imageId: string) {
+    if (!(await askConfirm({ title: "Delete this picture from the sheet?", message: "", confirmLabel: "Delete", danger: true }))) return;
     change(pages.map((p, i) => (i === pageIndex ? { ...p, images: (p.images ?? []).filter((im) => im.id !== imageId) } : p)));
   }
 

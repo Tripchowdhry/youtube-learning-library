@@ -37,7 +37,7 @@ import { createClient } from "@/lib/supabase/client";
 import type { Article, ArticleCategory, SectionKind } from "@/lib/types";
 import { hasWriting } from "@/lib/note-mode";
 import { askArticleAi } from "@/lib/video-ai";
-import { askConfirm } from "./ConfirmDialog";
+import { askConfirm, askText } from "./ConfirmDialog";
 import FilterMenu from "@/components/FilterMenu";
 import { Ico, type Tone } from "./Icon";
 import { Images, Brush, FilePen, ExternalLink, FileText, GraduationCap, Inbox, LockKeyhole, NotebookPen, NotebookText, Pencil, PencilLine, Clapperboard, Sparkles, Tag, Trash2, TriangleAlert, type LucideIcon, ArrowUp, Copy, Eye, Link2, Link2Off } from "lucide-react";
@@ -282,7 +282,7 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
 
     let title: string | null = info.title;
     if (!title) {
-      title = window.prompt("This site didn't share its title. Type one:", info.site ?? "")?.trim() || null;
+      title = await askText({ title: "This site didn't share its title. Type one:", value: info.site ?? "", confirmLabel: "Add" });
       if (!title) return false;
     }
 
@@ -442,8 +442,8 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
     updateArticle(article.id, { read_at: article.read_at ? null : new Date().toISOString() });
   }
 
-  function editArticleTags(article: Article) {
-    const tags = askTags(article.tags ?? [], notify);
+  async function editArticleTags(article: Article) {
+    const tags = await askTags(article.tags ?? [], notify);
     if (tags) updateArticle(article.id, { tags });
   }
 
@@ -451,8 +451,8 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
     updateArticle(article.id, { tags: (article.tags ?? []).filter((t) => t !== tag) });
   }
 
-  function renameArticle(article: Article) {
-    const title = window.prompt("Title:", article.title ?? "")?.trim();
+  async function renameArticle(article: Article) {
+    const title = await askText({ title: "Title", value: article.title ?? "", confirmLabel: "Save" });
     if (!title || title === article.title) return;
     updateArticle(article.id, { title });
   }
@@ -593,7 +593,7 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
   };
 
   async function renameCategory(category: ArticleCategory) {
-    const name = window.prompt("Rename:", category.name)?.trim();
+    const name = (await askText({ title: "Rename", value: category.name, confirmLabel: "Rename" }));
     if (!name || name === category.name) return;
     setCategories((prev) => prev.map((c) => (c.id === category.id ? { ...c, name } : c)));
     const { error } = await supabase.from("article_categories").update({ name }).eq("id", category.id);
@@ -604,9 +604,12 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
   }
 
   async function deleteCategory(category: ArticleCategory) {
-    const ok = window.confirm(
-      `Delete "${category.name}" and any categories inside it?\nThe articles inside will move to Uncategorized, not be deleted.`,
-    );
+    const ok = await askConfirm({
+      title: `Delete "${category.name}" and any categories inside it?`,
+      message: "The articles inside will move to Uncategorized, not be deleted.",
+      confirmLabel: "Delete",
+      danger: true,
+    });
     if (!ok) return;
     const { error } = await supabase.from("article_categories").delete().eq("id", category.id);
     if (error) return notify(friendlyError(error.message), true);
@@ -621,7 +624,14 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
 
   async function toggleShare(category: ArticleCategory) {
     if (category.share_token) {
-      if (!window.confirm("Turn off the share link? People with the old link won't be able to see it anymore.")) return;
+      if (
+        !(await askConfirm({
+          title: "Turn off the share link?",
+          message: "People with the old link won't be able to see it anymore.",
+          confirmLabel: "Turn off",
+        }))
+      )
+        return;
       const { error } = await supabase.from("article_categories").update({ share_token: null }).eq("id", category.id);
       if (error) return notify(shareError(error.message), true);
       setCategories((prev) => prev.map((c) => (c.id === category.id ? { ...c, share_token: null } : c)));
@@ -646,7 +656,7 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
       await navigator.clipboard.writeText(link);
       notify("Share link copied. Anyone with it can view this category.");
     } catch {
-      window.prompt("Copy this share link:", link);
+      await askText({ title: "Copy this share link", value: link, confirmLabel: "Done" });
     }
   }
 

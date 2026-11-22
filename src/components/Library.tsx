@@ -51,7 +51,7 @@ import { isWithin } from "@/lib/category-tree";
 import { aiJobHooks, onAiJobDone, runAiJob, useAiJobs } from "@/lib/ai-jobs";
 import { askVideoAi } from "@/lib/video-ai";
 import { deleteItem } from "@/lib/delete-item";
-import { askConfirm } from "./ConfirmDialog";
+import { askConfirm, askText } from "./ConfirmDialog";
 import TagPills from "./TagPills";
 import { askTags } from "@/lib/tags";
 
@@ -394,14 +394,14 @@ export default function Library({ userEmail }: { userEmail: string }) {
     updateVideo(neighbor.id, { position: video.position });
   }
 
-  function renameVideo(video: Video) {
-    const title = window.prompt("Title:", video.title ?? "")?.trim();
+  async function renameVideo(video: Video) {
+    const title = await askText({ title: "Title", value: video.title ?? "", confirmLabel: "Save" });
     if (!title || title === video.title) return;
     updateVideo(video.id, { title: title.slice(0, 300) });
   }
 
-  function editTags(video: Video) {
-    const tags = askTags(video.tags, notify);
+  async function editTags(video: Video) {
+    const tags = await askTags(video.tags, notify);
     if (tags) updateVideo(video.id, { tags });
   }
 
@@ -431,7 +431,10 @@ export default function Library({ userEmail }: { userEmail: string }) {
   // ---------- Category actions ----------
 
   async function createFolder(parentId: string | null) {
-    const name = window.prompt(parentId ? `New subcategory inside "${folderPath(parentId)}":` : "New category name:");
+    const name = await askText({
+      title: parentId ? `New subcategory inside "${folderPath(parentId)}"` : "New category name",
+      confirmLabel: "Create",
+    });
     if (!name?.trim()) return;
     const siblings = folders.filter((f) => f.parent_id === parentId);
     const position = siblings.length ? Math.max(...siblings.map((f) => f.position)) + 1 : 0;
@@ -531,7 +534,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
   }
 
   async function renameFolder(folder: VideoCategory) {
-    const name = window.prompt("Rename category:", folder.name);
+    const name = await askText({ title: "Rename category", value: folder.name, confirmLabel: "Rename" });
     if (!name?.trim() || name.trim() === folder.name) return;
     setFolders((prev) => prev.map((f) => (f.id === folder.id ? { ...f, name: name.trim() } : f)));
     const { error } = await supabase.from("video_categories").update({ name: name.trim() }).eq("id", folder.id);
@@ -542,9 +545,12 @@ export default function Library({ userEmail }: { userEmail: string }) {
   }
 
   async function deleteFolder(folder: VideoCategory) {
-    const ok = window.confirm(
-      `Delete "${folder.name}" and any categories inside it?\nThe videos inside will move to Uncategorized, not be deleted.`,
-    );
+    const ok = await askConfirm({
+      title: `Delete "${folder.name}" and any categories inside it?`,
+      message: "The videos inside will move to Uncategorized, not be deleted.",
+      confirmLabel: "Delete",
+      danger: true,
+    });
     if (!ok) return;
     const { error } = await supabase.from("video_categories").delete().eq("id", folder.id);
     if (error) return notify(friendlyError(error.message), true);
@@ -554,7 +560,14 @@ export default function Library({ userEmail }: { userEmail: string }) {
 
   async function toggleShare(folder: VideoCategory) {
     if (folder.share_token) {
-      if (!window.confirm("Turn off the share link? People with the old link won't be able to see it anymore.")) return;
+      if (
+        !(await askConfirm({
+          title: "Turn off the share link?",
+          message: "People with the old link won't be able to see it anymore.",
+          confirmLabel: "Turn off",
+        }))
+      )
+        return;
       const { error } = await supabase.from("video_categories").update({ share_token: null }).eq("id", folder.id);
       if (error) return notify(friendlyError(error.message), true);
       setFolders((prev) => prev.map((f) => (f.id === folder.id ? { ...f, share_token: null } : f)));
@@ -579,7 +592,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
       await navigator.clipboard.writeText(link);
       notify("Share link copied. Anyone with it can view this category.");
     } catch {
-      window.prompt("Copy this share link:", link);
+      await askText({ title: "Copy this share link", value: link, confirmLabel: "Done" });
     }
   }
 
