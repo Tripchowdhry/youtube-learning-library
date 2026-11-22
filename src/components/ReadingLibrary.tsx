@@ -1,6 +1,5 @@
 "use client";
 
-import MoreButton from "@/components/MoreButton";
 import AiUsageLink from "@/components/AiUsageLink";
 import AiModelTag from "@/components/AiModelTag";
 import { deleteItem } from "@/lib/delete-item";
@@ -1311,8 +1310,6 @@ export function NavItem(props: {
   onDragStart?: () => void;
   onDragEnd?: () => void;
   onContextMenu?: (e: React.MouseEvent) => void;
-  // Shows a "⋯" button that opens the same menu as right-clicking.
-  onMore?: (e: React.MouseEvent) => void;
   icon?: LucideIcon;
   tone?: Tone;
 }) {
@@ -1323,13 +1320,13 @@ export function NavItem(props: {
     onDrop: props.onDropArticle,
   });
   const Icon = props.icon;
-  const row = (
+  return (
     <button
       ref={ref}
       {...handlers}
       onClick={props.onClick}
       onContextMenu={props.onContextMenu}
-      className={`flex w-full min-w-0 items-center gap-2 rounded-md py-1.5 pr-2 text-left text-sm ${props.onMore ? "" : props.active ? "bg-slate-900 text-white" : "hover:bg-slate-100"} ${over ? "ring-2 ring-blue-500" : ""}`}
+      className={`flex w-full items-center gap-2 rounded-md py-1.5 pr-2 text-left text-sm ${props.active ? "bg-slate-900 text-white" : "hover:bg-slate-100"} ${over ? "ring-2 ring-blue-500" : ""}`}
       style={{ paddingLeft: 8 + (props.indent ?? 0) * 22 }}
     >
       {Icon && <Ico icon={Icon} tone={props.tone ?? "slate"} />}
@@ -1338,13 +1335,6 @@ export function NavItem(props: {
         <span className={`ml-auto text-xs ${props.active ? "text-slate-300" : "text-slate-400"}`}>{props.count}</span>
       )}
     </button>
-  );
-  if (!props.onMore) return row;
-  return (
-    <div className={`group flex items-center rounded-md ${props.active ? "bg-slate-900 text-white" : "hover:bg-slate-100"}`}>
-      {row}
-      <MoreButton label={props.label} active={props.active} onClick={props.onMore} />
-    </div>
   );
 }
 

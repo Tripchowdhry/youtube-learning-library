@@ -113,10 +113,12 @@ export function ItemSortSelect({ sort, onChange }: { sort: FolderSort; onChange:
   );
 }
 
-// The hint under the list. Renaming and sharing are on each category's "⋯" now, and + adds one.
-// Dragging works in any sort; it switches the list to "My order".
-export function sortHint(_sort: FolderSort, things: string) {
-  return `Drag ${things} to reorder.`;
+// The hint under the list: dragging only makes sense in your own order.
+export function sortHint(sort: FolderSort, things: string, canShare = true) {
+  const menu = canShare ? "Right-click one to rename or share." : "Right-click one to rename.";
+  // Dragging works in any sort; it switches the list to "My order".
+  const heading = things === "folders" ? "Folders" : "Categories";
+  return `Drag ${things} to reorder. ${menu} Right-click "${heading}" to add a new one.`;
 }
 
 // The "Folders" / "Categories" heading in the sidebar. Hovering it lights it up and shows a small + folder icon,

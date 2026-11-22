@@ -1,6 +1,5 @@
 "use client";
 
-import MoreButton from "@/components/MoreButton";
 import AiUsageLink from "@/components/AiUsageLink";
 import { friendlyError } from "@/lib/errors";
 import { fetchAll } from "@/lib/fetch-all";
@@ -884,8 +883,6 @@ function NavItem(props: {
   onDragStart?: () => void;
   onDragEnd?: () => void;
   onContextMenu?: (e: React.MouseEvent) => void;
-  // Shows a "⋯" button that opens the same menu as right-clicking.
-  onMore?: (e: React.MouseEvent) => void;
   icon?: LucideIcon;
   tone?: Tone;
 }) {
@@ -900,7 +897,7 @@ function NavItem(props: {
       ref={ref}
       {...handlers}
       onContextMenu={props.onContextMenu}
-      className={`group flex items-center rounded-md text-sm ${props.active ? "bg-slate-900 text-white" : "hover:bg-slate-100"} ${over ? "ring-2 ring-blue-500" : ""}`}
+      className={`flex items-center rounded-md text-sm ${props.active ? "bg-slate-900 text-white" : "hover:bg-slate-100"} ${over ? "ring-2 ring-blue-500" : ""}`}
       style={{ paddingLeft: (props.indent ?? 0) * 14 }}
     >
       {props.leading}
@@ -911,7 +908,6 @@ function NavItem(props: {
           <span className={`ml-auto text-xs ${props.active ? "text-slate-300" : "text-slate-400"}`}>{props.count}</span>
         )}
       </button>
-      {props.onMore && <MoreButton label={props.label} active={props.active} onClick={props.onMore} />}
     </div>
   );
 }
@@ -969,7 +965,6 @@ function FolderTree(props: {
               onDragStart={props.canDragFolders ? () => props.onFolderDragStart(folder.id) : undefined}
               onDragEnd={props.onFolderDragEnd}
               onContextMenu={(e) => props.onFolderMenu(folder, e)}
-              onMore={(e) => props.onFolderMenu(folder, e)}
               leading={
                 <button
                   onClick={toggle}
