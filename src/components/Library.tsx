@@ -629,7 +629,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
         </Link>
         <AiUsageLink />
         <div className="hidden items-center gap-2 text-sm text-slate-500 sm:flex">
-          <span className="hidden max-w-40 truncate 2xl:inline">{userEmail}</span>
+          <span className="hidden max-w-40 truncate lg:inline">{userEmail}</span>
           <button onClick={signOut} className="rounded-md px-2 py-1 whitespace-nowrap hover:bg-slate-100">
             Sign out
           </button>
@@ -646,6 +646,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
             setMenu({ x: e.clientX, y: e.clientY, items: [{ label: "New category", icon: FolderPlus, tone: "amber" as const, onClick: () => createFolder(null) }] });
           }}
         >
+          <AiUsageLink sidebar />
           <NavItem icon={Clapperboard} tone="red" label="All videos" count={videos.length} active={view.kind === "all" && !searching} onClick={() => openView({ kind: "all" })} />
           <NavItem
             icon={Inbox}

@@ -500,7 +500,7 @@ export default function VaultLibrary({ userEmail }: { userEmail: string }) {
         <SearchBox value={query} onChange={setQuery} placeholder="Search names, web addresses, user IDs…" className="ml-auto w-auto sm:w-full sm:max-w-xs" collapse />
         <AiUsageLink />
         <div className="hidden items-center gap-2 text-sm text-slate-500 sm:flex">
-          <span className="hidden max-w-40 truncate 2xl:inline">{userEmail}</span>
+          <span className="hidden max-w-40 truncate lg:inline">{userEmail}</span>
           <button onClick={signOut} className="rounded-md px-2 py-1 whitespace-nowrap hover:bg-slate-100">
             Sign out
           </button>
@@ -518,6 +518,7 @@ export default function VaultLibrary({ userEmail }: { userEmail: string }) {
             setMenu({ x: e.clientX, y: e.clientY, items: [{ label: "New category", icon: Tag, tone: "amber" as const, onClick: () => createCategory(null) }] });
           }}
         >
+          <AiUsageLink sidebar />
           <NavItem icon={LockKeyhole} tone="navy" label="All entries" count={entries.length} active={view.kind === "all" && !searching} onClick={() => openView({ kind: "all" })} />
           <NavItem
             icon={Inbox}
