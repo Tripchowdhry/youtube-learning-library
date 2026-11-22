@@ -906,7 +906,7 @@ function PassphraseForm({ submitLabel, onSubmit }: { submitLabel: string; onSubm
           value={passphrase}
           onChange={(e) => setPassphrase(e.target.value)}
           placeholder={`New passphrase (at least ${PASSPHRASE_MIN} characters)`}
-          className="min-w-0 flex-1 rounded-md border border-slate-300 bg-white px-3 py-2 font-mono"
+          className="min-w-0 flex-1 rounded-md border border-slate-300 bg-white px-3 py-2 font-mono placeholder:font-sans"
         />
         <button type="button" onClick={() => setShow((s) => !s)} className="rounded-md border border-slate-300 px-2 text-sm">
           {show ? "Hide" : "Show"}
@@ -917,7 +917,7 @@ function PassphraseForm({ submitLabel, onSubmit }: { submitLabel: string; onSubm
         value={again}
         onChange={(e) => setAgain(e.target.value)}
         placeholder="Type it again"
-        className="rounded-md border border-slate-300 bg-white px-3 py-2 font-mono"
+        className="rounded-md border border-slate-300 bg-white px-3 py-2 font-mono placeholder:font-sans"
       />
       <p className="text-xs text-slate-500">
         Tip: a few random words, like <i>river-candle-tiger-maple-orbit</i>, are easy to remember and hard to guess.{" "}
