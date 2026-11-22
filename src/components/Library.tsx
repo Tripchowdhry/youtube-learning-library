@@ -5,7 +5,6 @@ import { friendlyError } from "@/lib/errors";
 import { fetchAll } from "@/lib/fetch-all";
 import SearchBox from "@/components/SearchBox";
 import { revealById } from "@/lib/reveal";
-import ReportWriterLink from "@/components/ReportWriterLink";
 import { AskCategoryButton } from "@/components/CategoryChat";
 import BrandMark from "@/components/BrandMark";
 import { WelcomePanel } from "@/components/GettingStarted";
@@ -714,7 +713,6 @@ export default function Library({ userEmail }: { userEmail: string }) {
         </aside>
 
         <main className="min-w-0 flex-1 p-4 md:p-6">
-          <ReportWriterLink />
           <div className="mb-4 flex flex-wrap items-center gap-2">
             <h1 className="mr-auto text-2xl font-bold">{title}</h1>
             {currentFolder && !searching && (

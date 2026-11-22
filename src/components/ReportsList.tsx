@@ -107,7 +107,7 @@ export default function ReportsList({ userEmail }: { userEmail: string }) {
 
       {/* AI usage sits under BrainShelf, where the sidebar puts it on the other pages. Phones use the header icon. */}
       <div className="hidden px-4 pt-3 md:block [&>div]:mb-0 [&>div]:border-0 [&>div]:pb-0">
-        <AiUsageLink sidebar />
+        <AiUsageLink sidebar withReport={false} />
       </div>
       <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-6 md:pt-3">
         {needsSetup ? (

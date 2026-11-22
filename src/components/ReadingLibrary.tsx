@@ -8,7 +8,6 @@ import { fetchAll } from "@/lib/fetch-all";
 import SearchBox from "@/components/SearchBox";
 import { revealById } from "@/lib/reveal";
 import StopAiButton from "@/components/StopAiButton";
-import ReportWriterLink from "@/components/ReportWriterLink";
 import { AskCategoryButton } from "@/components/CategoryChat";
 import { Tour, TourButton, useSectionTour } from "@/components/Tour";
 import BrandMark from "@/components/BrandMark";
@@ -772,7 +771,6 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
             <SetupNotice />
           ) : (
             <>
-              <ReportWriterLink />
               <div className="mb-4 flex flex-wrap items-center gap-2">
                 <h1 className="mr-auto text-2xl font-bold">{title}</h1>
                 {currentCategory && !searching && (
