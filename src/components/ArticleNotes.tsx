@@ -1,7 +1,7 @@
 "use client";
 
 import AiModelTag from "@/components/AiModelTag";
-import { friendlyError } from "@/lib/errors";
+import { friendlyError, notSetUp } from "@/lib/errors";
 import StopAiButton from "@/components/StopAiButton";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { askConfirm } from "@/components/ConfirmDialog";
@@ -35,10 +35,8 @@ import { pictureUrl } from "@/lib/report";
 
 type SaveState = "saved" | "saving" | "unsaved" | "error";
 
-const MISSING_COLUMN =
-  "Notes can't be saved yet. In Supabase, open SQL Editor and run the file supabase/article-notes.sql once, then reload.";
-const PAGES_SETUP =
-  "Handwriting can't be saved yet. In Supabase, open SQL Editor and run the file supabase/article-pages.sql once, then reload.";
+const MISSING_COLUMN = "Saving notes isn't available yet.";
+const PAGES_SETUP = "Handwriting isn't available yet.";
 const MODE_KEY = "reading-notes-mode";
 
 // Adds an AI answer to the end of the typed notes (the text, not the clips saved after it).
@@ -143,7 +141,13 @@ export default function ArticleNotes(props: {
       .eq("id", article.id);
     if (error) {
       setSaveState("error");
-      setSaveError(/pages/.test(error.message) ? PAGES_SETUP : /notes/.test(error.message) ? MISSING_COLUMN : friendlyError(error.message));
+      setSaveError(
+        /pages/.test(error.message)
+          ? notSetUp("article-pages.sql", PAGES_SETUP)
+          : /notes/.test(error.message)
+            ? notSetUp("article-notes.sql", MISSING_COLUMN)
+            : friendlyError(error.message),
+      );
     } else {
       setSaveState(revision.current === started ? "saved" : "unsaved");
       setSaveError(null);

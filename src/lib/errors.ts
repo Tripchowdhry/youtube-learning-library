@@ -29,3 +29,10 @@ export function friendlyError(message: string | null | undefined): string {
   if (TECHNICAL.test(text)) return "Something went wrong. Please try again.";
   return text;
 }
+
+// A feature whose database step hasn't been run yet. People see a plain sentence; the setup
+// detail (which SQL file to run in Supabase) goes to the browser console for whoever runs the app.
+export function notSetUp(sqlFile: string, message: string): string {
+  if (typeof console !== "undefined") console.warn(`BrainShelf setup: run supabase/${sqlFile} in the Supabase SQL Editor, then reload.`);
+  return message;
+}

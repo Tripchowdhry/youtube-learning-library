@@ -2,6 +2,7 @@
 // Stored in the private "files" Supabase Storage bucket under the owner's user id (supabase/files.sql).
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { notSetUp } from "@/lib/errors";
 
 export const FILES_BUCKET = "files";
 export const FILE_MAX_BYTES = 25 * 1024 * 1024;
@@ -9,8 +10,7 @@ export const FILE_MAX_BYTES = 25 * 1024 * 1024;
 export type ScrapFile = { path: string; name: string; size: number; type: string; added_at: string };
 
 // Before supabase/files.sql is run there's no files column or bucket.
-export const FILES_SETUP =
-  "Files can't be added yet. In Supabase, open SQL Editor and run the file supabase/files.sql once, then reload.";
+export const FILES_SETUP = "Adding files isn't available yet.";
 export const isFilesSetupError = (message: string) => /files|bucket|not found|schema cache|column/i.test(message);
 
 // The kinds of file the AI can read. Videos are those kept on the person's computer.
@@ -64,7 +64,7 @@ export async function uploadScrapFile(supabase: SupabaseClient, file: File): Pro
   const path = `${user.id}/${crypto.randomUUID()}/${safe}`;
   const type = fileType(file);
   const { error } = await supabase.storage.from(FILES_BUCKET).upload(path, file, { contentType: type });
-  if (error) throw new Error(isFilesSetupError(error.message) ? FILES_SETUP : error.message);
+  if (error) throw new Error(isFilesSetupError(error.message) ? notSetUp("files.sql", FILES_SETUP) : error.message);
   return { path, name: file.name, size: file.size, type, added_at: new Date().toISOString() };
 }
 

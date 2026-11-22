@@ -14,7 +14,8 @@ export async function POST(request: Request) {
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Please sign in first." }, { status: 401 });
   if (!geminiConfigured()) {
-    return NextResponse.json({ error: "AI isn't set up yet (GEMINI_API_KEY is missing).", code: "no-key" }, { status: 503 });
+    console.warn("BrainShelf setup: GEMINI_API_KEY is missing.");
+    return NextResponse.json({ error: "AI features aren't turned on yet.", code: "no-key" }, { status: 503 });
   }
   const body = await request.json().catch(() => ({}));
   const size = Number(body.size);

@@ -354,7 +354,7 @@ function KeepButtons({ question, answer, sources }: { question: string; answer: 
     if (reports) return setReports(null);
     setError(null);
     const { data, error: e } = await supabase.from("reports").select("id, title").order("updated_at", { ascending: false }).limit(6);
-    if (e) return setError(/does not exist|schema cache|relation/i.test(e.message) ? "Report Writer isn't set up yet." : friendlyError(e.message));
+    if (e) return setError(/does not exist|schema cache|relation/i.test(e.message) ? "Report Writer isn't available yet." : friendlyError(e.message));
     setReports(data ?? []);
   }
 

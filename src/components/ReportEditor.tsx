@@ -1,7 +1,7 @@
 "use client";
 
 import HomeLink from "@/components/HomeLink";
-import { friendlyError } from "@/lib/errors";
+import { friendlyError, notSetUp } from "@/lib/errors";
 import { postAi } from "@/lib/ai-request";
 import { stillWorkingNote, useSecondsSince } from "@/lib/ai-jobs";
 import SearchBox from "@/components/SearchBox";
@@ -252,7 +252,7 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
           // ScrapBook pages need supabase/report-scrapbook.sql before they can be saved as chosen items.
           notify(
             /source_kind/.test(error.message)
-              ? "ScrapBook pages need one setup step: in Supabase, run supabase/report-scrapbook.sql once, then reload."
+              ? notSetUp("report-scrapbook.sql", "ScrapBook pages can't be added to reports yet.")
               : `Couldn't save the chosen items: ${friendlyError(error.message)}`,
             true,
           );
@@ -296,7 +296,7 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
     if (!handReady) {
       setHandError({
         key,
-        text: "Reading handwriting needs one setup step first. In Supabase, open SQL Editor and run the file supabase/report-handwriting.sql once, then reload this page.",
+        text: notSetUp("report-handwriting.sql", "Reading handwriting isn't available yet."),
       });
       return;
     }
@@ -466,7 +466,7 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
   async function startSharing() {
     if (shareToken) return setShareOpen((o) => !o);
     if (!shareReady) {
-      return notify("Sharing needs one setup step: in Supabase, run supabase/report-share.sql once, then reload.", true);
+      return notify(notSetUp("report-share.sql", "Sharing isn't available yet."), true);
     }
     setShareBusy(true);
     const token = crypto.randomUUID();
