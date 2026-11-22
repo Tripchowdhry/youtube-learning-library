@@ -18,7 +18,8 @@ import { formatDate } from "@/components/ReadingLibrary";
 import { createClient } from "@/lib/supabase/client";
 import type { ArticleCategory, NotePage, NoteStroke, Scrap } from "@/lib/types";
 import { hasWriting, openingMode } from "@/lib/note-mode";
-import { Bold, Eraser, Highlighter, Italic, Keyboard, List, ListOrdered, PenLine, RemoveFormatting, Trash2, Underline } from "lucide-react";
+import { Bold, Eraser, Highlighter, Italic, Keyboard, List, ListOrdered, MoreHorizontal, PenLine, RemoveFormatting, Trash2, Underline } from "lucide-react";
+import ContextMenu, { type MenuState } from "@/components/ContextMenu";
 import { Divider, ToolButton, editorToReport } from "@/components/ReportRichEditor";
 import NotesExport from "@/components/NotesExport";
 import ScrapFiles, { AttachFileButton, addFiles, type Chosen } from "@/components/ScrapFiles";
@@ -100,6 +101,8 @@ export default function ScrapEditor({ scrapId }: { scrapId: string }) {
   const router = useRouter();
   const [scrap, setScrap] = useState<Scrap | null>(null);
   const [missing, setMissing] = useState(false);
+  // The "⋯" menu next to Download (Clear sheet).
+  const [pageMenu, setPageMenu] = useState<MenuState | null>(null);
   const [categories, setCategories] = useState<ArticleCategory[]>([]);
   const [folderSort] = useFolderSort();
   const [title, setTitle] = useState("");
@@ -457,8 +460,8 @@ export default function ScrapEditor({ scrapId }: { scrapId: string }) {
         <Link href="/scrapbook" className="shrink-0 rounded-md px-2 py-1 text-sm text-slate-600 hover:bg-slate-100">
           ← ScrapBook
         </Link>
+        {/* The title is edited in the card below, so the header only says where the page lives. */}
         <div className="min-w-0 flex-1">
-          <p className="truncate font-medium leading-tight">{title || "Untitled"}</p>
           {scrap && (
             <CategoryCrumb
               section="ScrapBook"
@@ -516,30 +519,30 @@ export default function ScrapEditor({ scrapId }: { scrapId: string }) {
               </div>
             </div>
 
-            <div className="sticky top-[60px] z-20 flex flex-wrap items-center gap-2 rounded-xl bg-white p-2 shadow-sm ring-1 ring-slate-200">
-              <div className="flex overflow-hidden rounded-lg bg-slate-100 p-0.5">
-                {(
-                  [
-                    ["type", "Typing", Keyboard],
-                    ["write", "Handwriting", PenLine],
-                  ] as const
-                ).map(([id, label, icon]) => (
-                  <button
-                    key={id}
-                    onClick={() => chooseMode(id)}
-                    className={`flex items-center gap-1.5 rounded-md px-3 py-1 text-sm ${mode === id ? "bg-white font-semibold shadow-sm" : "text-slate-600"}`}
-                  >
-                    <Ico icon={icon} tone={id === "write" ? "blue" : "slate"} size={15} />
-                    {label}
-                  </button>
-                ))}
-              </div>
-              <ClipButton what="screen" onPicture={addClip} />
-              <AttachFileButton onFiles={attach} busy={adding} />
-              {mode === "type" ? (
-                <>
-                  <TypingTools onFormat={format} onClear={clearTyped} canClear={!isEmpty} />
-                  <div className="ml-auto">
+            <div className="sticky top-[60px] z-20 flex flex-col gap-2 rounded-xl bg-white p-2 shadow-sm ring-1 ring-slate-200">
+              {/* Row 1: what kind of page, what to add, and saving it out. Row 2: the tools for that mode. */}
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="flex overflow-hidden rounded-lg bg-slate-100 p-0.5">
+                  {(
+                    [
+                      ["type", "Typing", Keyboard],
+                      ["write", "Handwriting", PenLine],
+                    ] as const
+                  ).map(([id, label, icon]) => (
+                    <button
+                      key={id}
+                      onClick={() => chooseMode(id)}
+                      className={`flex items-center gap-1.5 rounded-md px-3 py-1 text-sm ${mode === id ? "bg-white font-semibold shadow-sm" : "text-slate-600"}`}
+                    >
+                      <Ico icon={icon} tone={id === "write" ? "blue" : "slate"} size={15} />
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                <ClipButton what="screen" onPicture={addClip} />
+                <AttachFileButton onFiles={attach} busy={adding} />
+                {mode === "type" && (
+                  <div className="ml-auto flex items-center gap-1">
                     <NotesExport
                       saveState={saveState}
                       onRetry={save}
@@ -548,8 +551,27 @@ export default function ScrapEditor({ scrapId }: { scrapId: string }) {
                       resolve={(src) => pictureUrl(supabase, src)}
                       empty={isEmpty}
                     />
+                    <button
+                      onClick={(e) => {
+                        const r = e.currentTarget.getBoundingClientRect();
+                        setPageMenu({
+                          x: r.right - 176,
+                          y: r.bottom + 4,
+                          items: [{ label: "Clear sheet", icon: Eraser, tone: "red", danger: true, onClick: clearTyped }],
+                        });
+                      }}
+                      disabled={isEmpty}
+                      aria-label="More"
+                      title="More"
+                      className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-800 disabled:opacity-40"
+                    >
+                      <MoreHorizontal size={18} aria-hidden />
+                    </button>
                   </div>
-                </>
+                )}
+              </div>
+              {mode === "type" ? (
+                <TypingTools onFormat={format} />
               ) : (
                 <InkTools
                   tool={tool}
@@ -566,6 +588,7 @@ export default function ScrapEditor({ scrapId }: { scrapId: string }) {
                 />
               )}
             </div>
+            {pageMenu && <ContextMenu menu={pageMenu} onClose={() => setPageMenu(null)} />}
 
             <ScrapFiles supabase={supabase} scrapId={scrapId} files={files} onChange={changeFiles} onAnswer={addAnswer} onNotice={showNotice} />
 
@@ -642,7 +665,7 @@ export default function ScrapEditor({ scrapId }: { scrapId: string }) {
 }
 
 // The same kind of toolbar as Report Writer, plus Highlight.
-function TypingTools(props: { onFormat: (command: string, value?: string) => void; onClear: () => void; canClear: boolean }) {
+function TypingTools(props: { onFormat: (command: string, value?: string) => void }) {
   const { onFormat } = props;
   return (
     <div
@@ -671,16 +694,6 @@ function TypingTools(props: { onFormat: (command: string, value?: string) => voi
       <ToolButton label="Numbered list" Icon={ListOrdered} onClick={() => onFormat("insertOrderedList")} />
       <ToolButton label="Highlight" Icon={Highlighter} onClick={() => onFormat("hiliteColor", "#fef08a")} />
       <ToolButton label="Clear formatting" Icon={RemoveFormatting} onClick={() => onFormat("removeFormat")} />
-      <Divider />
-      <button
-        onClick={props.onClear}
-        disabled={!props.canClear}
-        title="Erase everything typed on this page"
-        className="flex items-center gap-1 rounded-md px-2 py-1 text-sm text-slate-700 hover:bg-red-50 hover:text-red-700 disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-slate-700"
-      >
-        <Eraser size={15} aria-hidden />
-        Clear sheet
-      </button>
     </div>
   );
 }
