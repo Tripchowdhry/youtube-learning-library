@@ -497,7 +497,7 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="sticky top-0 z-20 flex items-center gap-3 border-b border-slate-200 bg-white px-4 py-3">
+      <header className="sticky top-0 z-20 flex items-center gap-2 border-b border-slate-200 bg-white px-4 py-3 sm:gap-3">
         <button
           className="rounded-md border border-slate-300 px-2 py-1 text-sm md:hidden"
           onClick={() => setShowCategories((s) => !s)}
@@ -536,6 +536,7 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
             setMenu({ x: e.clientX, y: e.clientY, items: [{ label: "New category", icon: Tag, tone: "amber" as const, onClick: () => createCategory(null) }] });
           }}
         >
+          <AiUsageLink sidebar />
           <NavItem icon={NotebookPen} tone="amber" label="All pages" count={scraps.length} active={view.kind === "all" && !searching} onClick={() => openView({ kind: "all" })} />
           <NavItem
             icon={Inbox}
@@ -573,8 +574,7 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
             <p className="mt-3 px-2 text-xs text-slate-400">{sortHint(folderSort, "categories")}</p>
           )}
 
-          <AiUsageLink phoneMenu />
-          <button onClick={signOut} className="mt-3 px-2 text-sm text-slate-500 underline sm:hidden">
+          <button onClick={signOut} className="mt-6 px-2 text-sm text-slate-500 underline sm:hidden">
             Sign out
           </button>
         </aside>

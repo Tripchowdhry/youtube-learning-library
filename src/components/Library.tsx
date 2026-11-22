@@ -606,7 +606,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="sticky top-0 z-20 flex items-center gap-3 border-b border-slate-200 bg-white px-4 py-3">
+      <header className="sticky top-0 z-20 flex items-center gap-2 border-b border-slate-200 bg-white px-4 py-3 sm:gap-3">
         <button
           className="rounded-md border border-slate-300 px-2 py-1 text-sm md:hidden"
           onClick={() => setShowFolders((s) => !s)}
@@ -646,6 +646,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
             setMenu({ x: e.clientX, y: e.clientY, items: [{ label: "New category", icon: FolderPlus, tone: "amber" as const, onClick: () => createFolder(null) }] });
           }}
         >
+          <AiUsageLink sidebar />
           <NavItem icon={Clapperboard} tone="red" label="All videos" count={videos.length} active={view.kind === "all" && !searching} onClick={() => openView({ kind: "all" })} />
           <NavItem
             icon={Inbox}
@@ -694,8 +695,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
             <p className="mt-3 px-2 text-xs text-slate-400">{sortHint(folderSort, "categories")}</p>
           )}
 
-          <AiUsageLink phoneMenu />
-          <button onClick={signOut} className="mt-3 px-2 text-sm text-slate-500 underline sm:hidden">
+          <button onClick={signOut} className="mt-6 px-2 text-sm text-slate-500 underline sm:hidden">
             Sign out
           </button>
         </aside>

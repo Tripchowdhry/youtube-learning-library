@@ -676,7 +676,7 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
 
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="sticky top-0 z-20 flex items-center gap-3 border-b border-slate-200 bg-white px-4 py-3">
+      <header className="sticky top-0 z-20 flex items-center gap-2 border-b border-slate-200 bg-white px-4 py-3 sm:gap-3">
         <button
           className="rounded-md border border-slate-300 px-2 py-1 text-sm md:hidden"
           onClick={() => setShowCategories((s) => !s)}
@@ -714,6 +714,7 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
             setMenu({ x: e.clientX, y: e.clientY, items: [{ label: "New category", icon: Tag, tone: "amber" as const, onClick: () => createCategory(null) }] });
           }}
         >
+          <AiUsageLink sidebar />
           <NavItem icon={kind === "tutorial" ? GraduationCap : FileText} tone={kind === "tutorial" ? "green" : "blue"} label={section.all} count={articles.length} active={view.kind === "all" && !searching} onClick={() => openView({ kind: "all" })} />
           <NavItem
             icon={Inbox}
@@ -751,8 +752,7 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
             <p className="mt-3 px-2 text-xs text-slate-400">{sortHint(folderSort, "categories")}</p>
           )}
 
-          <AiUsageLink phoneMenu />
-          <button onClick={signOut} className="mt-3 px-2 text-sm text-slate-500 underline sm:hidden">
+          <button onClick={signOut} className="mt-6 px-2 text-sm text-slate-500 underline sm:hidden">
             Sign out
           </button>
         </aside>
@@ -921,7 +921,7 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
 // The Videos | Reading | Tutorials | ScrapBook switch in the header of every section.
 export function SectionSwitch({ active }: { active: "videos" | SectionKind | "scrap" | "vault" }) {
   const tab = (on: boolean) =>
-    `flex items-center gap-1.5 rounded-md px-2.5 py-1 text-sm font-medium ${on ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:text-slate-900"}`;
+    `flex items-center gap-1.5 rounded-md px-1.5 py-1 text-sm font-medium sm:px-2.5 ${on ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:text-slate-900"}`;
   const items: { key: string; href: string; name: string; Icon: LucideIcon; tone: Tone }[] = [
     { key: "videos", href: "/", name: "Videos", Icon: Clapperboard, tone: "red" },
     { key: "reading", href: "/reading", name: "Reading", Icon: FileText, tone: "blue" },
