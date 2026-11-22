@@ -1,14 +1,16 @@
 "use client";
 
-import HomeLink from "@/components/HomeLink";
+import AiUsageLink from "@/components/AiUsageLink";
+import { Ico } from "@/components/Icon";
+import SearchBox from "@/components/SearchBox";
 import { friendlyError } from "@/lib/errors";
 import BrandMark from "@/components/BrandMark";
 import { askConfirm } from "@/components/ConfirmDialog";
-import { SetupNotice, formatDate } from "@/components/ReadingLibrary";
+import { SectionSwitch, SetupNotice, formatDate } from "@/components/ReadingLibrary";
 import { isMissingTable, type Report } from "@/lib/report";
 import { createClient } from "@/lib/supabase/client";
 import { ReportIcon } from "@/components/ReportWriterLink";
-import { FilePlus2, Trash2 } from "lucide-react";
+import { FilePlus2, Images, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -23,6 +25,11 @@ export default function ReportsList({ userEmail }: { userEmail: string }) {
   const [needsSetup, setNeedsSetup] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  const [query, setQuery] = useState("");
+  const shown = useMemo(() => {
+    const words = query.trim().toLowerCase();
+    return words ? reports?.filter((r) => r.title.toLowerCase().includes(words)) ?? null : reports;
+  }, [reports, query]);
 
   const load = useCallback(async () => {
     const { data, error } = await supabase
@@ -76,19 +83,33 @@ export default function ReportsList({ userEmail }: { userEmail: string }) {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="sticky top-0 z-20 flex items-center gap-3 border-b border-slate-200 bg-white px-4 py-3">
+      {/* The same header as Videos, Reading, Tutorials, ScrapBook and Vault, with no tab highlighted. */}
+      <header className="sticky top-0 z-20 flex items-center gap-2 border-b border-slate-200 bg-white px-4 py-3 sm:gap-3">
         <BrandMark />
-        {/* The logo already goes Home on wider screens; phones hide it. */}
-        <HomeLink className="sm:hidden" />
-        <div className="ml-auto hidden items-center gap-2 text-sm text-slate-500 sm:flex">
-          <span className="max-w-40 truncate">{userEmail}</span>
-          <button onClick={signOut} className="rounded-md px-2 py-1 hover:bg-slate-100">
+        <SectionSwitch active="reports" />
+        <SearchBox value={query} onChange={setQuery} placeholder="Search reports…" className="ml-auto w-auto sm:w-full sm:max-w-xs" collapse />
+        <Link
+          href="/clips"
+          className="flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1 text-sm text-slate-600 hover:bg-slate-100"
+          title="See and delete your clips to free up space"
+        >
+          <Ico icon={Images} tone="violet" />
+          <span className="hidden sm:inline">Clips</span>
+        </Link>
+        <AiUsageLink />
+        <div className="hidden items-center gap-2 text-sm text-slate-500 sm:flex">
+          <span className="hidden max-w-40 truncate lg:inline">{userEmail}</span>
+          <button onClick={signOut} className="rounded-md px-2 py-1 whitespace-nowrap hover:bg-slate-100">
             Sign out
           </button>
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-6">
+      {/* AI usage sits under BrainShelf, where the sidebar puts it on the other pages. Phones use the header icon. */}
+      <div className="hidden px-4 pt-3 md:block [&>div]:mb-0 [&>div]:border-0 [&>div]:pb-0">
+        <AiUsageLink sidebar />
+      </div>
+      <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-6 md:pt-3">
         {needsSetup ? (
           <SetupNotice file="reports.sql" />
         ) : (
@@ -112,16 +133,18 @@ export default function ReportsList({ userEmail }: { userEmail: string }) {
 
             {error && <p className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
 
-            {reports === null ? (
+            {shown === null ? (
               <p className="text-sm text-slate-500">Loading…</p>
-            ) : reports.length === 0 ? (
+            ) : reports?.length && !shown.length ? (
+              <p className="text-sm text-slate-500">No reports match &ldquo;{query.trim()}&rdquo;.</p>
+            ) : shown.length === 0 ? (
               <div className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center text-slate-600">
                 <ReportIcon size={48} className="mx-auto mb-2" />
                 No reports yet. Click <b>New report</b> to make your first one.
               </div>
             ) : (
               <ul className="divide-y divide-slate-200 rounded-xl bg-white shadow-sm ring-1 ring-slate-200">
-                {reports.map((r) => {
+                {shown.map((r) => {
                   const count = r.report_sources?.[0]?.count ?? 0;
                   return (
                     <li key={r.id} className="flex items-center gap-3 px-4 py-3">
