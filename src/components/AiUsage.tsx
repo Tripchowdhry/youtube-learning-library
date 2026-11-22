@@ -143,7 +143,7 @@ export default function AiUsage() {
             )}
             <p className="text-xs text-slate-500">
               Tokens are the pieces of text, pictures and video the AI reads and writes, as Google counts them. Google doesn&apos;t say how much of
-              the free limit is left, so this shows what&apos;s been used.
+              the free limit is left, so this shows what&apos;s been used. Requests older than 30 days are deleted.
             </p>
           </>
         )}
