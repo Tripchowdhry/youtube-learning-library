@@ -96,7 +96,7 @@ export default function ReportsList({ userEmail }: { userEmail: string }) {
           <Ico icon={Images} tone="violet" />
           <span className="hidden sm:inline">Clips</span>
         </Link>
-        <AiUsageLink noSidebar />
+        <AiUsageLink />
         <div className="hidden items-center gap-2 text-sm text-slate-500 sm:flex">
           <span className="hidden max-w-40 truncate lg:inline">{userEmail}</span>
           <button onClick={signOut} className="rounded-md px-2 py-1 whitespace-nowrap hover:bg-slate-100">
@@ -105,7 +105,11 @@ export default function ReportsList({ userEmail }: { userEmail: string }) {
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-6">
+      {/* AI usage sits under BrainShelf, where the sidebar puts it on the other pages. Phones use the header icon. */}
+      <div className="hidden px-4 pt-3 md:block [&>div]:mb-0 [&>div]:border-0 [&>div]:pb-0">
+        <AiUsageLink sidebar />
+      </div>
+      <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-6 md:pt-3">
         {needsSetup ? (
           <SetupNotice file="reports.sql" />
         ) : (
