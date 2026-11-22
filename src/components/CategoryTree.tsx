@@ -48,6 +48,7 @@ export default function CategoryTree<C extends TreeNode>(props: {
                   onDragStart={props.onDragStart ? () => props.onDragStart!(cat.id) : undefined}
                   onDragEnd={props.onDragEnd}
                   onContextMenu={(e) => props.onMenu(cat, e)}
+                  onMore={(e) => props.onMenu(cat, e)}
                 />
               </div>
             </div>
