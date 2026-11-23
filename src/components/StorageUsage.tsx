@@ -55,12 +55,16 @@ export default function StorageUsage({ supabase }: { supabase: ReturnType<typeof
 
   return (
     <section className="overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-slate-200">
-      <h2 className="border-b border-slate-200 px-4 py-2.5 font-semibold">Storage</h2>
+      <h2 className="flex items-center gap-1.5 border-b border-slate-200 px-4 py-2.5 font-semibold">
+        <Ico icon={HardDrive} tone="green" size={14} />
+        Storage
+      </h2>
       <div className="grid gap-4 p-4 md:grid-cols-2">
-        <Meter icon={Database} tone="blue" label="Database" used={stats.database_bytes} limit={FREE_DATABASE_BYTES} />
+        <Meter icon={Database} tone="blue" color="bg-[#2563eb]" label="Database" used={stats.database_bytes} limit={FREE_DATABASE_BYTES} />
         <Meter
           icon={HardDrive}
-          tone="violet"
+          tone="green"
+          color="bg-[#16a34a]"
           label={`Your files (${fileCount} ${fileCount === 1 ? "file" : "files"})`}
           used={fileBytes}
           limit={FREE_FILE_BYTES}
@@ -106,9 +110,23 @@ export default function StorageUsage({ supabase }: { supabase: ReturnType<typeof
   );
 }
 
-function Meter({ icon, tone, label, used, limit }: { icon: typeof Database; tone: Tone; label: string; used: number; limit: number }) {
+function Meter({
+  icon,
+  tone,
+  color,
+  label,
+  used,
+  limit,
+}: {
+  icon: typeof Database;
+  tone: Tone;
+  color: string;
+  label: string;
+  used: number;
+  limit: number;
+}) {
   const percent = percentOf(used, limit);
-  const bar = percent >= 90 ? "bg-red-500" : percent >= 70 ? "bg-amber-500" : "bg-blue-500";
+  const bar = percent >= 90 ? "bg-red-500" : percent >= 70 ? "bg-amber-500" : color;
   return (
     <div>
       <p className="flex items-center gap-1.5 text-xs text-slate-500">

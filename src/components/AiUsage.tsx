@@ -2,9 +2,10 @@
 
 import BackLink from "@/components/BackLink";
 import HomeLink from "@/components/HomeLink";
-import { Activity, CircleCheck, Clock, Coins, Database, Repeat, Sparkles } from "lucide-react";
+import { Activity, CircleCheck, Clock, Coins, Database, LayoutGrid, ListOrdered, Repeat, Sparkles } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { Ico, type Tone } from "@/components/Icon";
+import { Ico } from "@/components/Icon";
+import BrandStripe from "@/components/BrandStripe";
 import StorageUsage from "@/components/StorageUsage";
 import { friendlyError } from "@/lib/errors";
 import { fetchAll } from "@/lib/fetch-all";
@@ -18,6 +19,14 @@ const RANGES = [
 ] as const;
 type Range = (typeof RANGES)[number]["key"];
 type View = "ai" | "storage";
+// The logo's colours, used for each stat's book-spine edge and the bars in the tables.
+const SPINE: Record<"blue" | "green" | "red" | "amber", string> = {
+  blue: "border-l-[#2563eb]",
+  green: "border-l-[#16a34a]",
+  red: "border-l-[#dc2626]",
+  amber: "border-l-[#f59e0b]",
+};
+const BAR = { blue: "bg-[#2563eb]", green: "bg-[#16a34a]" } as const;
 // How many recent requests show before "Show all".
 const LATEST = 8;
 
@@ -79,18 +88,21 @@ export default function AiUsage() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <header className="sticky top-0 z-20 flex items-center gap-3 border-b border-slate-200 bg-white px-4 py-3">
-        <HomeLink />
-        <BackLink />
-        <h1 className="text-lg font-bold">AI usage</h1>
+      <header className="sticky top-0 z-20 bg-white">
+        <div className="flex items-center gap-3 px-4 py-3">
+          <HomeLink />
+          <BackLink />
+          <h1 className="text-lg font-bold">AI usage</h1>
+        </div>
+        <BrandStripe />
       </header>
 
       <main className="mx-auto flex max-w-4xl flex-col gap-4 p-4">
         <nav className="flex w-fit rounded-lg bg-slate-100 p-0.5" aria-label="Show">
           {(
             [
-              ["ai", "AI requests", Sparkles, "violet"],
-              ["storage", "Storage", Database, "blue"],
+              ["ai", "AI requests", Sparkles, "blue"],
+              ["storage", "Storage", Database, "green"],
             ] as const
           ).map(([key, label, icon, tone]) => (
             <button
@@ -122,7 +134,7 @@ export default function AiUsage() {
                 <button
                   key={r.key}
                   onClick={() => setRange(r.key)}
-                  className={`rounded-md px-2.5 py-1 ring-1 ring-slate-300 ${range === r.key ? "bg-slate-900 text-white" : "bg-white hover:bg-slate-100"}`}
+                  className={`rounded-md px-2.5 py-1 ring-1 ring-slate-300 ${range === r.key ? "bg-[#2563eb] text-white ring-[#2563eb]" : "bg-white hover:bg-slate-100"}`}
                 >
                   {r.label}
                 </button>
@@ -148,18 +160,21 @@ export default function AiUsage() {
                   <Stat icon={Clock} tone="amber" label="Average answer time" value={formatDuration(stats.total.avgMs)} sub={`${stats.total.timeouts} over 5 minutes`} />
                   <Stat
                     icon={Coins}
-                    tone="violet"
+                    tone="red"
                     label="Tokens"
                     value={formatTokens(stats.total.tokens)}
                     sub={`${formatTokens(stats.inputTokens)} in · ${formatTokens(stats.outputTokens)} out`}
                   />
                 </section>
 
-                <Table title="By AI model" groups={stats.byModel} showLimits />
-                <Table title="By feature" groups={stats.byFeature} />
+                <Table title="By AI model" icon={Repeat} accent="blue" groups={stats.byModel} showLimits />
+                <Table title="By feature" icon={LayoutGrid} accent="green" groups={stats.byFeature} />
 
                 <section className="overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-slate-200">
-                  <h2 className="border-b border-slate-200 px-4 py-2.5 font-semibold">Latest requests</h2>
+                  <h2 className="flex items-center gap-1.5 border-b border-slate-200 px-4 py-2.5 font-semibold">
+                    <Ico icon={ListOrdered} tone="amber" size={14} />
+                    Latest requests
+                  </h2>
                   <ul className="divide-y divide-slate-100 text-sm">
                     {rows.slice(0, showAllLatest ? 50 : LATEST).map((r, i) => (
                       <li key={i} className="flex flex-wrap items-center gap-x-3 gap-y-0.5 px-4 py-2">
@@ -168,7 +183,11 @@ export default function AiUsage() {
                         </span>
                         <span className="min-w-0 flex-1 truncate">{featureName(r.feature)}</span>
                         <span className="text-slate-600">{r.model}</span>
-                        <span className={r.ok ? "text-green-700" : r.handed_off ? "text-amber-700" : "text-red-700"}>{outcome(r)}</span>
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-xs font-medium ${r.ok ? "bg-green-50 text-green-700" : r.handed_off ? "bg-amber-50 text-amber-700" : "bg-red-50 text-red-700"}`}
+                        >
+                          {outcome(r)}
+                        </span>
                         <span className="w-12 text-right tabular-nums text-slate-500">{formatDuration(r.ms)}</span>
                         <span className="w-14 text-right tabular-nums text-slate-500">{formatTokens(r.input_tokens + r.output_tokens)}</span>
                       </li>
@@ -196,9 +215,9 @@ export default function AiUsage() {
   );
 }
 
-function Stat({ icon, tone, label, value, sub }: { icon: typeof Clock; tone: Tone; label: string; value: string; sub: string }) {
+function Stat({ icon, tone, label, value, sub }: { icon: typeof Clock; tone: keyof typeof SPINE; label: string; value: string; sub: string }) {
   return (
-    <div className="rounded-xl bg-white p-3 shadow-sm ring-1 ring-slate-200">
+    <div className={`rounded-xl border-l-4 bg-white p-3 shadow-sm ring-1 ring-slate-200 ${SPINE[tone]}`}>
       <p className="flex items-center gap-1.5 text-xs text-slate-500">
         <Ico icon={icon} tone={tone} size={14} />
         {label}
@@ -209,11 +228,24 @@ function Stat({ icon, tone, label, value, sub }: { icon: typeof Clock; tone: Ton
   );
 }
 
-function Table({ title, groups, showLimits }: { title: string; groups: Group[]; showLimits?: boolean }) {
+function Table({
+  title,
+  icon,
+  accent,
+  groups,
+  showLimits,
+}: {
+  title: string;
+  icon: typeof Clock;
+  accent: keyof typeof BAR;
+  groups: Group[];
+  showLimits?: boolean;
+}) {
+  const most = Math.max(1, ...groups.map((g) => g.tokens));
   return (
     <section className="overflow-x-auto rounded-xl bg-white shadow-sm ring-1 ring-slate-200">
       <h2 className="flex items-center gap-1.5 border-b border-slate-200 px-4 py-2.5 font-semibold">
-        {showLimits && <Ico icon={Repeat} tone="slate" size={14} />}
+        <Ico icon={icon} tone={accent} size={14} />
         {title}
       </h2>
       <table className="w-full min-w-[34rem] text-sm">
@@ -237,7 +269,14 @@ function Table({ title, groups, showLimits }: { title: string; groups: Group[]; 
               <td className={`px-2 py-2 text-right ${g.handoffs ? "text-amber-700" : "text-slate-400"}`}>{g.handoffs}</td>
               {showLimits && <td className={`px-2 py-2 text-right ${g.limitHits ? "text-amber-700" : "text-slate-400"}`}>{g.limitHits}</td>}
               <td className="px-2 py-2 text-right">{g.answers ? formatDuration(g.avgMs) : "–"}</td>
-              <td className="px-4 py-2 text-right">{formatTokens(g.tokens)}</td>
+              <td className="px-4 py-2 text-right">
+                <span className="flex items-center justify-end gap-2">
+                  <span className="h-1.5 w-16 overflow-hidden rounded-full bg-slate-100">
+                    <span className={`block h-full rounded-full ${BAR[accent]}`} style={{ width: `${(g.tokens / most) * 100}%` }} />
+                  </span>
+                  <span className="w-12">{formatTokens(g.tokens)}</span>
+                </span>
+              </td>
             </tr>
           ))}
         </tbody>
