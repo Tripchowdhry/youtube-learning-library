@@ -21,6 +21,7 @@ const TABLES: Record<string, string> = {
   scraps: "ScrapBook",
   reports: "Reports",
   report_sources: "Report sources",
+  report_categories: "Report categories",
   vault_entries: "Vault",
   vault_categories: "Vault categories",
   vault_keys: "Vault keys",
