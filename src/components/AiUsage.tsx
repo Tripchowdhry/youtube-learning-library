@@ -2,7 +2,7 @@
 
 import BackLink from "@/components/BackLink";
 import HomeLink from "@/components/HomeLink";
-import { Activity, CircleCheck, Clock, Coins, Repeat } from "lucide-react";
+import { Activity, CircleCheck, Clock, Coins, Database, Repeat, Sparkles } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Ico, type Tone } from "@/components/Icon";
 import StorageUsage from "@/components/StorageUsage";
@@ -17,6 +17,9 @@ const RANGES = [
   { key: "month", label: "Last 30 days" },
 ] as const;
 type Range = (typeof RANGES)[number]["key"];
+type View = "ai" | "storage";
+// How many recent requests show before "Show all".
+const LATEST = 8;
 
 function since(range: Range) {
   const start = new Date();
@@ -31,6 +34,16 @@ function since(range: Range) {
 export default function AiUsage() {
   const supabase = useMemo(() => createClient(), []);
   const [range, setRange] = useState<Range>("today");
+  // Two views instead of one long page; /ai-usage#storage opens on Storage.
+  const [view, setView] = useState<View>("ai");
+  const [showAllLatest, setShowAllLatest] = useState(false);
+  useEffect(() => {
+    if (window.location.hash === "#storage") setView("storage");
+  }, []);
+  function chooseView(next: View) {
+    setView(next);
+    window.history.replaceState(null, "", next === "storage" ? "#storage" : window.location.pathname);
+  }
   const [rows, setRows] = useState<UsageLogRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [setupNeeded, setSetupNeeded] = useState(false);
@@ -73,7 +86,28 @@ export default function AiUsage() {
       </header>
 
       <main className="mx-auto flex max-w-4xl flex-col gap-4 p-4">
-        {setupNeeded ? (
+        <nav className="flex w-fit rounded-lg bg-slate-100 p-0.5" aria-label="Show">
+          {(
+            [
+              ["ai", "AI requests", Sparkles, "violet"],
+              ["storage", "Storage", Database, "blue"],
+            ] as const
+          ).map(([key, label, icon, tone]) => (
+            <button
+              key={key}
+              onClick={() => chooseView(key)}
+              aria-pressed={view === key}
+              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium ${view === key ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:text-slate-900"}`}
+            >
+              <Ico icon={icon} tone={tone} size={15} />
+              {label}
+            </button>
+          ))}
+        </nav>
+
+        {view === "storage" ? (
+          <StorageUsage supabase={supabase} />
+        ) : setupNeeded ? (
           <section className="rounded-xl bg-amber-50 p-4 text-sm text-amber-900 ring-1 ring-amber-200">
             <p className="font-semibold">One step to turn this on</p>
             <p className="mt-1">
@@ -127,7 +161,7 @@ export default function AiUsage() {
                 <section className="overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-slate-200">
                   <h2 className="border-b border-slate-200 px-4 py-2.5 font-semibold">Latest requests</h2>
                   <ul className="divide-y divide-slate-100 text-sm">
-                    {rows.slice(0, 20).map((r, i) => (
+                    {rows.slice(0, showAllLatest ? 50 : LATEST).map((r, i) => (
                       <li key={i} className="flex flex-wrap items-center gap-x-3 gap-y-0.5 px-4 py-2">
                         <span className="w-36 shrink-0 text-slate-500">
                           {new Date(r.created_at).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
@@ -140,6 +174,14 @@ export default function AiUsage() {
                       </li>
                     ))}
                   </ul>
+                  {rows.length > LATEST && (
+                    <button
+                      onClick={() => setShowAllLatest((s) => !s)}
+                      className="w-full border-t border-slate-100 px-4 py-2 text-sm text-blue-700 hover:bg-slate-50"
+                    >
+                      {showAllLatest ? "Show fewer" : `Show more (${Math.min(rows.length, 50) - LATEST} more)`}
+                    </button>
+                  )}
                 </section>
               </>
             )}
@@ -149,7 +191,6 @@ export default function AiUsage() {
             </p>
           </>
         )}
-        <StorageUsage supabase={supabase} />
       </main>
     </div>
   );
