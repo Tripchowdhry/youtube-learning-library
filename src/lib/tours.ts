@@ -8,7 +8,7 @@ export const TOURS = {
     {
       target: "add-video",
       title: "Save what you're learning",
-      text: "Paste any YouTube link here. BrainShelf fills in the details and sorts it into a category by channel.",
+      text: "Paste any YouTube link here. BrainShelf fills in the details and sorts it into a category by channel. Make your own categories and subcategories too.",
     },
     {
       target: "sections",
@@ -28,12 +28,17 @@ export const TOURS = {
     {
       target: "report-writer",
       title: "Turn notes into a report",
-      text: "Report Writer pulls your notes from videos, readings and tutorials into one report you can edit, copy or download for Word.",
+      text: "Report Writer pulls your notes from videos, readings, tutorials and ScrapBook into one report. Edit it, share a read-only link, or download it as Word or PDF.",
     },
     {
       target: "clips",
       title: "Your clips in one place",
       text: "See every screenshot you've clipped into your notes, and delete the ones you don't need to free up space.",
+    },
+    {
+      target: "ai-usage",
+      title: "See your AI usage",
+      text: "AI usage shows how many answers AI gave you, how fast, which models, and how much space your notes and files take.",
     },
   ],
   study: [
@@ -60,7 +65,7 @@ export const TOURS = {
     {
       target: "notes-export",
       title: "Copy or download your notes",
-      text: "In Typing, Copy puts your notes, with their formatting and clips, into Word, Google Docs or an email. Download Word saves them as a file.",
+      text: "In Typing, Copy puts your notes, with their formatting and clips, into Word, Google Docs or an email. Download saves them as a Word file or a PDF.",
     },
   ],
   // Reading and Tutorials work the same way, so seeing it in one counts for both.
@@ -77,7 +82,7 @@ export const TOURS = {
     },
     {
       title: "Notes beside what you read",
-      text: "While reading, open My notes to type with headings, bold and lists, or switch to Handwriting for Apple Pencil. Ask AI for a summary and add clips. Copy or Download Word takes typed notes anywhere.",
+      text: "While reading, open My notes to type with headings, bold and lists, or switch to Handwriting for Apple Pencil. Ask AI for a summary and add clips. Copy or Download (Word or PDF) takes typed notes anywhere.",
     },
     {
       target: "ask-category",
@@ -87,18 +92,18 @@ export const TOURS = {
     {
       target: "report-writer",
       title: "Turn notes into a report",
-      text: "Report Writer pulls your notes from readings, tutorials and videos into one report you can edit, copy or download for Word.",
+      text: "Report Writer pulls your notes from readings, tutorials, videos and ScrapBook into one report. Edit it, share a read-only link, or download it as Word or PDF.",
     },
   ],
   scrapbook: [
     {
       target: "new-page",
       title: "Pages of your own",
-      text: "Give a page a title and tap + New page to write, type or draw freely, and sort pages into categories.",
+      text: "Give a page a title and tap + New page to write, type or draw freely, and sort pages into categories and subcategories.",
     },
     {
       title: "Type like in Word",
-      text: "When typing on a page, use the toolbar for headings, bold, lists and highlight, add clips, then Copy it or Download Word. Add file puts PDFs, slides, documents, pictures and videos on the page. They stay on your computer, and Ask AI can read or watch them for you.",
+      text: "When typing on a page, use the toolbar for headings, bold, lists and highlight, add clips, then Copy it or Download it as Word or PDF. Add file puts PDFs, slides, documents, pictures and videos on the page. They stay on your computer, and Ask AI can read or watch them for you.",
     },
     {
       target: "ask-category",
@@ -109,7 +114,7 @@ export const TOURS = {
   vault: [
     {
       title: "Logins and API keys, kept safe",
-      text: "Passwords and API keys are locked in your browser with a passphrase only you know, before they're saved. Web addresses and user IDs stay readable, so you can still reset things if you forget it. The vault locks itself after 5 idle minutes.",
+      text: "Passwords and API keys are locked in your browser with a passphrase only you know, before they're saved. Web addresses and user IDs stay readable, so you can still reset things if you forget it. The vault locks itself after 5 idle minutes. Sort entries into categories and subcategories, like the other tabs.",
     },
   ],
   // Report Writer's list of reports.
