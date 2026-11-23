@@ -73,7 +73,7 @@ export const TOURS = {
     {
       target: "add-article",
       title: "Save anything you read",
-      text: "Paste a link to an article, an X post or any web page. BrainShelf sorts it into a category named after its author (or its company), or pick a category yourself.",
+      text: "Paste a link to an article, an X post or any web page. BrainShelf sorts it into a category named after its author (or its company), or pick a category yourself. Make your own categories and subcategories too.",
     },
     {
       target: "read-filter",
@@ -94,6 +94,16 @@ export const TOURS = {
       title: "Turn notes into a report",
       text: "Report Writer pulls your notes from readings, tutorials, videos and ScrapBook into one report. Edit it, share a read-only link, or download it as Word or PDF.",
     },
+    {
+      target: "clips",
+      title: "Your clips in one place",
+      text: "See every screenshot you've clipped into your notes, and delete the ones you don't need to free up space.",
+    },
+    {
+      target: "ai-usage",
+      title: "See your AI usage",
+      text: "AI usage shows how many answers AI gave you, how fast, which models, and how much space your notes and files take.",
+    },
   ],
   scrapbook: [
     {
@@ -109,6 +119,21 @@ export const TOURS = {
       target: "ask-category",
       title: "Ask a whole category",
       text: "Open a category and tap Ask this category to ask one question across all its pages. Each answer says which page it came from.",
+    },
+    {
+      target: "report-writer",
+      title: "Turn notes into a report",
+      text: "Report Writer pulls your notes from ScrapBook pages, videos, readings and tutorials into one report. Edit it, share a read-only link, or download it as Word or PDF.",
+    },
+    {
+      target: "clips",
+      title: "Your clips in one place",
+      text: "See every screenshot you've clipped into your notes, and delete the ones you don't need to free up space.",
+    },
+    {
+      target: "ai-usage",
+      title: "See your AI usage",
+      text: "AI usage shows how many answers AI gave you, how fast, which models, and how much space your notes and files take.",
     },
   ],
   vault: [
