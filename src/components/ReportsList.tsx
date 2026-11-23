@@ -39,6 +39,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { Tour, TourButton, useSectionTour } from "@/components/Tour";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 type Row = Pick<Report, "id" | "title" | "updated_at"> & {
@@ -80,6 +81,7 @@ export default function ReportsList({ userEmail }: { userEmail: string }) {
   );
   const [menu, setMenu] = useState<MenuState | null>(null);
   const closeMenu = useCallback(() => setMenu(null), []);
+  const tour = useSectionTour("reports", reports !== null && !needsSetup);
 
   const load = useCallback(async () => {
     const [r, c] = await Promise.all([
@@ -446,6 +448,7 @@ export default function ReportsList({ userEmail }: { userEmail: string }) {
       <header className="sticky top-0 z-20 flex items-center gap-2 border-b border-slate-200 bg-white px-4 py-3 sm:gap-3">
         {categoriesReady && (
           <button
+            data-tour="report-categories"
             className="rounded-md border border-slate-300 px-2 py-1 text-sm md:hidden"
             onClick={() => setShowCategories((s) => !s)}
           >
@@ -482,6 +485,7 @@ export default function ReportsList({ userEmail }: { userEmail: string }) {
           </button>
         </div>
       </header>
+      <Tour open={tour.open} steps={tour.steps} onClose={tour.close} />
 
       <div className="flex flex-1">
         <aside
@@ -525,42 +529,47 @@ export default function ReportsList({ userEmail }: { userEmail: string }) {
                   draggingId ? () => moveReport(draggingId, null) : undefined
                 }
               />
-              <SidebarHeading label="Categories">
-                <FolderSortSelect sort={folderSort} onChange={setFolderSort} />
-                <button
-                  onClick={() => createCategory(null)}
-                  className="rounded px-1.5 text-base text-slate-700 hover:bg-slate-100"
-                  title="New category"
-                >
-                  +
-                </button>
-              </SidebarHeading>
-              {topCategories.length === 0 && (
-                <p className="px-2 text-sm text-slate-500">
-                  No categories yet. Click + to make one, like &quot;Machine
-                  learning&quot;.
-                </p>
-              )}
-              <CategoryTree
-                parentId={null}
-                childrenOf={childCategories}
-                collapsed={collapsed}
-                onToggle={toggleCategory}
-                activeId={
-                  !searching && view.kind === "category" ? view.id : null
-                }
-                count={countIn}
-                onOpen={(id) => openView({ kind: "category", id })}
-                dropOn={dropOnCategory}
-                onDragStart={setDraggingCategoryId}
-                onDragEnd={() => setDraggingCategoryId(null)}
-                onMenu={openCategoryMenu}
-              />
-              {topCategories.length > 1 && (
-                <p className="mt-3 px-2 text-xs text-slate-400">
-                  {sortHint(folderSort, "categories", false)}
-                </p>
-              )}
+              <div data-tour="report-categories">
+                <SidebarHeading label="Categories">
+                  <FolderSortSelect
+                    sort={folderSort}
+                    onChange={setFolderSort}
+                  />
+                  <button
+                    onClick={() => createCategory(null)}
+                    className="rounded px-1.5 text-base text-slate-700 hover:bg-slate-100"
+                    title="New category"
+                  >
+                    +
+                  </button>
+                </SidebarHeading>
+                {topCategories.length === 0 && (
+                  <p className="px-2 text-sm text-slate-500">
+                    No categories yet. Click + to make one, like &quot;Machine
+                    learning&quot;.
+                  </p>
+                )}
+                <CategoryTree
+                  parentId={null}
+                  childrenOf={childCategories}
+                  collapsed={collapsed}
+                  onToggle={toggleCategory}
+                  activeId={
+                    !searching && view.kind === "category" ? view.id : null
+                  }
+                  count={countIn}
+                  onOpen={(id) => openView({ kind: "category", id })}
+                  dropOn={dropOnCategory}
+                  onDragStart={setDraggingCategoryId}
+                  onDragEnd={() => setDraggingCategoryId(null)}
+                  onMenu={openCategoryMenu}
+                />
+                {topCategories.length > 1 && (
+                  <p className="mt-3 px-2 text-xs text-slate-400">
+                    {sortHint(folderSort, "categories", false)}
+                  </p>
+                )}
+              </div>
             </>
           )}
           <button
@@ -585,6 +594,7 @@ export default function ReportsList({ userEmail }: { userEmail: string }) {
                 <h1 className="mr-auto flex items-center gap-2 text-2xl font-bold text-slate-900">
                   {title}
                 </h1>
+                <TourButton onClick={tour.start} />
                 {currentCategory && !searching && (
                   <>
                     <SmallButton
@@ -613,6 +623,7 @@ export default function ReportsList({ userEmail }: { userEmail: string }) {
                 into one report. Your notes stay as they are.
               </p>
               <button
+                data-tour="new-report"
                 onClick={create}
                 disabled={creating}
                 className="mb-4 rounded-md bg-blue-600 px-4 py-2 font-semibold text-white hover:bg-blue-700 disabled:opacity-60"

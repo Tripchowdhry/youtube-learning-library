@@ -105,10 +105,14 @@ export function Tour({ open, steps, onClose }: { open: boolean; steps: TourStep[
     const left = Math.max(16, Math.min(box.left, window.innerWidth - tipWidth - 16));
     // Below the highlighted spot if there's room, otherwise above it.
     const below = box.top + box.height + pad + 10;
+    const above = window.innerHeight - box.top + pad + 10;
+    // A tall spot on a small screen can leave room on neither side: then the tip sits at the bottom.
     tipStyle =
       below + 190 < window.innerHeight
         ? { top: below, left, width }
-        : { bottom: window.innerHeight - box.top + pad + 10, left, width };
+        : box.top - pad - 10 > 250
+          ? { bottom: above, left, width }
+          : { bottom: 16, left, width };
   }
 
   return (
