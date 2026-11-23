@@ -20,6 +20,7 @@ export async function GET(request: Request) {
   let title: string | null = null;
   let author: string | null = null;
   let publisher: string | null = null;
+  let link: string | null = null;
 
   if (xPostId(url)) {
     // X's public oEmbed endpoint needs no key and returns the post's text and author.
@@ -32,11 +33,16 @@ export async function GET(request: Request) {
         const data = await res.json();
         author = clean(data.author_name, 100);
         const { document } = parseHTML(`<div>${data.html ?? ""}</div>`);
-        title = clean(document.querySelector("p")?.textContent, 140);
+        const p = document.querySelector("p");
+        // Links in a post show as t.co addresses, which make a poor title: leave them out.
+        title = clean(p?.textContent?.replace(/(https?:\/\/t\.co|pic\.twitter\.com)\/\S+/g, ""), 140);
+        link = p?.querySelector('a[href^="https://t.co/"]')?.getAttribute("href") ?? null;
       }
     } catch {
       // Fall through; the user can type a title.
     }
+    // A post that is only a link (often an X Article): use the article's or the linked page's title.
+    if (!title) title = await xLinkedTitle(xPostId(url)!, link);
     if (!title && author) title = `Post by ${author}`;
   } else {
     const html = await fetchPage(url);
@@ -54,6 +60,34 @@ export async function GET(request: Request) {
   }
 
   return NextResponse.json({ url: cleanLink(url), title, site, author, publisher });
+}
+
+// The title of an X Article, or of the page a link-only post points to, or null.
+async function xLinkedTitle(id: string, link: string | null): Promise<string | null> {
+  try {
+    // The public data X's own embeds read. It names an X Article's title, or a link card's.
+    const token = ((Number(id) / 1e15) * Math.PI).toString(36).replace(/(0+|\.)/g, "");
+    const res = await fetch(`https://cdn.syndication.twimg.com/tweet-result?id=${id}&token=${token}`, {
+      next: { revalidate: 86400 },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      const found = clean(data?.article?.title ?? data?.card?.binding_values?.title?.string_value, 140);
+      if (found) return found;
+    }
+  } catch {
+    // Try the link itself.
+  }
+  if (!link) return null;
+  const html = await fetchPage(new URL(link));
+  if (!html) return null;
+  const { document } = parseHTML(html);
+  const meta = (name: string) =>
+    document.querySelector(`meta[property="${name}"], meta[name="${name}"]`)?.getAttribute("content");
+  const found = clean(meta("og:title") ?? meta("twitter:title") ?? document.querySelector("title")?.textContent, 140);
+  // X's own pages need signing in and only say "X".
+  return found && !/^(x|twitter|x\.com)$/i.test(found) ? found : null;
 }
 
 type LdNode = { "@type"?: string | string[]; "@graph"?: LdNode[]; author?: unknown; publisher?: unknown; name?: unknown };
