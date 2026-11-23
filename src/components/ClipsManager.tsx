@@ -138,7 +138,7 @@ export default function ClipsManager() {
                 </p>
                 <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100">
                   <div
-                    className="h-full rounded-full bg-slate-700"
+                    className={`h-full rounded-full ${used >= FREE_STORAGE * 0.9 ? "bg-red-500" : used >= FREE_STORAGE * 0.7 ? "bg-amber-500" : "bg-[#16a34a]"}`}
                     style={{ width: `${Math.min(100, Math.max(used ? 1 : 0, (used / FREE_STORAGE) * 100))}%` }}
                   />
                 </div>
