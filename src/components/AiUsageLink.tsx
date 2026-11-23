@@ -14,6 +14,7 @@ export default function AiUsageLink({ sidebar, withReport = true }: { sidebar?: 
       <div className={`mb-3 flex-wrap gap-2 border-b border-slate-200 pb-3 ${withReport ? "flex" : "hidden md:flex"}`}>
         <Link
           href="/ai-usage"
+          data-tour="ai-usage"
           title={title}
           className="hidden items-center gap-1.5 rounded-md px-2.5 py-1 text-sm text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 md:inline-flex"
         >
@@ -24,7 +25,7 @@ export default function AiUsageLink({ sidebar, withReport = true }: { sidebar?: 
       </div>
     );
   return (
-    <Link href="/ai-usage" title={title} aria-label="AI usage" className="flex shrink-0 items-center rounded-md px-1.5 py-1 hover:bg-slate-100 md:hidden">
+    <Link href="/ai-usage" data-tour="ai-usage" title={title} aria-label="AI usage" className="flex shrink-0 items-center rounded-md px-1.5 py-1 hover:bg-slate-100 md:hidden">
       <Ico icon={ChartColumn} tone="blue" />
     </Link>
   );
