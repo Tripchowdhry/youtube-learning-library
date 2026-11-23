@@ -27,6 +27,7 @@ import { pageToPng } from "@/lib/handwriting-image";
 import { DRAFT_STYLES, draftStyle, type DraftStyle } from "@/lib/report-styles";
 import { createClient } from "@/lib/supabase/client";
 import { ReportIcon } from "@/components/ReportWriterLink";
+import { Tour, TourButton, useSectionTour } from "@/components/Tour";
 import {
   ArrowDown,
   ArrowLeft,
@@ -89,6 +90,7 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [saveState, setSaveState] = useState<SaveState>("saved");
+  const tour = useSectionTour("report", report !== null);
   const [saveError, setSaveError] = useState<string | null>(null);
 
   const [sources, setSources] = useState<ReportSource[] | null>(null);
@@ -548,7 +550,9 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
   return (
     <Shell
       title={<span className="min-w-0 truncate text-lg font-semibold">{title.trim() || UNTITLED}</span>}
+      actions={<TourButton onClick={tour.start} />}
     >
+      <Tour open={tour.open} steps={tour.steps} onClose={tour.close} />
       {/* The report's title, in its own clearly marked box at the top */}
       <section className="mb-5 rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
         <div className="mb-1.5 flex flex-wrap items-center gap-2">
@@ -625,7 +629,7 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
       {saveError && <p className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{saveError}</p>}
 
       {/* 1. Choose */}
-      <section className="mb-5 rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
+      <section data-tour="report-choose" className="mb-5 rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
         <div className="mb-3 flex flex-wrap items-center gap-2">
           <h2 className="mr-auto font-semibold">
             1. Choose notes <span className="font-normal text-slate-500">({chosen.length} chosen)</span>
@@ -737,7 +741,7 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
       </section>
 
       {/* 2. Build */}
-      <section className="mb-5 rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
+      <section data-tour="report-build" className="mb-5 rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
         <h2 className="mb-3 font-semibold">2. Build the report</h2>
         <div className="grid gap-3 md:grid-cols-2">
           <div className="overflow-hidden rounded-lg border border-slate-200 bg-white p-3 pt-4 relative">{/* A thin stripe in the BrainShelf logo's book colours */}
@@ -799,7 +803,7 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
 
       {/* 3. Edit and export */}
       <section className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
-        <div className="mb-3 flex flex-wrap items-center gap-2">
+        <div data-tour="report-export" className="mb-3 flex flex-wrap items-center gap-2">
           <h2 className="mr-auto font-semibold">3. Edit and export</h2>
           {saveState === "error" ? (
             <button onClick={() => saveText(title, body)} className="text-xs text-red-600 underline">
@@ -880,7 +884,7 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
 
 // ---------- Pieces ----------
 
-function Shell({ title, children }: { title: React.ReactNode; children: React.ReactNode }) {
+function Shell({ title, actions, children }: { title: React.ReactNode; actions?: React.ReactNode; children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen flex-col">
       <header className="sticky top-0 z-20 flex items-center gap-2 border-b border-slate-200 bg-white px-4 py-3">
@@ -889,6 +893,7 @@ function Shell({ title, children }: { title: React.ReactNode; children: React.Re
           <ArrowLeft size={16} aria-hidden /> <ReportIcon size={20} /> <span className="font-medium text-slate-800">Report Writer</span>
         </Link>
         {typeof title === "string" ? <span className="text-lg font-semibold">{title}</span> : title}
+        {actions && <div className="ml-auto shrink-0">{actions}</div>}
       </header>
       <main className="mx-auto w-full max-w-4xl flex-1 px-4 py-6">{children}</main>
     </div>

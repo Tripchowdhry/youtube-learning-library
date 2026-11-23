@@ -112,6 +112,37 @@ export const TOURS = {
       text: "Passwords and API keys are locked in your browser with a passphrase only you know, before they're saved. Web addresses and user IDs stay readable, so you can still reset things if you forget it. The vault locks itself after 5 idle minutes.",
     },
   ],
+  // Report Writer's list of reports.
+  reports: [
+    {
+      target: "new-report",
+      title: "Start a report",
+      text: "Tap + New report to bring notes from your videos, readings, tutorials and ScrapBook together into one report. Open a category first and the new report is filed there.",
+    },
+    {
+      target: "report-categories",
+      title: "Keep reports in categories",
+      text: "Make categories and subcategories with +, then drag a report onto one, or pick its category on the report. Right-click a category to rename, move or delete it.",
+    },
+  ],
+  // One report, in Report Writer.
+  report: [
+    {
+      target: "report-choose",
+      title: "1. Choose your notes",
+      text: "Tap Add or remove to pick the videos, readings, tutorials and ScrapBook pages to use. The arrows set their order in the report.",
+    },
+    {
+      target: "report-build",
+      title: "2. Build the report",
+      text: "Put together copies your notes in as they are, with no AI. Draft with AI writes one report from them: a summary, a study guide, key takeaways or a quiz.",
+    },
+    {
+      target: "report-export",
+      title: "3. Edit, share and download",
+      text: "Edit the report like in Word, and use Improve to have AI rewrite a part. Then Copy it, Share a read-only link, or Download it as Word or PDF. It saves as you type.",
+    },
+  ],
 } satisfies Record<string, TourStep[]>;
 
 export type TourId = keyof typeof TOURS;
