@@ -7,7 +7,7 @@ import ReportWriterLink from "@/components/ReportWriterLink";
 // sidebar is always open, and as an icon in the header on phones, where the sidebar is tucked away.
 // The sidebar row also holds Report Writer, except on Report Writer's own page.
 export default function AiUsageLink({ sidebar, withReport = true }: { sidebar?: boolean; withReport?: boolean }) {
-  const title = "AI usage: answers, speed, tokens, models and storage";
+  const title = "AI usage: answers, speed, tokens, models, storage and bandwidth";
   if (sidebar)
     return (
       // On phones the header already has the AI usage icon, so only Report Writer shows here.

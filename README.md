@@ -31,6 +31,7 @@ Built with Next.js, Tailwind CSS and Supabase. Hosted on Vercel.
    For handwriting in Reading and Tutorials notes, also run [`supabase/article-pages.sql`](supabase/article-pages.sql).
    For Reports (Report Writer), run [`supabase/reports.sql`](supabase/reports.sql). It only adds its own two tables.
    To keep each article's text after its first read (less server time on Vercel), also run [`supabase/article-texts.sql`](supabase/article-texts.sql).
+   For the Bandwidth tab on the AI usage page (this month's Supabase and Vercel data use against the free limits, starting again on the 1st), run [`supabase/bandwidth.sql`](supabase/bandwidth.sql).
 3. Open **Project Settings → API** (or **Data API**) and copy the **Project URL** and the **anon public** key.
 
 Supabase pauses a free project after about a week with no activity. The app's `vercel.json` has Vercel call `/api/keep-awake` once a day to prevent that; nothing to set up.

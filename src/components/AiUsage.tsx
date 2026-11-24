@@ -2,10 +2,11 @@
 
 import BackLink from "@/components/BackLink";
 import HomeLink from "@/components/HomeLink";
-import { Activity, CircleCheck, Clock, Coins, Database, LayoutGrid, ListOrdered, Repeat, Sparkles } from "lucide-react";
+import { Activity, ArrowDownUp, CircleCheck, Clock, Coins, Database, LayoutGrid, ListOrdered, Repeat, Sparkles } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Ico } from "@/components/Icon";
 import BrandStripe from "@/components/BrandStripe";
+import BandwidthUsage from "@/components/BandwidthUsage";
 import StorageUsage from "@/components/StorageUsage";
 import { friendlyError } from "@/lib/errors";
 import { fetchAll } from "@/lib/fetch-all";
@@ -18,7 +19,7 @@ const RANGES = [
   { key: "month", label: "Last 30 days" },
 ] as const;
 type Range = (typeof RANGES)[number]["key"];
-type View = "ai" | "storage";
+type View = "ai" | "storage" | "bandwidth";
 // The logo's colours, used for each stat's book-spine edge and the bars in the tables.
 const SPINE: Record<"blue" | "green" | "red" | "amber", string> = {
   blue: "border-l-[#2563eb]",
@@ -43,15 +44,16 @@ function since(range: Range) {
 export default function AiUsage() {
   const supabase = useMemo(() => createClient(), []);
   const [range, setRange] = useState<Range>("today");
-  // Two views instead of one long page; /ai-usage#storage opens on Storage.
+  // Three views instead of one long page; /ai-usage#storage and #bandwidth open on those.
   const [view, setView] = useState<View>("ai");
   const [showAllLatest, setShowAllLatest] = useState(false);
   useEffect(() => {
     if (window.location.hash === "#storage") setView("storage");
+    if (window.location.hash === "#bandwidth") setView("bandwidth");
   }, []);
   function chooseView(next: View) {
     setView(next);
-    window.history.replaceState(null, "", next === "storage" ? "#storage" : window.location.pathname);
+    window.history.replaceState(null, "", next === "ai" ? window.location.pathname : `#${next}`);
   }
   const [rows, setRows] = useState<UsageLogRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -103,6 +105,7 @@ export default function AiUsage() {
             [
               ["ai", "AI requests", Sparkles, "blue"],
               ["storage", "Storage", Database, "green"],
+              ["bandwidth", "Bandwidth", ArrowDownUp, "amber"],
             ] as const
           ).map(([key, label, icon, tone]) => (
             <button
@@ -119,6 +122,8 @@ export default function AiUsage() {
 
         {view === "storage" ? (
           <StorageUsage supabase={supabase} />
+        ) : view === "bandwidth" ? (
+          <BandwidthUsage supabase={supabase} />
         ) : setupNeeded ? (
           <section className="rounded-xl bg-amber-50 p-4 text-sm text-amber-900 ring-1 ring-amber-200">
             <p className="font-semibold">One step to turn this on</p>

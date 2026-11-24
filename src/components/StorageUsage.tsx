@@ -110,7 +110,7 @@ export default function StorageUsage({ supabase }: { supabase: ReturnType<typeof
   );
 }
 
-function Meter({
+export function Meter({
   icon,
   tone,
   color,

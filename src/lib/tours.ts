@@ -38,7 +38,7 @@ export const TOURS = {
     {
       target: "ai-usage",
       title: "See your AI usage",
-      text: "AI usage shows how many answers AI gave you, how fast, which models, and how much space your notes and files take.",
+      text: "AI usage shows how many answers AI gave you, how fast, which models, how much space your notes and files take, and how much bandwidth the app used this month.",
     },
   ],
   study: [
@@ -102,7 +102,7 @@ export const TOURS = {
     {
       target: "ai-usage",
       title: "See your AI usage",
-      text: "AI usage shows how many answers AI gave you, how fast, which models, and how much space your notes and files take.",
+      text: "AI usage shows how many answers AI gave you, how fast, which models, how much space your notes and files take, and how much bandwidth the app used this month.",
     },
   ],
   scrapbook: [
@@ -133,7 +133,7 @@ export const TOURS = {
     {
       target: "ai-usage",
       title: "See your AI usage",
-      text: "AI usage shows how many answers AI gave you, how fast, which models, and how much space your notes and files take.",
+      text: "AI usage shows how many answers AI gave you, how fast, which models, how much space your notes and files take, and how much bandwidth the app used this month.",
     },
   ],
   vault: [
