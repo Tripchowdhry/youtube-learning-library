@@ -6,6 +6,7 @@ import { deleteItem } from "@/lib/delete-item";
 import { friendlyError } from "@/lib/errors";
 import { fetchAll } from "@/lib/fetch-all";
 import SearchBox from "@/components/SearchBox";
+import FoundElsewhere, { useSearchFromLink } from "@/components/FoundElsewhere";
 import { allTags } from "@/lib/ai-tags";
 import { FoundIn, Highlight, SearchBar, type SearchScope } from "@/components/SearchHighlight";
 import { TAGS_LABEL, bestFirst, hashTag, matches, tagTest, prepare, queryWords, whereFound, type SearchMatch, type SearchWord } from "@/lib/search";
@@ -81,6 +82,7 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
   const [needsSetup, setNeedsSetup] = useState(false);
   const [view, setView] = useState<View>({ kind: "all" });
   const [query, setQuery] = useState("");
+  useSearchFromLink(setQuery);
   // Clicking a tag shows every page with exactly that tag.
   const [tag, setTag] = useState<string | null>(null);
   // Inside a category, search can look only there or in the whole tab.
@@ -567,7 +569,7 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
         </button>
         <BrandMark />
         <SectionSwitch active="scrap" />
-        <SearchBox value={query} onChange={setQuery} placeholder="Search titles and text…" className="ml-auto w-auto sm:w-full sm:max-w-xs" collapse />
+        <SearchBox value={query} onChange={setQuery} placeholder="Search titles and text…" className="ml-auto w-auto sm:w-full sm:max-w-xs" collapse recentKey="scrapbook" />
         <Link
           data-tour="clips"
           href="/clips"
@@ -734,6 +736,7 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
                   {searching || period !== "any"
                     ? "Nothing matches. Try another search or a longer time range."
                     : "Nothing here yet. Start a new page above, or move pages in from another category."}
+                  {searching && <FoundElsewhere query={query} here="scrapbook" />}
                 </div>
               ) : (
                 <>

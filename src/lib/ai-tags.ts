@@ -97,3 +97,36 @@ export async function tagWithAi(
     return null;
   }
 }
+
+// ---------- Tagging what was saved before AI tags ----------
+
+export type Untagged = { kind: AiTagKind; id: string; title: string; about: string; text: string };
+
+// Everything not tagged by the AI yet (ai_tags is null). Items whose AI tags you removed have an
+// empty list and are left alone. Empty before supabase/ai-tags.sql is run.
+export async function findUntagged(supabase: SupabaseClient): Promise<Untagged[]> {
+  const str = (v: unknown) => (typeof v === "string" ? v : "");
+  const read = async (table: Table, columns: string) => {
+    const { data, error } = await supabase.from(table).select(columns).is("ai_tags", null).limit(1000);
+    return error ? [] : ((data ?? []) as unknown as Record<string, unknown>[]);
+  };
+  const [videos, articles, scraps, reports] = await Promise.all([
+    read("videos", "id, title, channel, note"),
+    read("articles", "id, title, url, site, author, note, kind"),
+    read("scraps", "id, title, body"),
+    read("reports", "id, title, body"),
+  ]);
+  const plain = (html: string) => html.replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim();
+  return [
+    ...videos.map((v) => ({ kind: "video" as const, id: str(v.id), title: str(v.title), about: str(v.channel), text: str(v.note) })),
+    ...articles.map((a) => ({
+      kind: a.kind === "tutorial" ? ("tutorial" as const) : ("article" as const),
+      id: str(a.id),
+      title: str(a.title) || str(a.url),
+      about: [str(a.site), str(a.author)].filter(Boolean).join(", "),
+      text: str(a.note),
+    })),
+    ...scraps.map((s) => ({ kind: "scrap" as const, id: str(s.id), title: str(s.title), about: "", text: plain(str(s.body)) })),
+    ...reports.map((r) => ({ kind: "report" as const, id: str(r.id), title: str(r.title), about: "", text: r.body ? str(r.body) : "" })),
+  ].filter((item) => item.id && (item.title.trim() || item.text.trim()));
+}

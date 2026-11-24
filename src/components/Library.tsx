@@ -4,6 +4,7 @@ import AiUsageLink from "@/components/AiUsageLink";
 import { friendlyError } from "@/lib/errors";
 import { fetchAll } from "@/lib/fetch-all";
 import SearchBox from "@/components/SearchBox";
+import FoundElsewhere, { useSearchFromLink } from "@/components/FoundElsewhere";
 import { allTags, tagWithAi } from "@/lib/ai-tags";
 import { FoundIn, Highlight, SearchBar, type SearchScope } from "@/components/SearchHighlight";
 import { TAGS_LABEL, bestFirst, hashTag, matches, tagTest, notesText as notesTextOf, prepare, queryWords, whereFound, type SearchMatch, type SearchWord } from "@/lib/search";
@@ -77,6 +78,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<View>({ kind: "all" });
   const [query, setQuery] = useState("");
+  useSearchFromLink(setQuery);
   // Clicking a tag shows every video with exactly that tag.
   const [tag, setTag] = useState<string | null>(null);
   // Inside a category, search can look only there or in the whole tab.
@@ -686,7 +688,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
         <span data-tour="sections" className="shrink-0">
           <SectionSwitch active="videos" />
         </span>
-        <SearchBox value={query} onChange={setQuery} placeholder="Search titles, summaries, notes…" className="ml-auto w-auto sm:w-full sm:max-w-xs" collapse tour="search" />
+        <SearchBox value={query} onChange={setQuery} placeholder="Search titles, summaries, notes…" className="ml-auto w-auto sm:w-full sm:max-w-xs" collapse recentKey="videos" tour="search" />
         <Link
           data-tour="clips"
           href="/clips"
@@ -873,7 +875,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
           ) : videos.length === 0 && !searching ? (
             <WelcomePanel onAddSample={() => addVideo(SAMPLE_VIDEO.link)} />
           ) : visibleVideos.length === 0 ? (
-            <EmptyState searching={searching || watchFilter !== "all" || period !== "any"} hasVideos={videos.length > 0} />
+            <EmptyState searching={searching || watchFilter !== "all" || period !== "any"} hasVideos={videos.length > 0} query={query} />
           ) : (
             <>
               {canReorder && visibleVideos.length > 1 && (
@@ -1266,7 +1268,7 @@ function VideoCard(props: {
   );
 }
 
-function EmptyState({ searching, hasVideos }: { searching: boolean; hasVideos: boolean }) {
+function EmptyState({ searching, hasVideos, query }: { searching: boolean; hasVideos: boolean; query: string }) {
   return (
     <div className="rounded-xl border border-dashed border-slate-300 p-10 text-center text-slate-500">
       {searching
@@ -1274,6 +1276,7 @@ function EmptyState({ searching, hasVideos }: { searching: boolean; hasVideos: b
         : hasVideos
           ? "No videos here yet. Paste a link above, or move videos in from another category."
           : "Your library is empty. Paste a YouTube link above to save your first video."}
+      {searching && <FoundElsewhere query={query} here="videos" />}
     </div>
   );
 }
