@@ -9,7 +9,7 @@ import { createClient } from "@/lib/supabase/client";
 
 // The tabs search can look in, with where each one lives.
 export type Section = "videos" | "reading" | "tutorial" | "scrapbook" | "reports";
-const SECTIONS: { key: Section; name: string; path: string }[] = [
+export const SECTIONS: { key: Section; name: string; path: string }[] = [
   { key: "videos", name: "Videos", path: "/" },
   { key: "reading", name: "Reading", path: "/reading" },
   { key: "tutorial", name: "Tutorials", path: "/tutorials" },
@@ -17,7 +17,8 @@ const SECTIONS: { key: Section; name: string; path: string }[] = [
   { key: "reports", name: "Report Writer", path: "/reports" },
 ];
 
-type Entry = { section: Section; index: SearchIndex; tags: string[] };
+// One saved item, ready to search: where it lives, what to show, and the page that opens it.
+export type Entry = { section: Section; id: string; title: string; sub: string; href: string; index: SearchIndex; tags: string[] };
 
 // A link that opens a tab with a search already typed in.
 export const searchHref = (path: string, query: string) => `${path}?q=${encodeURIComponent(query)}`;
@@ -46,27 +47,30 @@ async function rows(supabase: ReturnType<typeof createClient>, table: string, co
   return [];
 }
 
-// Everything in the other tabs, read once per visit and only when a search here finds nothing.
+// Everything in every tab (not Vault), read once per visit and only when it's needed.
+// `fresh` reads it again, so something saved a moment ago shows up.
 let everything: Promise<Entry[]> | null = null;
-function loadEverything() {
+export function loadEverything(fresh = false) {
+  if (fresh) everything = null;
   everything ??= (async () => {
     const supabase = createClient();
     const text = (v: unknown) => (typeof v === "string" ? v : "");
     const [videos, notes, articles, scraps, reports] = await Promise.all([
       rows(supabase, "videos", "id, title, channel, note, tags, ai_tags"),
       rows(supabase, "notes", "video_id, text"),
-      rows(supabase, "articles", "title, url, site, author, note, notes, kind, tags, ai_tags"),
-      rows(supabase, "scraps", "title, body, tags, ai_tags"),
-      rows(supabase, "reports", "title, body, tags, ai_tags"),
+      rows(supabase, "articles", "id, title, url, site, author, note, notes, kind, tags, ai_tags"),
+      rows(supabase, "scraps", "id, title, body, tags, ai_tags"),
+      rows(supabase, "reports", "id, title, body, tags, ai_tags"),
     ]);
     const noteOf = new Map(notes.map((n) => [n.video_id, notesText(text(n.text))]));
-    const entry = (section: Section, row: Record<string, unknown>, fields: { label: string; text: string }[]): Entry => {
+    const entry = (section: Section, row: Record<string, unknown>, href: string, sub: string, fields: { label: string; text: string }[]): Entry => {
       const tags = allTags(row as { tags?: string[]; ai_tags?: string[] });
-      return { section, tags, index: prepare([...fields, { label: TAGS_LABEL, text: tags.join(", ") }]) };
+      const title = fields[0].text || "Untitled";
+      return { section, id: text(row.id), title, sub, href, tags, index: prepare([...fields, { label: TAGS_LABEL, text: tags.join(", ") }]) };
     };
     return [
       ...videos.map((v) =>
-        entry("videos", v, [
+        entry("videos", v, `/video/${text(v.id)}`, text(v.channel), [
           { label: "Title", text: text(v.title) },
           { label: "the channel", text: text(v.channel) },
           { label: "the summary", text: text(v.note) },
@@ -74,7 +78,7 @@ function loadEverything() {
         ]),
       ),
       ...articles.map((a) =>
-        entry(a.kind === "tutorial" ? "tutorial" : "reading", a, [
+        entry(a.kind === "tutorial" ? "tutorial" : "reading", a, `/read/${text(a.id)}`, [text(a.site), text(a.author)].filter(Boolean).join(" · "), [
           { label: "Title", text: text(a.title) || text(a.url) },
           { label: "the site", text: [text(a.site), text(a.author)].filter(Boolean).join(" · ") },
           { label: "the summary", text: text(a.note) },
@@ -83,13 +87,13 @@ function loadEverything() {
         ]),
       ),
       ...scraps.map((s) =>
-        entry("scrapbook", s, [
+        entry("scrapbook", s, `/scrap/${text(s.id)}`, "", [
           { label: "Title", text: text(s.title) },
           { label: "the page", text: htmlToText(text(s.body)) },
         ]),
       ),
       ...reports.map((r) =>
-        entry("reports", r, [
+        entry("reports", r, `/report/${text(r.id)}`, "", [
           { label: "Title", text: text(r.title) },
           { label: "the report", text: notesText(text(r.body)) },
         ]),
