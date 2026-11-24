@@ -7,7 +7,7 @@ import TagPills from "@/components/TagPills";
 import { allTags } from "@/lib/ai-tags";
 import { askTags } from "@/lib/tags";
 import { FoundIn, Highlight, SearchBar, type SearchScope } from "@/components/SearchHighlight";
-import { bestFirst, matches, notesText, prepare, queryWords, whereFound, type SearchMatch, type SearchWord } from "@/lib/search";
+import { TAGS_LABEL, bestFirst, hashTag, matches, tagTest, notesText, prepare, queryWords, whereFound, type SearchMatch, type SearchWord } from "@/lib/search";
 import { friendlyError } from "@/lib/errors";
 import BrandMark from "@/components/BrandMark";
 import { askConfirm, askText } from "@/components/ConfirmDialog";
@@ -166,7 +166,9 @@ export default function ReportsList({ userEmail }: { userEmail: string }) {
 
   // Searching covers typed words and a tag clicked on a report.
   const searching = query.trim().length > 0 || tag !== null;
-  const words = useMemo(() => queryWords(query), [query]);
+  // "#react" in the search box filters by tag instead of searching words.
+  const typedTag = useMemo(() => hashTag(query), [query]);
+  const words = useMemo(() => (typedTag === null ? queryWords(query) : []), [query, typedTag]);
   // Everything search looks at for each report, prepared once rather than on every key press.
   const searchIndex = useMemo(
     () =>
@@ -177,7 +179,7 @@ export default function ReportsList({ userEmail }: { userEmail: string }) {
             { label: "Title", text: r.title },
             { label: "the report", text: notesText(r.body) },
             { label: "the category", text: categoryPath(r.category_id) },
-            { label: "the tags", text: allTags(r).join(", ") },
+            { label: TAGS_LABEL, text: allTags(r).join(", ") },
           ]),
         ]),
       ),
@@ -185,9 +187,9 @@ export default function ReportsList({ userEmail }: { userEmail: string }) {
   );
   const shown = useMemo(() => {
     if (!reports) return null;
-    const tagKey = tag?.toLowerCase();
+    const tagOk = tagTest(tag, typedTag);
     const found = reports.filter((r) => {
-      if (tagKey && !allTags(r).some((t) => t.toLowerCase() === tagKey)) return false;
+      if (tagOk && !tagOk(allTags(r))) return false;
       if (words.length && !matches(searchIndex.get(r.id) ?? [], words)) return false;
       // A search looks in the whole tab unless you chose only the category you're in.
       if (searching && scope === "everywhere") return true;
@@ -197,7 +199,7 @@ export default function ReportsList({ userEmail }: { userEmail: string }) {
     });
     // Best match first; otherwise the most recently edited first, as loaded.
     return words.length ? found.sort(bestFirst(words, (r) => searchIndex.get(r.id) ?? [], () => 0)) : found;
-  }, [reports, words, tag, searching, scope, searchIndex, view, inCategory]);
+  }, [reports, words, tag, typedTag, searching, scope, searchIndex, view, inCategory]);
 
   function openView(next: View) {
     setView(next);

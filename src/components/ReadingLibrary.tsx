@@ -8,7 +8,7 @@ import { fetchAll } from "@/lib/fetch-all";
 import SearchBox from "@/components/SearchBox";
 import { allTags, tagWithAi } from "@/lib/ai-tags";
 import { FoundIn, Highlight, SearchBar, type SearchScope } from "@/components/SearchHighlight";
-import { bestFirst, matches, notesText, prepare, queryWords, whereFound, type SearchMatch, type SearchWord } from "@/lib/search";
+import { TAGS_LABEL, bestFirst, hashTag, matches, tagTest, notesText, prepare, queryWords, whereFound, type SearchMatch, type SearchWord } from "@/lib/search";
 import { revealById } from "@/lib/reveal";
 import StopAiButton from "@/components/StopAiButton";
 import { AskCategoryButton } from "@/components/CategoryChat";
@@ -191,7 +191,9 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
   const canReorder = !searching && view.kind !== "all";
   const canShift = canReorder && itemSort === "custom";
 
-  const words = useMemo(() => queryWords(query), [query]);
+  // "#react" in the search box filters by tag instead of searching words.
+  const typedTag = useMemo(() => hashTag(query), [query]);
+  const words = useMemo(() => (typedTag === null ? queryWords(query) : []), [query, typedTag]);
   // Everything search looks at for each link, prepared once rather than on every key press.
   const searchIndex = useMemo(
     () =>
@@ -204,7 +206,7 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
             { label: "the summary", text: a.note },
             { label: "your notes", text: notesText(a.notes) },
             { label: "the category", text: categoryPath(a.category_id) },
-            { label: "the tags", text: allTags(a).join(", ") },
+            { label: TAGS_LABEL, text: allTags(a).join(", ") },
             { label: "the link", text: a.url },
           ]),
         ]),
@@ -215,12 +217,12 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
   const visibleArticles = useMemo(() => {
     const days = PERIODS.find((p) => p.value === period)!.days;
     const since = days ? Date.now() - days * 86_400_000 : 0;
-    const tagKey = tag?.toLowerCase();
+    const tagOk = tagTest(tag, typedTag);
     const shown = articles.filter((a) => {
       if (since && new Date(a.created_at).getTime() < since) return false;
       if (readFilter === "read" && !a.read_at) return false;
       if (readFilter === "unread" && a.read_at) return false;
-      if (tagKey && !allTags(a).some((t) => t.toLowerCase() === tagKey)) return false;
+      if (tagOk && !tagOk(allTags(a))) return false;
       if (words.length && !matches(searchIndex.get(a.id) ?? [], words)) return false;
       // A search looks in the whole tab unless you chose only the category you're in.
       if (searching && scope === "everywhere") return true;
@@ -230,7 +232,7 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
     });
     const order = compareItems<Article>(searching ? "newest" : itemSort, (a) => a.title ?? a.url, !searching && view.kind !== "all");
     return shown.sort(bestFirst(words, (a) => searchIndex.get(a.id) ?? [], order));
-  }, [articles, words, tag, scope, searchIndex, period, readFilter, view, inCategory, searching, itemSort]);
+  }, [articles, words, tag, typedTag, scope, searchIndex, period, readFilter, view, inCategory, searching, itemSort]);
 
   const countIn = (id: string) => articles.filter((a) => inCategory(a, id)).length;
 

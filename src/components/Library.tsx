@@ -6,7 +6,7 @@ import { fetchAll } from "@/lib/fetch-all";
 import SearchBox from "@/components/SearchBox";
 import { allTags, tagWithAi } from "@/lib/ai-tags";
 import { FoundIn, Highlight, SearchBar, type SearchScope } from "@/components/SearchHighlight";
-import { bestFirst, matches, notesText as notesTextOf, prepare, queryWords, whereFound, type SearchMatch, type SearchWord } from "@/lib/search";
+import { TAGS_LABEL, bestFirst, hashTag, matches, tagTest, notesText as notesTextOf, prepare, queryWords, whereFound, type SearchMatch, type SearchWord } from "@/lib/search";
 import { revealById } from "@/lib/reveal";
 import { AskCategoryButton } from "@/components/CategoryChat";
 import BrandMark from "@/components/BrandMark";
@@ -175,7 +175,9 @@ export default function Library({ userEmail }: { userEmail: string }) {
   const canReorder = !searching && view.kind !== "all";
   const canShift = canReorder && itemSort === "custom";
 
-  const words = useMemo(() => queryWords(query), [query]);
+  // "#react" in the search box filters by tag instead of searching words.
+  const typedTag = useMemo(() => hashTag(query), [query]);
+  const words = useMemo(() => (typedTag === null ? queryWords(query) : []), [query, typedTag]);
   // Everything search looks at for each video, prepared once rather than on every key press.
   const searchIndex = useMemo(
     () =>
@@ -188,7 +190,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
             { label: "the summary", text: v.note },
             { label: "your notes", text: notesText.get(v.id) },
             { label: "the category", text: v.category_id ? folderPath(v.category_id) : "" },
-            { label: "the tags", text: allTags(v).join(", ") },
+            { label: TAGS_LABEL, text: allTags(v).join(", ") },
           ]),
         ]),
       ),
@@ -196,13 +198,13 @@ export default function Library({ userEmail }: { userEmail: string }) {
   );
 
   const visibleVideos = useMemo(() => {
-    const q = words.length > 0 || tag !== null;
+    const tagOk = tagTest(tag, typedTag);
+    const q = words.length > 0 || tagOk !== null;
     const folderId = view.kind === "folder" ? view.id : null;
-    const tagKey = tag?.toLowerCase();
     const shown = q
       ? videos.filter(
           (v) =>
-            (!tagKey || allTags(v).some((t) => t.toLowerCase() === tagKey)) &&
+            (!tagOk || tagOk(allTags(v))) &&
             (!words.length || matches(searchIndex.get(v.id) ?? [], words)) &&
             (scope === "everywhere" ||
               view.kind === "all" ||
@@ -217,7 +219,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
       .filter((v) => !since || new Date(v.created_at).getTime() >= since)
       .filter((v) => watchFilter === "all" || (watchFilter === "watched") === Boolean(v.watched_at))
       .sort(bestFirst(words, (v) => searchIndex.get(v.id) ?? [], compareItems<Video>(q ? "newest" : itemSort, (v) => v.title ?? "", !q && view.kind !== "all")));
-  }, [videos, view, words, tag, scope, folders, searchIndex, itemSort, watchFilter, period]);
+  }, [videos, view, words, tag, typedTag, scope, folders, searchIndex, itemSort, watchFilter, period]);
 
   // New and moved videos go to the top of their folder.
   const topPosition = (folderId: string | null) => {
