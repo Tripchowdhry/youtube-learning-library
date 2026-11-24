@@ -4,6 +4,8 @@ import AiUsageLink from "@/components/AiUsageLink";
 import { friendlyError } from "@/lib/errors";
 import { fetchAll } from "@/lib/fetch-all";
 import SearchBox from "@/components/SearchBox";
+import { FoundIn, Highlight } from "@/components/SearchHighlight";
+import { matches, notesText as notesTextOf, prepare, queryWords, whereFound, type SearchMatch, type SearchWord } from "@/lib/search";
 import { revealById } from "@/lib/reveal";
 import { AskCategoryButton } from "@/components/CategoryChat";
 import BrandMark from "@/components/BrandMark";
@@ -69,6 +71,8 @@ export default function Library({ userEmail }: { userEmail: string }) {
   videosRef.current = videos;
   const aiJobs = useAiJobs();
   const [notedVideoIds, setNotedVideoIds] = useState<Set<string>>(new Set());
+  // Each video's typed notes (and AI answers), so search can look inside them.
+  const [notesText, setNotesText] = useState<Map<string, string>>(new Map());
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<View>({ kind: "all" });
   const [query, setQuery] = useState("");
@@ -95,10 +99,16 @@ export default function Library({ userEmail }: { userEmail: string }) {
     const [f, v, n] = await Promise.all([
       fetchAll((from, to) => supabase.from("video_categories").select("*").order("position").order("name").order("id").range(from, to)),
       fetchAll((from, to) => supabase.from("videos").select("*").order("position").order("id").range(from, to)),
-      fetchAll((from, to) => supabase.from("notes").select("video_id").order("id").range(from, to)),
+      fetchAll((from, to) => supabase.from("notes").select("video_id, text").order("id").range(from, to)),
     ]);
     // Notes are optional: ignore errors so the library still loads before the notes table exists.
-    if (!n.error) setNotedVideoIds(new Set((n.data ?? []).map((row) => row.video_id as string)));
+    // Older setups have no typed notes column; then only the badge works.
+    const notes = n.error ? await fetchAll((from, to) => supabase.from("notes").select("video_id").order("id").range(from, to)) : n;
+    if (!notes.error) {
+      const rows = (notes.data ?? []) as { video_id: string; text?: string }[];
+      setNotedVideoIds(new Set(rows.map((row) => row.video_id)));
+      setNotesText(new Map(rows.map((row) => [row.video_id, notesTextOf(row.text)])));
+    }
     if (f.error || v.error) {
       notify((f.error ?? v.error)!.message, true);
     } else {
@@ -159,13 +169,31 @@ export default function Library({ userEmail }: { userEmail: string }) {
   const canReorder = !searching && view.kind !== "all";
   const canShift = canReorder && itemSort === "custom";
 
+  const words = useMemo(() => queryWords(query), [query]);
+  // Everything search looks at for each video, prepared once rather than on every key press.
+  const searchIndex = useMemo(
+    () =>
+      new Map(
+        videos.map((v) => [
+          v.id,
+          prepare([
+            { label: "Title", text: v.title },
+            { label: "the channel", text: v.channel },
+            { label: "the summary", text: v.note },
+            { label: "your notes", text: notesText.get(v.id) },
+            { label: "the category", text: v.category_id ? folderPath(v.category_id) : "" },
+            { label: "the tags", text: v.tags.join(", ") },
+          ]),
+        ]),
+      ),
+    [videos, notesText, folderPath],
+  );
+
   const visibleVideos = useMemo(() => {
-    const q = query.trim().toLowerCase();
+    const q = words.length > 0;
     const folderId = view.kind === "folder" ? view.id : null;
     const shown = q
-      ? videos.filter((v) =>
-          [v.title, v.channel, v.note, folderPath(v.category_id), ...v.tags].some((s) => s?.toLowerCase().includes(q)),
-        )
+      ? videos.filter((v) => matches(searchIndex.get(v.id) ?? [], words))
       : view.kind === "all"
         ? [...videos]
         : videos.filter((v) => v.category_id === folderId);
@@ -175,7 +203,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
       .filter((v) => !since || new Date(v.created_at).getTime() >= since)
       .filter((v) => watchFilter === "all" || (watchFilter === "watched") === Boolean(v.watched_at))
       .sort(compareItems<Video>(itemSort, (v) => v.title ?? "", !q && view.kind !== "all"));
-  }, [videos, view, query, folderPath, itemSort, watchFilter, period]);
+  }, [videos, view, words, searchIndex, itemSort, watchFilter, period]);
 
   // New and moved videos go to the top of their folder.
   const topPosition = (folderId: string | null) => {
@@ -629,7 +657,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
         <span data-tour="sections" className="shrink-0">
           <SectionSwitch active="videos" />
         </span>
-        <SearchBox value={query} onChange={setQuery} placeholder="Search titles, channels, notes…" className="ml-auto w-auto sm:w-full sm:max-w-xs" collapse tour="search" />
+        <SearchBox value={query} onChange={setQuery} placeholder="Search titles, summaries, notes…" className="ml-auto w-auto sm:w-full sm:max-w-xs" collapse tour="search" />
         <Link
           data-tour="clips"
           href="/clips"
@@ -824,6 +852,8 @@ export default function Library({ userEmail }: { userEmail: string }) {
                     video={video}
                     folderOptions={folderOptions}
                     hasNotes={notedVideoIds.has(video.id)}
+                    words={words}
+                    found={searching ? whereFound(searchIndex.get(video.id) ?? [], words) : null}
                     flash={flashId === video.id}
                     canReorder={canReorder}
                     dragging={draggingId === video.id}
@@ -1017,6 +1047,9 @@ function VideoCard(props: {
   video: Video;
   folderOptions: { id: string; label: string }[];
   hasNotes: boolean;
+  /** The searched words, marked in the title, and where the search found the video. */
+  words: SearchWord[];
+  found: SearchMatch;
   canReorder: boolean;
   dragging: boolean;
   onDragStart: () => void;
@@ -1082,8 +1115,9 @@ function VideoCard(props: {
           className={`line-clamp-2 font-medium hover:underline ${video.watched_at ? "text-slate-500" : ""}`}
           draggable={false}
         >
-          {video.title}
+          <Highlight text={video.title} words={props.words} />
         </a>
+        <FoundIn match={props.found} words={props.words} />
         {props.where && (
           <CategoryTag path={props.where} onClick={props.onShowWhere} />
         )}

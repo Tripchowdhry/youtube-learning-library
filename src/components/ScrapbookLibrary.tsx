@@ -6,6 +6,8 @@ import { deleteItem } from "@/lib/delete-item";
 import { friendlyError } from "@/lib/errors";
 import { fetchAll } from "@/lib/fetch-all";
 import SearchBox from "@/components/SearchBox";
+import { FoundIn, Highlight } from "@/components/SearchHighlight";
+import { matches, prepare, queryWords, whereFound, type SearchMatch, type SearchWord } from "@/lib/search";
 import { AskCategoryButton } from "@/components/CategoryChat";
 import { Tour, TourButton, useSectionTour } from "@/components/Tour";
 import BrandMark from "@/components/BrandMark";
@@ -158,19 +160,37 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
   const canReorder = !searching && view.kind !== "all";
   const canShift = canReorder && itemSort === "custom";
 
+  const words = useMemo(() => queryWords(query), [query]);
+  // Everything search looks at for each page, prepared once rather than on every key press.
+  const searchIndex = useMemo(
+    () =>
+      new Map(
+        scraps.map((s) => [
+          s.id,
+          prepare([
+            { label: "Title", text: s.title },
+            { label: "the page", text: plainText(s.body) },
+            { label: "the category", text: categoryPath(s.category_id) },
+            { label: "the tags", text: (s.tags ?? []).join(", ") },
+          ]),
+        ]),
+      ),
+    [scraps, categoryPath],
+  );
+
   const visibleScraps = useMemo(() => {
-    const q = query.trim().toLowerCase();
+    const q = words.length > 0;
     const days = PERIODS.find((p) => p.value === period)!.days;
     const since = days ? Date.now() - days * 86_400_000 : 0;
     const shown = scraps.filter((s) => {
       if (since && new Date(s.created_at).getTime() < since) return false;
-      if (q) return [s.title, plainText(s.body), categoryPath(s.category_id), ...(s.tags ?? [])].some((t) => t.toLowerCase().includes(q));
+      if (q) return matches(searchIndex.get(s.id) ?? [], words);
       if (view.kind === "uncategorized") return !s.category_id;
       if (view.kind === "category") return inCategory(s, view.id);
       return true;
     });
     return shown.sort(compareItems<ScrapSummary>(itemSort, (s) => s.title, !searching && view.kind !== "all"));
-  }, [scraps, query, period, view, categoryPath, inCategory, searching, itemSort]);
+  }, [scraps, words, searchIndex, period, view, inCategory, searching, itemSort]);
 
   const countIn = (id: string) => scraps.filter((s) => inCategory(s, id)).length;
 
@@ -694,6 +714,8 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
                       <ScrapRow
                         key={scrap.id}
                         scrap={scrap}
+                        words={words}
+                        found={searching ? whereFound(searchIndex.get(scrap.id) ?? [], words) : null}
                         categoryLabel={categoryPath(scrap.category_id) || "Uncategorized"}
                         showCategory={searching || view.kind !== "category"}
                         onShowCategory={() => pointAt(scrap)}
@@ -740,6 +762,9 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
 
 function ScrapRow(props: {
   scrap: ScrapSummary;
+  /** The searched words, marked in the title, and where the search found the page. */
+  words: SearchWord[];
+  found: SearchMatch;
   categoryLabel: string;
   /** Show the category tag: on lists that mix categories (All, search). */
   showCategory: boolean;
@@ -782,14 +807,22 @@ function ScrapRow(props: {
       <Ico icon={FileText} tone="blue" size={22} className="mt-0.5" />
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <Link href={`/scrap/${scrap.id}`} className="line-clamp-2 font-medium hover:underline">
-          {scrap.title}
+          <Highlight text={scrap.title} words={props.words} />
         </Link>
         {props.showCategory && <CategoryTag path={props.categoryLabel} onClick={props.onShowCategory} />}
         <p className="text-xs text-slate-500">
           Created {formatDate(scrap.created_at)}
           {edited !== formatDate(scrap.created_at) && ` · Edited ${edited}`}
         </p>
-        {preview && <p className="line-clamp-2 text-sm text-slate-600">{preview}</p>}
+        {props.found ? (
+          <FoundIn match={props.found} words={props.words} />
+        ) : (
+          preview && (
+            <p className="line-clamp-2 text-sm text-slate-600">
+              <Highlight text={preview} words={props.words} />
+            </p>
+          )
+        )}
         <TagPills tags={scrap.tags} onTagClick={props.onTagClick} onRemove={props.onRemoveTag} />
         <div className="mt-1 flex flex-wrap items-center gap-1">
           <Link

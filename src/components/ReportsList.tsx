@@ -3,6 +3,8 @@
 import AiUsageLink from "@/components/AiUsageLink";
 import { Ico } from "@/components/Icon";
 import SearchBox from "@/components/SearchBox";
+import { FoundIn, Highlight } from "@/components/SearchHighlight";
+import { matches, notesText, prepare, queryWords, whereFound, type SearchMatch, type SearchWord } from "@/lib/search";
 import { friendlyError } from "@/lib/errors";
 import BrandMark from "@/components/BrandMark";
 import { askConfirm, askText } from "@/components/ConfirmDialog";
@@ -43,6 +45,8 @@ import { Tour, TourButton, useSectionTour } from "@/components/Tour";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 type Row = Pick<Report, "id" | "title" | "updated_at"> & {
+  // The report's text, for search.
+  body?: string;
   category_id?: string | null;
   report_sources: { count: number }[];
 };
@@ -87,7 +91,7 @@ export default function ReportsList({ userEmail }: { userEmail: string }) {
     const [r, c] = await Promise.all([
       supabase
         .from("reports")
-        .select("id, title, updated_at, category_id, report_sources(count)")
+        .select("id, title, body, updated_at, category_id, report_sources(count)")
         .order("updated_at", { ascending: false }),
       supabase
         .from("report_categories")
@@ -102,7 +106,7 @@ export default function ReportsList({ userEmail }: { userEmail: string }) {
       if (!r.error) return setReports(r.data as Row[]);
       const plain = await supabase
         .from("reports")
-        .select("id, title, updated_at, report_sources(count)")
+        .select("id, title, body, updated_at, report_sources(count)")
         .order("updated_at", { ascending: false });
       if (plain.error) {
         if (isMissingTable(plain.error.message)) setNeedsSetup(true);
@@ -161,19 +165,31 @@ export default function ReportsList({ userEmail }: { userEmail: string }) {
     (reports ?? []).filter((r) => inCategory(r, id)).length;
 
   const searching = query.trim().length > 0;
+  const words = useMemo(() => queryWords(query), [query]);
+  // Everything search looks at for each report, prepared once rather than on every key press.
+  const searchIndex = useMemo(
+    () =>
+      new Map(
+        (reports ?? []).map((r) => [
+          r.id,
+          prepare([
+            { label: "Title", text: r.title },
+            { label: "the report", text: notesText(r.body) },
+            { label: "the category", text: categoryPath(r.category_id) },
+          ]),
+        ]),
+      ),
+    [reports, categoryPath],
+  );
   const shown = useMemo(() => {
     if (!reports) return null;
-    const words = query.trim().toLowerCase();
     return reports.filter((r) => {
-      if (words)
-        return [r.title, categoryPath(r.category_id)].some((t) =>
-          t.toLowerCase().includes(words),
-        );
+      if (words.length) return matches(searchIndex.get(r.id) ?? [], words);
       if (view.kind === "uncategorized") return !r.category_id;
       if (view.kind === "category") return inCategory(r, view.id);
       return true;
     });
-  }, [reports, query, view, categoryPath, inCategory]);
+  }, [reports, words, searchIndex, view, inCategory]);
 
   function openView(next: View) {
     setView(next);
@@ -460,7 +476,7 @@ export default function ReportsList({ userEmail }: { userEmail: string }) {
         <SearchBox
           value={query}
           onChange={setQuery}
-          placeholder="Search reports…"
+          placeholder="Search titles and report text…"
           className="ml-auto w-auto sm:w-full sm:max-w-xs"
           collapse
         />
@@ -674,6 +690,8 @@ export default function ReportsList({ userEmail }: { userEmail: string }) {
                       <ReportRow
                         key={r.id}
                         report={r}
+                        words={words}
+                        found={searching ? whereFound(searchIndex.get(r.id) ?? [], words) : null}
                         categoriesReady={categoriesReady}
                         categoryLabel={
                           categoryPath(r.category_id) || "Uncategorized"
@@ -712,6 +730,9 @@ export default function ReportsList({ userEmail }: { userEmail: string }) {
 
 function ReportRow(props: {
   report: Row;
+  /** The searched words, marked in the title, and where the search found the report. */
+  words: SearchWord[];
+  found: SearchMatch;
   categoriesReady: boolean;
   categoryLabel: string;
   showCategory: boolean;
@@ -739,13 +760,14 @@ function ReportRow(props: {
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <Link href={`/report/${r.id}`} className="min-w-0">
           <span className="block truncate font-medium text-slate-900 hover:underline">
-            {r.title}
+            <Highlight text={r.title} words={props.words} />
           </span>
           <span className="text-xs text-slate-500">
             {count} source{count === 1 ? "" : "s"} · edited{" "}
             {formatDate(r.updated_at)}
           </span>
         </Link>
+        <FoundIn match={props.found} words={props.words} />
         {props.showCategory && (
           <CategoryTag
             path={props.categoryLabel}

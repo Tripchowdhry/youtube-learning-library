@@ -1,5 +1,6 @@
 "use client";
 
+import { matches, notesText, prepare, queryWords } from "@/lib/search";
 import HomeLink from "@/components/HomeLink";
 import { friendlyError } from "@/lib/errors";
 import { postAi } from "@/lib/ai-request";
@@ -507,12 +508,21 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
   // ---------- Picker list ----------
 
   const visible = useMemo(() => {
-    const q = query.trim().toLowerCase();
+    const words = queryWords(query);
     return (sources ?? []).filter(
       (s) =>
         s.section === tab &&
         (!onlyWithNotes || hasNotes(s) || chosenKeys.has(sourceKey(s))) &&
-        (!q || `${s.title} ${s.sub ?? ""} ${s.category ?? ""} ${s.notes}`.toLowerCase().includes(q)),
+        (!words.length ||
+          matches(
+            prepare([
+              { label: "Title", text: s.title },
+              { label: "the site", text: s.sub },
+              { label: "the category", text: s.category },
+              { label: "your notes", text: notesText(s.notes) },
+            ]),
+            words,
+          )),
     );
   }, [sources, tab, query, onlyWithNotes, chosenKeys]);
 

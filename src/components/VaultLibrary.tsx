@@ -5,6 +5,8 @@ import AiUsageLink from "@/components/AiUsageLink";
 import { friendlyError } from "@/lib/errors";
 import { fetchAll } from "@/lib/fetch-all";
 import SearchBox from "@/components/SearchBox";
+import { Highlight } from "@/components/SearchHighlight";
+import { matches, prepare, queryWords, type SearchWord } from "@/lib/search";
 import { Tour, TourButton, useSectionTour } from "@/components/Tour";
 import BrandMark from "@/components/BrandMark";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -251,17 +253,27 @@ export default function VaultLibrary({ userEmail }: { userEmail: string }) {
   const searching = query.trim().length > 0;
 
   // Search only looks at the plain fields; passwords and API keys are never searched.
+  const words = useMemo(() => queryWords(query), [query]);
   const visibleEntries = useMemo(() => {
-    const q = query.trim().toLowerCase();
     return entries
       .filter((e) => {
-        if (q) return [e.name, e.url, e.username, e.note, categoryPath(e.category_id)].some((t) => t.toLowerCase().includes(q));
+        if (words.length)
+          return matches(
+            prepare([
+              { label: "Title", text: e.name },
+              { label: "the web address", text: e.url },
+              { label: "the user ID", text: e.username },
+              { label: "the note", text: e.note },
+              { label: "the category", text: categoryPath(e.category_id) },
+            ]),
+            words,
+          );
         if (view.kind === "uncategorized") return !e.category_id;
         if (view.kind === "category") return inCategory(e, view.id);
         return true;
       })
       .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" }));
-  }, [entries, query, view, categoryPath, inCategory]);
+  }, [entries, words, view, categoryPath, inCategory]);
 
   const countIn = (id: string) => entries.filter((e) => inCategory(e, id)).length;
 
@@ -654,6 +666,7 @@ export default function VaultLibrary({ userEmail }: { userEmail: string }) {
                       <EntryRow
                         key={entry.id}
                         entry={entry}
+                        words={words}
                         unlocked={Boolean(key)}
                         revealed={revealed}
                         categoryLabel={categoryPath(entry.category_id) || "Uncategorized"}
@@ -710,6 +723,8 @@ export default function VaultLibrary({ userEmail }: { userEmail: string }) {
 
 function EntryRow(props: {
   entry: VaultEntry;
+  /** The searched words, marked in the name. */
+  words: SearchWord[];
   unlocked: boolean;
   revealed: Record<string, string>;
   categoryLabel: string;
@@ -742,7 +757,9 @@ function EntryRow(props: {
     >
       <Ico icon={KeyRound} tone="amber" size={22} className="mt-0.5" />
       <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-        <p className="font-medium">{entry.name}</p>
+        <p className="font-medium">
+          <Highlight text={entry.name} words={props.words} />
+        </p>
         {props.showCategory && <CategoryTag path={props.categoryLabel} onClick={props.onShowCategory} />}
         {entry.url && (
           <PlainLine label="Web address">

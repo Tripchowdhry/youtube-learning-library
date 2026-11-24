@@ -6,6 +6,8 @@ import { deleteItem } from "@/lib/delete-item";
 import { friendlyError } from "@/lib/errors";
 import { fetchAll } from "@/lib/fetch-all";
 import SearchBox from "@/components/SearchBox";
+import { FoundIn, Highlight } from "@/components/SearchHighlight";
+import { matches, notesText, prepare, queryWords, whereFound, type SearchMatch, type SearchWord } from "@/lib/search";
 import { revealById } from "@/lib/reveal";
 import StopAiButton from "@/components/StopAiButton";
 import { AskCategoryButton } from "@/components/CategoryChat";
@@ -183,21 +185,42 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
   const canReorder = !searching && view.kind !== "all";
   const canShift = canReorder && itemSort === "custom";
 
+  const words = useMemo(() => queryWords(query), [query]);
+  // Everything search looks at for each link, prepared once rather than on every key press.
+  const searchIndex = useMemo(
+    () =>
+      new Map(
+        articles.map((a) => [
+          a.id,
+          prepare([
+            { label: "Title", text: a.title || a.url },
+            { label: "the site", text: [a.site, a.author].filter(Boolean).join(" · ") },
+            { label: "the summary", text: a.note },
+            { label: "your notes", text: notesText(a.notes) },
+            { label: "the category", text: categoryPath(a.category_id) },
+            { label: "the tags", text: (a.tags ?? []).join(", ") },
+            { label: "the link", text: a.url },
+          ]),
+        ]),
+      ),
+    [articles, categoryPath],
+  );
+
   const visibleArticles = useMemo(() => {
-    const q = query.trim().toLowerCase();
+    const q = words.length > 0;
     const days = PERIODS.find((p) => p.value === period)!.days;
     const since = days ? Date.now() - days * 86_400_000 : 0;
     const shown = articles.filter((a) => {
       if (since && new Date(a.created_at).getTime() < since) return false;
       if (readFilter === "read" && !a.read_at) return false;
       if (readFilter === "unread" && a.read_at) return false;
-      if (q) return [a.title, a.site, a.author, a.url, a.note, categoryPath(a.category_id), ...(a.tags ?? [])].some((s) => s?.toLowerCase().includes(q));
+      if (q) return matches(searchIndex.get(a.id) ?? [], words);
       if (view.kind === "uncategorized") return !a.category_id;
       if (view.kind === "category") return inCategory(a, view.id);
       return true;
     });
     return shown.sort(compareItems<Article>(itemSort, (a) => a.title ?? a.url, !searching && view.kind !== "all"));
-  }, [articles, query, period, readFilter, view, categoryPath, inCategory, searching, itemSort]);
+  }, [articles, words, searchIndex, period, readFilter, view, inCategory, searching, itemSort]);
 
   const countIn = (id: string) => articles.filter((a) => inCategory(a, id)).length;
 
@@ -694,7 +717,7 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
         </button>
         <BrandMark />
         <SectionSwitch active={kind} />
-        <SearchBox value={query} onChange={setQuery} placeholder="Search titles, sites, notes…" className="ml-auto w-auto sm:w-full sm:max-w-xs" collapse />
+        <SearchBox value={query} onChange={setQuery} placeholder="Search titles, summaries, notes…" className="ml-auto w-auto sm:w-full sm:max-w-xs" collapse />
         <Link
           data-tour="clips"
           href="/clips"
@@ -882,6 +905,8 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
                     <ArticleRow
                       key={article.id}
                       article={article}
+                      words={words}
+                      found={searching ? whereFound(searchIndex.get(article.id) ?? [], words) : null}
                       categoryLabel={categoryPath(article.category_id) || "Uncategorized"}
                       showCategory={searching || view.kind !== "category"}
                       onShowCategory={() => pointAt(article)}
@@ -967,6 +992,9 @@ export function ReadCheck({ read, onClick, word = "read" }: { read: boolean; onC
 
 function ArticleRow(props: {
   article: Article;
+  /** The searched words, marked in the title, and where the search found the link. */
+  words: SearchWord[];
+  found: SearchMatch;
   categoryLabel: string;
   /** Show the category tag: on lists that mix categories (All, search). */
   showCategory: boolean;
@@ -1024,8 +1052,9 @@ function ArticleRow(props: {
               Notes
             </span>
           )}
-          {article.title || article.url}
+          <Highlight text={article.title || article.url} words={props.words} />
         </Link>
+        <FoundIn match={props.found} words={props.words} />
         {props.showCategory && <CategoryTag path={props.categoryLabel} onClick={props.onShowCategory} />}
         <p className="text-xs text-slate-500">
           {[article.site, article.author].filter(Boolean).join(" · ")}
