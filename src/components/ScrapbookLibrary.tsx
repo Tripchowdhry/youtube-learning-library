@@ -6,6 +6,7 @@ import { deleteItem } from "@/lib/delete-item";
 import { friendlyError } from "@/lib/errors";
 import { fetchAll } from "@/lib/fetch-all";
 import SearchBox from "@/components/SearchBox";
+import { allTags } from "@/lib/ai-tags";
 import { FoundIn, Highlight, SearchBar, type SearchScope } from "@/components/SearchHighlight";
 import { bestFirst, matches, prepare, queryWords, whereFound, type SearchMatch, type SearchWord } from "@/lib/search";
 import { AskCategoryButton } from "@/components/CategoryChat";
@@ -104,10 +105,13 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
       fetchAll((from, to) => supabase.from("scraps").select(columns).order("created_at", { ascending: false }).order("id").range(from, to));
     const [c, withTags] = await Promise.all([
       fetchAll((from, to) => supabase.from("article_categories").select("*").eq("kind", "scrap").order("position").order("name").order("id").range(from, to)),
-      scrapRows(`${LIST_COLUMNS},tags`),
+      scrapRows(`${LIST_COLUMNS},tags,ai_tags`),
     ]);
-    // Before supabase/tags.sql has been run there is no tags column; load the pages without it.
-    const s = withTags.error && /tags/i.test(withTags.error.message) ? await scrapRows(LIST_COLUMNS) : withTags;
+    // Before supabase/ai-tags.sql (or tags.sql) has been run a tags column is missing; load the pages without it.
+    const missing = (r: typeof withTags) => r.error && /tags/i.test(r.error.message);
+    let s = withTags;
+    if (missing(s)) s = await scrapRows(`${LIST_COLUMNS},tags`);
+    if (missing(s)) s = await scrapRows(LIST_COLUMNS);
     const error = c.error ?? s.error;
     if (error) {
       // Before supabase/scrapbook.sql has been run, the table doesn't exist yet.
@@ -176,7 +180,7 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
             { label: "Title", text: s.title },
             { label: "the page", text: plainText(s.body) },
             { label: "the category", text: categoryPath(s.category_id) },
-            { label: "the tags", text: (s.tags ?? []).join(", ") },
+            { label: "the tags", text: allTags(s).join(", ") },
           ]),
         ]),
       ),
@@ -189,7 +193,7 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
     const tagKey = tag?.toLowerCase();
     const shown = scraps.filter((s) => {
       if (since && new Date(s.created_at).getTime() < since) return false;
-      if (tagKey && !(s.tags ?? []).some((t) => t.toLowerCase() === tagKey)) return false;
+      if (tagKey && !allTags(s).some((t) => t.toLowerCase() === tagKey)) return false;
       if (words.length && !matches(searchIndex.get(s.id) ?? [], words)) return false;
       // A search looks in the whole tab unless you chose only the category you're in.
       if (searching && scope === "everywhere") return true;
@@ -282,6 +286,11 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
   async function editScrapTags(scrap: ScrapSummary) {
     const tags = await askTags(scrap.tags ?? [], notify);
     if (tags) updateScrap(scrap.id, { tags });
+  }
+
+  // Removing an AI tag keeps it removed: the AI doesn't tag the page again.
+  function removeAiTag(scrap: ScrapSummary, tag: string) {
+    updateScrap(scrap.id, { ai_tags: (scrap.ai_tags ?? []).filter((t) => t !== tag) });
   }
 
   function removeScrapTag(scrap: ScrapSummary, tag: string) {
@@ -761,6 +770,7 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
                           setQuery("");
                         }}
                         onRemoveTag={(tag) => removeScrapTag(scrap, tag)}
+                        onRemoveAiTag={(tag) => removeAiTag(scrap, tag)}
                         onDelete={() => deleteScrap(scrap)}
                       />
                     ))}
@@ -811,6 +821,7 @@ function ScrapRow(props: {
   onEditTags: () => void;
   onTagClick: (tag: string) => void;
   onRemoveTag: (tag: string) => void;
+  onRemoveAiTag: (tag: string) => void;
   onDelete: () => void;
 }) {
   const { scrap } = props;
@@ -850,7 +861,7 @@ function ScrapRow(props: {
             </p>
           )
         )}
-        <TagPills tags={scrap.tags} onTagClick={props.onTagClick} onRemove={props.onRemoveTag} />
+        <TagPills tags={scrap.tags} aiTags={scrap.ai_tags} onTagClick={props.onTagClick} onRemove={props.onRemoveTag} onRemoveAi={props.onRemoveAiTag} />
         <div className="mt-1 flex flex-wrap items-center gap-1">
           <Link
             href={`/scrap/${scrap.id}`}

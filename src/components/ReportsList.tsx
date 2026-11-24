@@ -3,6 +3,9 @@
 import AiUsageLink from "@/components/AiUsageLink";
 import { Ico } from "@/components/Icon";
 import SearchBox from "@/components/SearchBox";
+import TagPills from "@/components/TagPills";
+import { allTags } from "@/lib/ai-tags";
+import { askTags } from "@/lib/tags";
 import { FoundIn, Highlight, SearchBar, type SearchScope } from "@/components/SearchHighlight";
 import { bestFirst, matches, notesText, prepare, queryWords, whereFound, type SearchMatch, type SearchWord } from "@/lib/search";
 import { friendlyError } from "@/lib/errors";
@@ -44,7 +47,7 @@ import { useRouter } from "next/navigation";
 import { Tour, TourButton, useSectionTour } from "@/components/Tour";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-type Row = Pick<Report, "id" | "title" | "updated_at"> & {
+type Row = Pick<Report, "id" | "title" | "updated_at" | "tags" | "ai_tags"> & {
   // The report's text, for search.
   body?: string;
   category_id?: string | null;
@@ -77,6 +80,8 @@ export default function ReportsList({ userEmail }: { userEmail: string }) {
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [query, setQuery] = useState("");
+  // Clicking a tag shows every report with exactly that tag.
+  const [tag, setTag] = useState<string | null>(null);
   // Inside a category, search can look only there or in the whole tab.
   const [scope, setScope] = useState<SearchScope>("everywhere");
   const [view, setView] = useState<View>({ kind: "all" });
@@ -93,7 +98,8 @@ export default function ReportsList({ userEmail }: { userEmail: string }) {
     const [r, c] = await Promise.all([
       supabase
         .from("reports")
-        .select("id, title, body, updated_at, category_id, report_sources(count)")
+        // Every column, so tags (supabase/ai-tags.sql) and categories show once their SQL is run.
+        .select("*, report_sources(count)")
         .order("updated_at", { ascending: false }),
       supabase
         .from("report_categories")
@@ -106,17 +112,9 @@ export default function ReportsList({ userEmail }: { userEmail: string }) {
       setCategoriesReady(false);
       setCategories([]);
       if (!r.error) return setReports(r.data as Row[]);
-      const plain = await supabase
-        .from("reports")
-        .select("id, title, body, updated_at, report_sources(count)")
-        .order("updated_at", { ascending: false });
-      if (plain.error) {
-        if (isMissingTable(plain.error.message)) setNeedsSetup(true);
-        else setError(friendlyError(plain.error.message));
-        setReports([]);
-        return;
-      }
-      setReports(plain.data as Row[]);
+      if (isMissingTable(r.error.message)) setNeedsSetup(true);
+      else setError(friendlyError(r.error.message));
+      setReports([]);
       return;
     }
     setCategoriesReady(true);
@@ -166,7 +164,8 @@ export default function ReportsList({ userEmail }: { userEmail: string }) {
   const countIn = (id: string) =>
     (reports ?? []).filter((r) => inCategory(r, id)).length;
 
-  const searching = query.trim().length > 0;
+  // Searching covers typed words and a tag clicked on a report.
+  const searching = query.trim().length > 0 || tag !== null;
   const words = useMemo(() => queryWords(query), [query]);
   // Everything search looks at for each report, prepared once rather than on every key press.
   const searchIndex = useMemo(
@@ -178,6 +177,7 @@ export default function ReportsList({ userEmail }: { userEmail: string }) {
             { label: "Title", text: r.title },
             { label: "the report", text: notesText(r.body) },
             { label: "the category", text: categoryPath(r.category_id) },
+            { label: "the tags", text: allTags(r).join(", ") },
           ]),
         ]),
       ),
@@ -185,21 +185,24 @@ export default function ReportsList({ userEmail }: { userEmail: string }) {
   );
   const shown = useMemo(() => {
     if (!reports) return null;
+    const tagKey = tag?.toLowerCase();
     const found = reports.filter((r) => {
+      if (tagKey && !allTags(r).some((t) => t.toLowerCase() === tagKey)) return false;
       if (words.length && !matches(searchIndex.get(r.id) ?? [], words)) return false;
       // A search looks in the whole tab unless you chose only the category you're in.
-      if (words.length && scope === "everywhere") return true;
+      if (searching && scope === "everywhere") return true;
       if (view.kind === "uncategorized") return !r.category_id;
       if (view.kind === "category") return inCategory(r, view.id);
       return true;
     });
     // Best match first; otherwise the most recently edited first, as loaded.
     return words.length ? found.sort(bestFirst(words, (r) => searchIndex.get(r.id) ?? [], () => 0)) : found;
-  }, [reports, words, scope, searchIndex, view, inCategory]);
+  }, [reports, words, tag, searching, scope, searchIndex, view, inCategory]);
 
   function openView(next: View) {
     setView(next);
     setQuery("");
+    setTag(null);
     setShowCategories(false);
   }
 
@@ -413,6 +416,21 @@ export default function ReportsList({ userEmail }: { userEmail: string }) {
     router.push(`/report/${data.id}`);
   }
 
+  // Your own tags (up to 2) and the AI's. Removing an AI tag keeps it removed.
+  async function updateTags(id: string, changes: Pick<Row, "tags"> | Pick<Row, "ai_tags">) {
+    setReports((rows) => rows?.map((r) => (r.id === id ? { ...r, ...changes } : r)) ?? rows);
+    const { error } = await supabase.from("reports").update(changes).eq("id", id);
+    if (error) {
+      setError(friendlyError(error.message));
+      load();
+    }
+  }
+
+  async function editTags(report: Row) {
+    const tags = await askTags(report.tags ?? [], (text, isError) => isError && setError(text));
+    if (tags) updateTags(report.id, { tags });
+  }
+
   async function moveReport(id: string, categoryId: string | null) {
     const report = reports?.find((r) => r.id === id);
     if (!report || (report.category_id ?? null) === categoryId) return;
@@ -457,7 +475,9 @@ export default function ReportsList({ userEmail }: { userEmail: string }) {
   }
 
   const title = searching
-    ? `Search results for "${query.trim()}"`
+    ? query.trim()
+      ? `Search results for "${query.trim()}"`
+      : `Tagged #${tag}`
     : view.kind === "all"
       ? "All reports"
       : view.kind === "uncategorized"
@@ -641,8 +661,9 @@ export default function ReportsList({ userEmail }: { userEmail: string }) {
               {searching && shown && (
                 <SearchBar
                   count={shown.length}
-                  tag={null}
-                  onClearTag={() => {}}
+                  ranked={words.length > 0}
+                  tag={tag}
+                  onClearTag={() => setTag(null)}
                   categoryName={view.kind === "all" ? null : view.kind === "uncategorized" ? "Uncategorized" : categoryPath(view.id)}
                   scope={scope}
                   onScope={setScope}
@@ -729,6 +750,13 @@ export default function ReportsList({ userEmail }: { userEmail: string }) {
                         onDragStart={() => setDraggingId(r.id)}
                         onDragEnd={() => setDraggingId(null)}
                         onDelete={() => remove(r)}
+                        onEditTags={() => editTags(r)}
+                        onTagClick={(t) => {
+                          setTag(t);
+                          setQuery("");
+                        }}
+                        onRemoveTag={(t) => updateTags(r.id, { tags: (r.tags ?? []).filter((x) => x !== t) })}
+                        onRemoveAiTag={(t) => updateTags(r.id, { ai_tags: (r.ai_tags ?? []).filter((x) => x !== t) })}
                       />
                     ))}
                   </ul>
@@ -759,8 +787,14 @@ function ReportRow(props: {
   onDragStart: () => void;
   onDragEnd: () => void;
   onDelete: () => void;
+  onEditTags: () => void;
+  onTagClick: (tag: string) => void;
+  onRemoveTag: (tag: string) => void;
+  onRemoveAiTag: (tag: string) => void;
 }) {
   const r = props.report;
+  // Tags show once supabase/ai-tags.sql has been run.
+  const tagsReady = "tags" in r;
   const count = r.report_sources?.[0]?.count ?? 0;
   const { ref, handlers } = usePointerDrag<HTMLLIElement>({
     onDragStart: props.categoriesReady ? props.onDragStart : undefined,
@@ -790,6 +824,7 @@ function ReportRow(props: {
             onClick={props.onShowCategory}
           />
         )}
+        <TagPills tags={r.tags} aiTags={r.ai_tags} onTagClick={props.onTagClick} onRemove={props.onRemoveTag} onRemoveAi={props.onRemoveAiTag} />
         <div className="mt-1 flex flex-wrap items-center gap-1">
           {props.categoriesReady && (
             <select
@@ -807,6 +842,11 @@ function ReportRow(props: {
                 </option>
               ))}
             </select>
+          )}
+          {tagsReady && (
+            <SmallButton onClick={props.onEditTags} title="Add your own tags" icon={Tag} tone="amber">
+              Tags
+            </SmallButton>
           )}
           <SmallButton
             onClick={props.onDelete}

@@ -19,6 +19,8 @@ export type Video = {
   channel: string | null;
   thumbnail_url: string | null;
   tags: string[];
+  // The AI's tags (up to 3, purple). Null until the AI has tagged it; missing until ai-tags.sql is run.
+  ai_tags?: string[] | null;
   note: string;
   // Missing until video-watched.sql has been run.
   watched_at?: string | null;
@@ -107,8 +109,10 @@ export type Article = {
   notes?: string;
   // Handwritten notes on the reading page. Missing until supabase/article-pages.sql is run.
   pages?: NotePage[];
-  // Up to 3 tags. Missing until supabase/tags.sql is run.
+  // Your own tags, up to 2. Missing until supabase/tags.sql is run.
   tags?: string[];
+  // The AI's tags (up to 3, purple). Null until the AI has tagged it; missing until ai-tags.sql is run.
+  ai_tags?: string[] | null;
   position: number;
   kind: SectionKind;
   read_at: string | null;
@@ -133,8 +137,10 @@ export type Scrap = {
   pages: NotePage[];
   // Attached files (supabase/files.sql). Missing until that SQL has been run.
   files?: { path: string; name: string; size: number; type: string; added_at: string }[];
-  // Up to 3 tags. Missing until supabase/tags.sql is run.
+  // Your own tags, up to 2. Missing until supabase/tags.sql is run.
   tags?: string[];
+  // The AI's tags (up to 3, purple). Null until the AI has tagged it; missing until ai-tags.sql is run.
+  ai_tags?: string[] | null;
   position: number;
   created_at: string;
   updated_at: string;

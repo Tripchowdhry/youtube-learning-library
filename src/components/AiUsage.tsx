@@ -1,5 +1,6 @@
 "use client";
 
+import AiTagsSwitch from "@/components/AiTagsSwitch";
 import BackLink from "@/components/BackLink";
 import HomeLink from "@/components/HomeLink";
 import { Activity, ArrowDownUp, CircleCheck, Clock, Coins, Database, LayoutGrid, ListOrdered, Repeat, Sparkles } from "lucide-react";
@@ -119,6 +120,7 @@ export default function AiUsage() {
             </button>
           ))}
         </nav>
+        {view === "ai" && <AiTagsSwitch />}
 
         {view === "storage" ? (
           <StorageUsage supabase={supabase} />

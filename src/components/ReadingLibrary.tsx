@@ -6,6 +6,7 @@ import { deleteItem } from "@/lib/delete-item";
 import { friendlyError } from "@/lib/errors";
 import { fetchAll } from "@/lib/fetch-all";
 import SearchBox from "@/components/SearchBox";
+import { allTags, tagWithAi } from "@/lib/ai-tags";
 import { FoundIn, Highlight, SearchBar, type SearchScope } from "@/components/SearchHighlight";
 import { bestFirst, matches, notesText, prepare, queryWords, whereFound, type SearchMatch, type SearchWord } from "@/lib/search";
 import { revealById } from "@/lib/reveal";
@@ -203,7 +204,7 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
             { label: "the summary", text: a.note },
             { label: "your notes", text: notesText(a.notes) },
             { label: "the category", text: categoryPath(a.category_id) },
-            { label: "the tags", text: (a.tags ?? []).join(", ") },
+            { label: "the tags", text: allTags(a).join(", ") },
             { label: "the link", text: a.url },
           ]),
         ]),
@@ -219,7 +220,7 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
       if (since && new Date(a.created_at).getTime() < since) return false;
       if (readFilter === "read" && !a.read_at) return false;
       if (readFilter === "unread" && a.read_at) return false;
-      if (tagKey && !(a.tags ?? []).some((t) => t.toLowerCase() === tagKey)) return false;
+      if (tagKey && !allTags(a).some((t) => t.toLowerCase() === tagKey)) return false;
       if (words.length && !matches(searchIndex.get(a.id) ?? [], words)) return false;
       // A search looks in the whole tab unless you chose only the category you're in.
       if (searching && scope === "everywhere") return true;
@@ -351,6 +352,14 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
     setArticles((prev) => [data as Article, ...prev]);
     notify(autoSorted ? `Saved to ${autoName}` : `Saved "${title}"`);
     writeAiNote(data as Article);
+    // The AI adds up to 3 tags of its own, in the background.
+    const added = data as Article;
+    tagWithAi(supabase, kind === "tutorial" ? "tutorial" : "article", added.id, {
+      title: added.title ?? added.url,
+      about: [added.site, added.author].filter(Boolean).join(", "),
+    }).then((ai_tags) => {
+      if (ai_tags) setArticles((prev) => prev.map((a) => (a.id === added.id ? { ...a, ai_tags } : a)));
+    });
     return true;
   }
 
@@ -476,6 +485,11 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
   async function editArticleTags(article: Article) {
     const tags = await askTags(article.tags ?? [], notify);
     if (tags) updateArticle(article.id, { tags });
+  }
+
+  // Removing an AI tag keeps it removed: the AI doesn't tag the link again.
+  function removeAiTag(article: Article, tag: string) {
+    updateArticle(article.id, { ai_tags: (article.ai_tags ?? []).filter((t) => t !== tag) });
   }
 
   function removeArticleTag(article: Article, tag: string) {
@@ -953,6 +967,7 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
                         setQuery("");
                       }}
                       onRemoveTag={(tag) => removeArticleTag(article, tag)}
+                      onRemoveAiTag={(tag) => removeAiTag(article, tag)}
                       onSaveNote={(note) => updateArticle(article.id, { note })}
                       aiNoteStartedAt={aiJobs.running.find((j) => j.key === aiNoteKey(article.id))?.startedAt ?? null}
                       aiNoteError={aiJobs.errors.get(aiNoteKey(article.id)) ?? null}
@@ -1044,6 +1059,7 @@ function ArticleRow(props: {
   onEditTags: () => void;
   onTagClick: (tag: string) => void;
   onRemoveTag: (tag: string) => void;
+  onRemoveAiTag: (tag: string) => void;
   onSaveNote: (note: string) => void;
   aiNoteStartedAt: number | null;
   aiNoteError: string | null;
@@ -1108,7 +1124,7 @@ function ArticleRow(props: {
             {props.aiNoteError}
           </p>
         )}
-        <TagPills tags={article.tags} onTagClick={props.onTagClick} onRemove={props.onRemoveTag} />
+        <TagPills tags={article.tags} aiTags={article.ai_tags} onTagClick={props.onTagClick} onRemove={props.onRemoveTag} onRemoveAi={props.onRemoveAiTag} />
         <div className="mt-1 flex flex-wrap items-center gap-1">
           <Link
             href={`/read/${article.id}?notes=1`}

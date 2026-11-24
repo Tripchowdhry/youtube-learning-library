@@ -4,6 +4,7 @@ import AiUsageLink from "@/components/AiUsageLink";
 import { friendlyError } from "@/lib/errors";
 import { fetchAll } from "@/lib/fetch-all";
 import SearchBox from "@/components/SearchBox";
+import { allTags, tagWithAi } from "@/lib/ai-tags";
 import { FoundIn, Highlight, SearchBar, type SearchScope } from "@/components/SearchHighlight";
 import { bestFirst, matches, notesText as notesTextOf, prepare, queryWords, whereFound, type SearchMatch, type SearchWord } from "@/lib/search";
 import { revealById } from "@/lib/reveal";
@@ -187,7 +188,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
             { label: "the summary", text: v.note },
             { label: "your notes", text: notesText.get(v.id) },
             { label: "the category", text: v.category_id ? folderPath(v.category_id) : "" },
-            { label: "the tags", text: v.tags.join(", ") },
+            { label: "the tags", text: allTags(v).join(", ") },
           ]),
         ]),
       ),
@@ -201,7 +202,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
     const shown = q
       ? videos.filter(
           (v) =>
-            (!tagKey || v.tags.some((t) => t.toLowerCase() === tagKey)) &&
+            (!tagKey || allTags(v).some((t) => t.toLowerCase() === tagKey)) &&
             (!words.length || matches(searchIndex.get(v.id) ?? [], words)) &&
             (scope === "everywhere" ||
               view.kind === "all" ||
@@ -304,6 +305,11 @@ export default function Library({ userEmail }: { userEmail: string }) {
     setVideos((prev) => [...prev, data as Video]);
     notify(folderId && !currentFolderId ? `Saved to ${info.channel}` : `Saved "${info.title}"`);
     writeAiNote(data as Video);
+    // The AI adds up to 3 tags of its own, in the background.
+    const saved = data as Video;
+    tagWithAi(supabase, "video", saved.id, { title: saved.title, about: saved.channel }).then((ai_tags) => {
+      if (ai_tags) setVideos((prev) => prev.map((v) => (v.id === saved.id ? { ...v, ai_tags } : v)));
+    });
     return true;
   }
 
@@ -447,6 +453,11 @@ export default function Library({ userEmail }: { userEmail: string }) {
 
   function removeTag(video: Video, tag: string) {
     updateVideo(video.id, { tags: video.tags.filter((t) => t !== tag) });
+  }
+
+  // Removing an AI tag keeps it removed: the AI doesn't tag the video again.
+  function removeAiTag(video: Video, tag: string) {
+    updateVideo(video.id, { ai_tags: (video.ai_tags ?? []).filter((t) => t !== tag) });
   }
 
   async function deleteVideo(video: Video) {
@@ -906,6 +917,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
                       setQuery("");
                     }}
                     onRemoveTag={(tag) => removeTag(video, tag)}
+                    onRemoveAiTag={(tag) => removeAiTag(video, tag)}
                     where={
                       searching || view.kind !== "folder"
                         ? video.category_id ? folderPath(video.category_id) || "Uncategorized" : "Uncategorized"
@@ -1104,6 +1116,7 @@ function VideoCard(props: {
   onDelete: () => void;
   onTagClick: (tag: string) => void;
   onRemoveTag: (tag: string) => void;
+  onRemoveAiTag: (tag: string) => void;
   /** The video's category path, shown when the list mixes categories (All videos, search). */
   where: string | null;
   onShowWhere: () => void;
@@ -1172,7 +1185,7 @@ function VideoCard(props: {
             {props.aiNoteError}
           </p>
         )}
-        <TagPills tags={video.tags} onTagClick={props.onTagClick} onRemove={props.onRemoveTag} />
+        <TagPills tags={video.tags} aiTags={video.ai_tags} onTagClick={props.onTagClick} onRemove={props.onRemoveTag} onRemoveAi={props.onRemoveAiTag} />
         <div className="mt-1 flex flex-wrap items-center gap-1">
           <a
             href={`/video/${video.id}`}

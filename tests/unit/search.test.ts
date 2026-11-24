@@ -68,3 +68,11 @@ describe("rank", () => {
     expect(rank(inTitle, words)).toBeGreaterThan(rank(inNotes, words));
   });
 });
+
+describe("cleanAiTags", () => {
+  it("tidies the AI's answer and reuses existing tags", async () => {
+    const { cleanAiTags } = await import("@/lib/ai-tags");
+    expect(cleanAiTags("#React, Web Performance,  react , 'css'\n- tags", ["JavaScript", "React"])).toEqual(["React", "web performance", "css"]);
+    expect(cleanAiTags("a, b, c, d")).toEqual(["a", "b", "c"]);
+  });
+});
