@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import AiJobsBadge from "@/components/AiJobsBadge";
+import BandwidthCounter from "@/components/BandwidthCounter";
 import { ConfirmHost } from "@/components/ConfirmDialog";
 import { BRAND } from "@/lib/brand";
 
@@ -40,6 +41,7 @@ export default function RootLayout({
         {children}
         <ConfirmHost />
         <AiJobsBadge />
+        <BandwidthCounter />
       </body>
     </html>
   );
