@@ -3,6 +3,7 @@
 import AiUsageLink from "@/components/AiUsageLink";
 import { Ico } from "@/components/Icon";
 import SearchBox from "@/components/SearchBox";
+import FoundElsewhere, { useSearchFromLink } from "@/components/FoundElsewhere";
 import TagPills from "@/components/TagPills";
 import { allTags } from "@/lib/ai-tags";
 import { askTags } from "@/lib/tags";
@@ -80,6 +81,7 @@ export default function ReportsList({ userEmail }: { userEmail: string }) {
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [query, setQuery] = useState("");
+  useSearchFromLink(setQuery);
   // Clicking a tag shows every report with exactly that tag.
   const [tag, setTag] = useState<string | null>(null);
   // Inside a category, search can look only there or in the whole tab.
@@ -507,6 +509,7 @@ export default function ReportsList({ userEmail }: { userEmail: string }) {
           placeholder="Search titles and report text…"
           className="ml-auto w-auto sm:w-full sm:max-w-xs"
           collapse
+          recentKey="reports"
         />
         <Link
           href="/clips"
@@ -699,9 +702,12 @@ export default function ReportsList({ userEmail }: { userEmail: string }) {
               {shown === null ? (
                 <p className="text-sm text-slate-500">Loading…</p>
               ) : searching && !shown.length ? (
-                <p className="text-sm text-slate-500">
-                  No reports match &ldquo;{query.trim()}&rdquo;.
-                </p>
+                <div className="text-sm text-slate-500">
+                  <p>No reports match &ldquo;{query.trim() || `#${tag}`}&rdquo;.</p>
+                  <div className="[&>p]:justify-start">
+                    <FoundElsewhere query={query} here="reports" />
+                  </div>
+                </div>
               ) : shown.length === 0 ? (
                 <div className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center text-slate-600">
                   <ReportIcon size={48} className="mx-auto mb-2" />
