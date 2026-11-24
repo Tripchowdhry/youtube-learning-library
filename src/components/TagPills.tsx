@@ -2,7 +2,7 @@
 
 import { X } from "lucide-react";
 
-// An item's tags as #pills. Clicking a tag searches for it; the × beside it removes it.
+// An item's tags as #pills. Clicking a tag shows everything with that tag; the × beside it removes it.
 export default function TagPills({
   tags,
   onTagClick,

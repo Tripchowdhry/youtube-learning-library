@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { highlightRanges, matches, notesText, prepare, queryWords, whereFound } from "@/lib/search";
+import { highlightRanges, matches, notesText, prepare, queryWords, rank, whereFound } from "@/lib/search";
 
 const find = (query: string, fields: { label: string; text: string }[]) => matches(prepare(fields), queryWords(query));
 
@@ -54,5 +54,17 @@ describe("search", () => {
   it("reads typed notes without formatting or clips", () => {
     const saved = "**✨ Summary**\n- point one\n\n--- clips ---\n[1:00] ![clip](a/b.webm)";
     expect(notesText(saved)).toBe("✨ Summary · point one");
+  });
+});
+
+describe("rank", () => {
+  it("puts title matches before matches in the notes", () => {
+    const words = queryWords("react");
+    const inTitle = prepare([{ label: "Title", text: "React basics" }]);
+    const inNotes = prepare([
+      { label: "Title", text: "Web speed" },
+      { label: "your notes", text: "React apps send too much" },
+    ]);
+    expect(rank(inTitle, words)).toBeGreaterThan(rank(inNotes, words));
   });
 });

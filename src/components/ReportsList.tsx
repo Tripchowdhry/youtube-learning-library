@@ -3,8 +3,8 @@
 import AiUsageLink from "@/components/AiUsageLink";
 import { Ico } from "@/components/Icon";
 import SearchBox from "@/components/SearchBox";
-import { FoundIn, Highlight } from "@/components/SearchHighlight";
-import { matches, notesText, prepare, queryWords, whereFound, type SearchMatch, type SearchWord } from "@/lib/search";
+import { FoundIn, Highlight, SearchBar, type SearchScope } from "@/components/SearchHighlight";
+import { bestFirst, matches, notesText, prepare, queryWords, whereFound, type SearchMatch, type SearchWord } from "@/lib/search";
 import { friendlyError } from "@/lib/errors";
 import BrandMark from "@/components/BrandMark";
 import { askConfirm, askText } from "@/components/ConfirmDialog";
@@ -77,6 +77,8 @@ export default function ReportsList({ userEmail }: { userEmail: string }) {
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [query, setQuery] = useState("");
+  // Inside a category, search can look only there or in the whole tab.
+  const [scope, setScope] = useState<SearchScope>("everywhere");
   const [view, setView] = useState<View>({ kind: "all" });
   const [showCategories, setShowCategories] = useState(false);
   const [draggingId, setDraggingId] = useState<string | null>(null);
@@ -183,13 +185,17 @@ export default function ReportsList({ userEmail }: { userEmail: string }) {
   );
   const shown = useMemo(() => {
     if (!reports) return null;
-    return reports.filter((r) => {
-      if (words.length) return matches(searchIndex.get(r.id) ?? [], words);
+    const found = reports.filter((r) => {
+      if (words.length && !matches(searchIndex.get(r.id) ?? [], words)) return false;
+      // A search looks in the whole tab unless you chose only the category you're in.
+      if (words.length && scope === "everywhere") return true;
       if (view.kind === "uncategorized") return !r.category_id;
       if (view.kind === "category") return inCategory(r, view.id);
       return true;
     });
-  }, [reports, words, searchIndex, view, inCategory]);
+    // Best match first; otherwise the most recently edited first, as loaded.
+    return words.length ? found.sort(bestFirst(words, (r) => searchIndex.get(r.id) ?? [], () => 0)) : found;
+  }, [reports, words, scope, searchIndex, view, inCategory]);
 
   function openView(next: View) {
     setView(next);
@@ -632,6 +638,16 @@ export default function ReportsList({ userEmail }: { userEmail: string }) {
                   </>
                 )}
               </div>
+              {searching && shown && (
+                <SearchBar
+                  count={shown.length}
+                  tag={null}
+                  onClearTag={() => {}}
+                  categoryName={view.kind === "all" ? null : view.kind === "uncategorized" ? "Uncategorized" : categoryPath(view.id)}
+                  scope={scope}
+                  onScope={setScope}
+                />
+              )}
               <p
                 className={`mb-4 text-sm text-slate-600 ${view.kind === "all" && !searching ? "" : "hidden"}`}
               >

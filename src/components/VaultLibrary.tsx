@@ -5,8 +5,8 @@ import AiUsageLink from "@/components/AiUsageLink";
 import { friendlyError } from "@/lib/errors";
 import { fetchAll } from "@/lib/fetch-all";
 import SearchBox from "@/components/SearchBox";
-import { Highlight } from "@/components/SearchHighlight";
-import { matches, prepare, queryWords, type SearchWord } from "@/lib/search";
+import { Highlight, SearchBar, type SearchScope } from "@/components/SearchHighlight";
+import { bestFirst, matches, prepare, queryWords, type SearchWord } from "@/lib/search";
 import { Tour, TourButton, useSectionTour } from "@/components/Tour";
 import BrandMark from "@/components/BrandMark";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -69,6 +69,8 @@ export default function VaultLibrary({ userEmail }: { userEmail: string }) {
   const [resetting, setResetting] = useState(false);
   const [view, setView] = useState<View>({ kind: "all" });
   const [query, setQuery] = useState("");
+  // Inside a category, search can look only there or in the whole tab.
+  const [scope, setScope] = useState<SearchScope>("everywhere");
   const [showCategories, setShowCategories] = useState(false);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [flashId, setFlashId] = useState<string | null>(null);
@@ -255,25 +257,26 @@ export default function VaultLibrary({ userEmail }: { userEmail: string }) {
   // Search only looks at the plain fields; passwords and API keys are never searched.
   const words = useMemo(() => queryWords(query), [query]);
   const visibleEntries = useMemo(() => {
+    const indexOf = (e: VaultEntry) =>
+      prepare([
+        { label: "Title", text: e.name },
+        { label: "the web address", text: e.url },
+        { label: "the user ID", text: e.username },
+        { label: "the note", text: e.note },
+        { label: "the category", text: categoryPath(e.category_id) },
+      ]);
+    const byName = (a: VaultEntry, b: VaultEntry) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" });
     return entries
       .filter((e) => {
-        if (words.length)
-          return matches(
-            prepare([
-              { label: "Title", text: e.name },
-              { label: "the web address", text: e.url },
-              { label: "the user ID", text: e.username },
-              { label: "the note", text: e.note },
-              { label: "the category", text: categoryPath(e.category_id) },
-            ]),
-            words,
-          );
+        if (words.length && !matches(indexOf(e), words)) return false;
+        // A search looks in the whole vault unless you chose only the category you're in.
+        if (words.length && scope === "everywhere") return true;
         if (view.kind === "uncategorized") return !e.category_id;
         if (view.kind === "category") return inCategory(e, view.id);
         return true;
       })
-      .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" }));
-  }, [entries, words, view, categoryPath, inCategory]);
+      .sort(bestFirst(words, indexOf, byName));
+  }, [entries, words, scope, view, categoryPath, inCategory]);
 
   const countIn = (id: string) => entries.filter((e) => inCategory(e, id)).length;
 
@@ -626,6 +629,16 @@ export default function VaultLibrary({ userEmail }: { userEmail: string }) {
                   </>
                 )}
               </div>
+              {searching && (
+                <SearchBar
+                  count={visibleEntries.length}
+                  tag={null}
+                  onClearTag={() => {}}
+                  categoryName={view.kind === "all" ? null : view.kind === "uncategorized" ? "Uncategorized" : categoryPath(view.id)}
+                  scope={scope}
+                  onScope={setScope}
+                />
+              )}
 
 
               {key ? (

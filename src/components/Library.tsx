@@ -4,8 +4,8 @@ import AiUsageLink from "@/components/AiUsageLink";
 import { friendlyError } from "@/lib/errors";
 import { fetchAll } from "@/lib/fetch-all";
 import SearchBox from "@/components/SearchBox";
-import { FoundIn, Highlight } from "@/components/SearchHighlight";
-import { matches, notesText as notesTextOf, prepare, queryWords, whereFound, type SearchMatch, type SearchWord } from "@/lib/search";
+import { FoundIn, Highlight, SearchBar, type SearchScope } from "@/components/SearchHighlight";
+import { bestFirst, matches, notesText as notesTextOf, prepare, queryWords, whereFound, type SearchMatch, type SearchWord } from "@/lib/search";
 import { revealById } from "@/lib/reveal";
 import { AskCategoryButton } from "@/components/CategoryChat";
 import BrandMark from "@/components/BrandMark";
@@ -76,6 +76,10 @@ export default function Library({ userEmail }: { userEmail: string }) {
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<View>({ kind: "all" });
   const [query, setQuery] = useState("");
+  // Clicking a tag shows every video with exactly that tag.
+  const [tag, setTag] = useState<string | null>(null);
+  // Inside a category, search can look only there or in the whole tab.
+  const [scope, setScope] = useState<SearchScope>("everywhere");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [draggingFolderId, setDraggingFolderId] = useState<string | null>(null);
@@ -164,7 +168,8 @@ export default function Library({ userEmail }: { userEmail: string }) {
 
   // ---------- Which videos to show ----------
 
-  const searching = query.trim().length > 0;
+  // Searching covers typed words and a tag clicked on a card.
+  const searching = query.trim().length > 0 || tag !== null;
   // Dragging to reorder works inside a folder whatever the sort; ▲ ▼ only in your own order.
   const canReorder = !searching && view.kind !== "all";
   const canShift = canReorder && itemSort === "custom";
@@ -190,10 +195,18 @@ export default function Library({ userEmail }: { userEmail: string }) {
   );
 
   const visibleVideos = useMemo(() => {
-    const q = words.length > 0;
+    const q = words.length > 0 || tag !== null;
     const folderId = view.kind === "folder" ? view.id : null;
+    const tagKey = tag?.toLowerCase();
     const shown = q
-      ? videos.filter((v) => matches(searchIndex.get(v.id) ?? [], words))
+      ? videos.filter(
+          (v) =>
+            (!tagKey || v.tags.some((t) => t.toLowerCase() === tagKey)) &&
+            (!words.length || matches(searchIndex.get(v.id) ?? [], words)) &&
+            (scope === "everywhere" ||
+              view.kind === "all" ||
+              (view.kind === "unsorted" ? !v.category_id : isWithin(folders, v.category_id, view.id))),
+        )
       : view.kind === "all"
         ? [...videos]
         : videos.filter((v) => v.category_id === folderId);
@@ -202,8 +215,8 @@ export default function Library({ userEmail }: { userEmail: string }) {
     return shown
       .filter((v) => !since || new Date(v.created_at).getTime() >= since)
       .filter((v) => watchFilter === "all" || (watchFilter === "watched") === Boolean(v.watched_at))
-      .sort(compareItems<Video>(itemSort, (v) => v.title ?? "", !q && view.kind !== "all"));
-  }, [videos, view, words, searchIndex, itemSort, watchFilter, period]);
+      .sort(bestFirst(words, (v) => searchIndex.get(v.id) ?? [], compareItems<Video>(q ? "newest" : itemSort, (v) => v.title ?? "", !q && view.kind !== "all")));
+  }, [videos, view, words, tag, scope, folders, searchIndex, itemSort, watchFilter, period]);
 
   // New and moved videos go to the top of their folder.
   const topPosition = (folderId: string | null) => {
@@ -631,13 +644,16 @@ export default function Library({ userEmail }: { userEmail: string }) {
   function openView(next: View) {
     setView(next);
     setQuery("");
+    setTag(null);
     setShowFolders(false);
   }
 
   // ---------- Render ----------
 
   const title = searching
-    ? `Search results for "${query.trim()}"`
+    ? query.trim()
+      ? `Search results for "${query.trim()}"`
+      : `Tagged #${tag}`
     : view.kind === "all"
       ? "All videos"
       : view.kind === "unsorted"
@@ -801,8 +817,20 @@ export default function Library({ userEmail }: { userEmail: string }) {
                 },
               ]}
             />
-            <ItemSortSelect sort={itemSort} onChange={setItemSort} />
+            {/* Search results come best match first, so the sort only shows outside a search. */}
+            {!searching && <ItemSortSelect sort={itemSort} onChange={setItemSort} />}
           </div>
+          {searching && !loading && (
+            <SearchBar
+              count={visibleVideos.length}
+                  ranked={words.length > 0}
+              tag={tag}
+              onClearTag={() => setTag(null)}
+              categoryName={view.kind === "all" ? null : view.kind === "unsorted" ? "Uncategorized" : folderPath(view.id)}
+              scope={scope}
+              onScope={setScope}
+            />
+          )}
 
 
           {!searching && (
@@ -840,9 +868,9 @@ export default function Library({ userEmail }: { userEmail: string }) {
                   Tip: use ▲ ▼ on a video, or drag it onto another, to change the order. Drop it on a folder to move it.
                 </p>
               )}
-              {!canReorder && visibleVideos.length > 1 && (
+              {!canReorder && !searching && visibleVideos.length > 1 && (
                 <p className="mb-3 text-xs text-slate-500">
-                  {`${searching ? "Search results" : "All videos"} show the newest first. To change the order, open a category on the left.`}
+                  {`All videos show the newest first. To change the order, open a category on the left.`}
                 </p>
               )}
               <div className="flex flex-col gap-2">
@@ -853,6 +881,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
                     folderOptions={folderOptions}
                     hasNotes={notedVideoIds.has(video.id)}
                     words={words}
+                    compact={searching}
                     found={searching ? whereFound(searchIndex.get(video.id) ?? [], words) : null}
                     flash={flashId === video.id}
                     canReorder={canReorder}
@@ -872,7 +901,10 @@ export default function Library({ userEmail }: { userEmail: string }) {
                     aiNoteError={aiJobs.errors.get(aiNoteKey(video.id)) ?? null}
                     onAiNote={() => writeAiNote(video)}
                     onDelete={() => deleteVideo(video)}
-                    onTagClick={(tag) => setQuery(tag)}
+                    onTagClick={(t) => {
+                      setTag(t);
+                      setQuery("");
+                    }}
                     onRemoveTag={(tag) => removeTag(video, tag)}
                     where={
                       searching || view.kind !== "folder"
@@ -881,6 +913,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
                     }
                     onShowWhere={() => {
                       setQuery("");
+                      setTag(null);
                       pointAt(video);
                     }}
                   />
@@ -1050,6 +1083,8 @@ function VideoCard(props: {
   /** The searched words, marked in the title, and where the search found the video. */
   words: SearchWord[];
   found: SearchMatch;
+  /** In search results: fewer buttons, so the matches stand out. */
+  compact: boolean;
   canReorder: boolean;
   dragging: boolean;
   onDragStart: () => void;
@@ -1125,9 +1160,12 @@ function VideoCard(props: {
           {video.channel && `${video.channel} · `}Added {formatDate(video.created_at)}
           {video.watched_at && <span className="text-green-700"> · Watched {formatDate(video.watched_at)}</span>}
         </p>
-        <div id={`ai-note-${video.id}`} className="rounded-md">
-          <ArticleNote note={video.note} editing={editingNote} setEditing={setEditingNote} onSave={props.onSaveNote} />
-        </div>
+        {/* The found line already shows why it matched; the summary would repeat it. */}
+        {!(props.compact && props.found) && (
+          <div id={`ai-note-${video.id}`} className="rounded-md">
+            <ArticleNote note={video.note} editing={editingNote} setEditing={setEditingNote} onSave={props.onSaveNote} />
+          </div>
+        )}
         {props.aiNoteError && !video.note && (
           <p className="flex items-center gap-1 rounded-md bg-red-50 px-2 py-1 text-xs text-red-700 ring-1 ring-red-200">
             <Ico icon={TriangleAlert} tone="red" size={14} />
@@ -1148,16 +1186,18 @@ function VideoCard(props: {
             <Ico icon={props.hasNotes ? NotebookText : Pencil} tone={props.hasNotes ? "amber" : "amber"} size={14} />
             {props.hasNotes ? "Open notes" : "Take notes"}
           </a>
-          <a
-            href={video.url}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-1 rounded-md border border-slate-300 px-2 py-1 text-xs text-slate-700 hover:bg-slate-100"
-            draggable={false}
-          >
-            <Ico icon={ExternalLink} tone="red" size={14} />
-            YouTube
-          </a>
+          {!props.compact && (
+            <a
+              href={video.url}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1 rounded-md border border-slate-300 px-2 py-1 text-xs text-slate-700 hover:bg-slate-100"
+              draggable={false}
+            >
+              <Ico icon={ExternalLink} tone="red" size={14} />
+              YouTube
+            </a>
+          )}
           {props.onShift && (
             <>
               <SmallButton onClick={() => props.onShift!(-1)} disabled={props.isFirst} title="Move up">
@@ -1168,8 +1208,8 @@ function VideoCard(props: {
               </SmallButton>
             </>
           )}
-          {!video.note && !editingNote && <SmallButton onClick={() => setEditingNote(true)} icon={FilePen} tone="blue">Add summary</SmallButton>}
-          {video.note && !editingNote && (
+          {!props.compact && !video.note && !editingNote && <SmallButton onClick={() => setEditingNote(true)} icon={FilePen} tone="blue">Add summary</SmallButton>}
+          {!props.compact && video.note && !editingNote && (
             <SmallButton
               onClick={async () => {
                 const ok = await askConfirm({
@@ -1187,7 +1227,7 @@ function VideoCard(props: {
               Clear summary
             </SmallButton>
           )}
-          {!video.note && !editingNote && props.aiNoteStartedAt === null && (
+          {!props.compact && !video.note && !editingNote && props.aiNoteStartedAt === null && (
             <SmallButton onClick={props.onAiNote} title="Let AI watch the video and write the summary" icon={Sparkles} tone="violet">
               AI summary
             </SmallButton>
@@ -1197,6 +1237,7 @@ function VideoCard(props: {
           <span className="ml-auto pl-2">
             <MoreMenu
               items={[
+                ...(props.compact ? [{ label: "Open on YouTube", icon: ExternalLink, onClick: () => window.open(video.url, "_blank", "noopener") }] : []),
                 { label: "Edit title", icon: PencilLine, onClick: props.onRename },
                 { label: "Tags", icon: Tag, tone: "amber", onClick: props.onEditTags },
                 { label: "Delete video", icon: Trash2, danger: true, onClick: props.onDelete },
