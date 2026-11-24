@@ -1,6 +1,7 @@
 "use client";
 
 import { matches, notesText, prepare, queryWords } from "@/lib/search";
+import { tagWithAi } from "@/lib/ai-tags";
 import HomeLink from "@/components/HomeLink";
 import { friendlyError } from "@/lib/errors";
 import { postAi } from "@/lib/ai-request";
@@ -206,10 +207,27 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
         lastSaved.current = { title: nextTitle, body: nextBody };
         setSaveState("saved");
         setSaveError(null);
+        tagOnce(cleanTitle, nextBody);
       }
     },
+    // tagOnce only reads refs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [supabase, reportId],
   );
+
+  // The AI tags the report once, as soon as it has some text. Reports tagged before (or whose AI
+  // tags were removed) are left alone.
+  const tagged = useRef(false);
+  const aiTagsRef = useRef<Report["ai_tags"]>(undefined);
+  aiTagsRef.current = report?.ai_tags;
+  function tagOnce(nextTitle: string, nextBody: string) {
+    // Undefined: the SQL that adds AI tags hasn't been run. An array: already tagged.
+    if (tagged.current || aiTagsRef.current !== null) return;
+    const text = notesText(nextBody);
+    if (text.length < 150) return;
+    tagged.current = true;
+    tagWithAi(supabase, "report", reportId, { title: nextTitle === UNTITLED ? "" : nextTitle, text });
+  }
 
   // Saves a moment after typing stops.
   useEffect(() => {

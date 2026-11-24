@@ -18,6 +18,8 @@ import { formatDate } from "@/components/ReadingLibrary";
 import { createClient } from "@/lib/supabase/client";
 import type { ArticleCategory, NotePage, NoteStroke, Scrap } from "@/lib/types";
 import { hasWriting, openingMode } from "@/lib/note-mode";
+import { tagWithAi } from "@/lib/ai-tags";
+import { htmlToText } from "@/lib/html-text";
 import { Bold, Eraser, Highlighter, Italic, Keyboard, List, ListOrdered, PenLine, RemoveFormatting, Trash2, Underline } from "lucide-react";
 import { Divider, ToolButton, editorToReport } from "@/components/ReportRichEditor";
 import NotesExport from "@/components/NotesExport";
@@ -193,7 +195,26 @@ export default function ScrapEditor({ scrapId }: { scrapId: string }) {
       })
       .eq("id", scrapId);
     setSaveState(error ? "error" : "saved");
+    if (!error) tagOnce();
+    // tagOnce only reads refs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [supabase, scrapId, clipPrefix]);
+
+  // The AI tags the page once, as soon as there's enough to go on: some typed text, or a title on
+  // a handwritten page. Pages tagged before (or whose AI tags were removed) are left alone.
+  const tagged = useRef(false);
+  const aiTagsRef = useRef<Scrap["ai_tags"]>(undefined);
+  aiTagsRef.current = scrap?.ai_tags;
+  function tagOnce() {
+    // Undefined: the SQL that adds AI tags hasn't been run. An array: already tagged.
+    if (tagged.current || aiTagsRef.current !== null) return;
+    const text = htmlToText(bodyRef.current);
+    const title = titleRef.current.trim();
+    const named = !!title && title !== "Untitled";
+    if (text.length < 80 && !(named && hasWriting(pagesRef.current))) return;
+    tagged.current = true;
+    tagWithAi(supabase, "scrap", scrapId, { title, text });
+  }
 
   useEffect(() => {
     if (saveState !== "unsaved") return;

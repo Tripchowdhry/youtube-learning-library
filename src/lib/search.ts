@@ -146,7 +146,7 @@ function snippet(field: Prepared, words: Word[]) {
   const { text } = field;
   if (text.length <= SNIPPET) return text;
   const first = highlightRanges(text, words)[0]?.[0] ?? 0;
-  let start = Math.max(0, first - 40);
+  let start = Math.max(0, first - 30);
   // Start at a word, not halfway through one.
   if (start > 0) {
     const space = text.indexOf(" ", start);
@@ -171,3 +171,32 @@ export function whereFound(index: SearchIndex, words: Word[], titleLabel = "Titl
 }
 
 export type { Word as SearchWord };
+
+// How well an item matches, for putting the best matches first. Each word counts for the best
+// field it's found in: the title most, then the fields in the order they were given.
+export function rank(index: SearchIndex, words: Word[]) {
+  let score = 0;
+  for (const word of words) {
+    const at = index.findIndex((f) => inField(f, word));
+    if (at !== -1) score += Math.max(1, 4 - at);
+  }
+  // A title that holds every word, or starts with the first one, beats one that holds some.
+  const title = index.find((f) => f.label === "Title");
+  if (title && words.length && words.every((w) => inField(title, w))) score += 2;
+  if (title && words[0] && title.folded.startsWith(words[0].raw)) score += 1;
+  return score;
+}
+
+// "1 result" or "3 results".
+export const resultCount = (n: number) => `${n} result${n === 1 ? "" : "s"}`;
+
+// Sorts best match first when there are search words; ties (and a tag on its own) keep `then`.
+export function bestFirst<T>(words: Word[], indexOf: (item: T) => SearchIndex, then: (a: T, b: T) => number) {
+  if (!words.length) return then;
+  const scores = new Map<T, number>();
+  const score = (item: T) => {
+    if (!scores.has(item)) scores.set(item, rank(indexOf(item), words));
+    return scores.get(item)!;
+  };
+  return (a: T, b: T) => score(b) - score(a) || then(a, b);
+}

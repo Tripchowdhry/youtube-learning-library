@@ -6,8 +6,9 @@ import { deleteItem } from "@/lib/delete-item";
 import { friendlyError } from "@/lib/errors";
 import { fetchAll } from "@/lib/fetch-all";
 import SearchBox from "@/components/SearchBox";
-import { FoundIn, Highlight } from "@/components/SearchHighlight";
-import { matches, notesText, prepare, queryWords, whereFound, type SearchMatch, type SearchWord } from "@/lib/search";
+import { allTags, tagWithAi } from "@/lib/ai-tags";
+import { FoundIn, Highlight, SearchBar, type SearchScope } from "@/components/SearchHighlight";
+import { bestFirst, matches, notesText, prepare, queryWords, whereFound, type SearchMatch, type SearchWord } from "@/lib/search";
 import { revealById } from "@/lib/reveal";
 import StopAiButton from "@/components/StopAiButton";
 import { AskCategoryButton } from "@/components/CategoryChat";
@@ -102,6 +103,10 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
   const [needsSetup, setNeedsSetup] = useState(false);
   const [view, setView] = useState<View>({ kind: "all" });
   const [query, setQuery] = useState("");
+  // Clicking a tag shows every link with exactly that tag.
+  const [tag, setTag] = useState<string | null>(null);
+  // Inside a category, search can look only there or in the whole tab.
+  const [scope, setScope] = useState<SearchScope>("everywhere");
   const [period, setPeriod] = useState<Period>("any");
   const [readFilter, setReadFilter] = useState<ReadFilter>("all");
   const [showCategories, setShowCategories] = useState(false);
@@ -179,7 +184,8 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
 
   // ---------- Which articles to show ----------
 
-  const searching = query.trim().length > 0;
+  // Searching covers typed words and a tag clicked on a card.
+  const searching = query.trim().length > 0 || tag !== null;
   // Inside a category your own order applies; All reading and search show the newest first.
   // Dragging to reorder works inside a folder whatever the sort; ▲ ▼ only in your own order.
   const canReorder = !searching && view.kind !== "all";
@@ -198,7 +204,7 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
             { label: "the summary", text: a.note },
             { label: "your notes", text: notesText(a.notes) },
             { label: "the category", text: categoryPath(a.category_id) },
-            { label: "the tags", text: (a.tags ?? []).join(", ") },
+            { label: "the tags", text: allTags(a).join(", ") },
             { label: "the link", text: a.url },
           ]),
         ]),
@@ -207,20 +213,24 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
   );
 
   const visibleArticles = useMemo(() => {
-    const q = words.length > 0;
     const days = PERIODS.find((p) => p.value === period)!.days;
     const since = days ? Date.now() - days * 86_400_000 : 0;
+    const tagKey = tag?.toLowerCase();
     const shown = articles.filter((a) => {
       if (since && new Date(a.created_at).getTime() < since) return false;
       if (readFilter === "read" && !a.read_at) return false;
       if (readFilter === "unread" && a.read_at) return false;
-      if (q) return matches(searchIndex.get(a.id) ?? [], words);
+      if (tagKey && !allTags(a).some((t) => t.toLowerCase() === tagKey)) return false;
+      if (words.length && !matches(searchIndex.get(a.id) ?? [], words)) return false;
+      // A search looks in the whole tab unless you chose only the category you're in.
+      if (searching && scope === "everywhere") return true;
       if (view.kind === "uncategorized") return !a.category_id;
       if (view.kind === "category") return inCategory(a, view.id);
       return true;
     });
-    return shown.sort(compareItems<Article>(itemSort, (a) => a.title ?? a.url, !searching && view.kind !== "all"));
-  }, [articles, words, searchIndex, period, readFilter, view, inCategory, searching, itemSort]);
+    const order = compareItems<Article>(searching ? "newest" : itemSort, (a) => a.title ?? a.url, !searching && view.kind !== "all");
+    return shown.sort(bestFirst(words, (a) => searchIndex.get(a.id) ?? [], order));
+  }, [articles, words, tag, scope, searchIndex, period, readFilter, view, inCategory, searching, itemSort]);
 
   const countIn = (id: string) => articles.filter((a) => inCategory(a, id)).length;
 
@@ -342,6 +352,14 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
     setArticles((prev) => [data as Article, ...prev]);
     notify(autoSorted ? `Saved to ${autoName}` : `Saved "${title}"`);
     writeAiNote(data as Article);
+    // The AI adds up to 3 tags of its own, in the background.
+    const added = data as Article;
+    tagWithAi(supabase, kind === "tutorial" ? "tutorial" : "article", added.id, {
+      title: added.title ?? added.url,
+      about: [added.site, added.author].filter(Boolean).join(", "),
+    }).then((ai_tags) => {
+      if (ai_tags) setArticles((prev) => prev.map((a) => (a.id === added.id ? { ...a, ai_tags } : a)));
+    });
     return true;
   }
 
@@ -467,6 +485,11 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
   async function editArticleTags(article: Article) {
     const tags = await askTags(article.tags ?? [], notify);
     if (tags) updateArticle(article.id, { tags });
+  }
+
+  // Removing an AI tag keeps it removed: the AI doesn't tag the link again.
+  function removeAiTag(article: Article, tag: string) {
+    updateArticle(article.id, { ai_tags: (article.ai_tags ?? []).filter((t) => t !== tag) });
   }
 
   function removeArticleTag(article: Article, tag: string) {
@@ -691,13 +714,16 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
   function openView(next: View) {
     setView(next);
     setQuery("");
+    setTag(null);
     setShowCategories(false);
   }
 
   // ---------- Render ----------
 
   const title = searching
-    ? `Search results for "${query.trim()}"`
+    ? query.trim()
+      ? `Search results for "${query.trim()}"`
+      : `Tagged #${tag}`
     : view.kind === "all"
       ? section.all
       : view.kind === "uncategorized"
@@ -855,8 +881,20 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
                     },
                   ]}
                 />
-                <ItemSortSelect sort={itemSort} onChange={setItemSort} />
+                {/* Search results come best match first, so the sort only shows outside a search. */}
+                {!searching && <ItemSortSelect sort={itemSort} onChange={setItemSort} />}
               </div>
+              {searching && (
+                <SearchBar
+                  count={visibleArticles.length}
+                  ranked={words.length > 0}
+                  tag={tag}
+                  onClearTag={() => setTag(null)}
+                  categoryName={view.kind === "all" ? null : view.kind === "uncategorized" ? "Uncategorized" : categoryPath(view.id)}
+                  scope={scope}
+                  onScope={setScope}
+                />
+              )}
 
 
               {!searching && (
@@ -893,11 +931,11 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
                 </div>
               ) : (
                 <>
-                {visibleArticles.length > 1 && (
+                {!searching && visibleArticles.length > 1 && (
                   <p className="mb-3 text-xs text-slate-500">
                     {canReorder
                       ? "Tip: drag an article onto another, or use ▲ ▼, to change the order. Drop it on a category to move it."
-                      : `${searching ? "Search results" : section.all} show the newest first. To change the order, open a category on the left.`}
+                      : `${section.all} show the newest first. To change the order, open a category on the left.`}
                   </p>
                 )}
                 <ul className="flex flex-col gap-2">
@@ -906,6 +944,7 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
                       key={article.id}
                       article={article}
                       words={words}
+                      compact={searching}
                       found={searching ? whereFound(searchIndex.get(article.id) ?? [], words) : null}
                       categoryLabel={categoryPath(article.category_id) || "Uncategorized"}
                       showCategory={searching || view.kind !== "category"}
@@ -923,8 +962,12 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
                       isLast={index === visibleArticles.length - 1}
                       onRename={() => renameArticle(article)}
                       onEditTags={() => editArticleTags(article)}
-                      onTagClick={(tag) => setQuery(tag)}
+                      onTagClick={(t) => {
+                        setTag(t);
+                        setQuery("");
+                      }}
                       onRemoveTag={(tag) => removeArticleTag(article, tag)}
+                      onRemoveAiTag={(tag) => removeAiTag(article, tag)}
                       onSaveNote={(note) => updateArticle(article.id, { note })}
                       aiNoteStartedAt={aiJobs.running.find((j) => j.key === aiNoteKey(article.id))?.startedAt ?? null}
                       aiNoteError={aiJobs.errors.get(aiNoteKey(article.id)) ?? null}
@@ -995,6 +1038,8 @@ function ArticleRow(props: {
   /** The searched words, marked in the title, and where the search found the link. */
   words: SearchWord[];
   found: SearchMatch;
+  /** In search results: fewer buttons, so the matches stand out. */
+  compact: boolean;
   categoryLabel: string;
   /** Show the category tag: on lists that mix categories (All, search). */
   showCategory: boolean;
@@ -1014,6 +1059,7 @@ function ArticleRow(props: {
   onEditTags: () => void;
   onTagClick: (tag: string) => void;
   onRemoveTag: (tag: string) => void;
+  onRemoveAiTag: (tag: string) => void;
   onSaveNote: (note: string) => void;
   aiNoteStartedAt: number | null;
   aiNoteError: string | null;
@@ -1061,21 +1107,24 @@ function ArticleRow(props: {
           {" · "}Added {formatDate(article.created_at)}
           {article.read_at && <span className="text-green-700"> · Read {formatDate(article.read_at)}</span>}
         </p>
-        <div id={`ai-note-${article.id}`} className="rounded-md">
-          <ArticleNote
-            note={article.note}
-            editing={editingNote}
-            setEditing={setEditingNote}
-            onSave={props.onSaveNote}
-          />
-        </div>
+        {/* The found line already shows why it matched; the summary would repeat it. */}
+        {!(props.compact && props.found) && (
+          <div id={`ai-note-${article.id}`} className="rounded-md">
+            <ArticleNote
+              note={article.note}
+              editing={editingNote}
+              setEditing={setEditingNote}
+              onSave={props.onSaveNote}
+            />
+          </div>
+        )}
         {props.aiNoteError && !article.note && (
           <p className="flex items-center gap-1 rounded-md bg-red-50 px-2 py-1 text-xs text-red-700 ring-1 ring-red-200">
             <Ico icon={TriangleAlert} tone="red" size={14} />
             {props.aiNoteError}
           </p>
         )}
-        <TagPills tags={article.tags} onTagClick={props.onTagClick} onRemove={props.onRemoveTag} />
+        <TagPills tags={article.tags} aiTags={article.ai_tags} onTagClick={props.onTagClick} onRemove={props.onRemoveTag} onRemoveAi={props.onRemoveAiTag} />
         <div className="mt-1 flex flex-wrap items-center gap-1">
           <Link
             href={`/read/${article.id}?notes=1`}
@@ -1088,15 +1137,17 @@ function ArticleRow(props: {
             <Ico icon={hasNotes ? NotebookText : Pencil} tone={hasNotes ? "amber" : "amber"} size={14} />
             {hasNotes ? "Open notes" : "Take notes"}
           </Link>
-          <a
-            href={article.url}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-1 rounded-md border border-slate-300 px-2 py-1 text-xs text-slate-700 hover:bg-slate-100"
-          >
-            <Ico icon={ExternalLink} tone="blue" size={14} />
-            Original
-          </a>
+          {!props.compact && (
+            <a
+              href={article.url}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1 rounded-md border border-slate-300 px-2 py-1 text-xs text-slate-700 hover:bg-slate-100"
+            >
+              <Ico icon={ExternalLink} tone="blue" size={14} />
+              Original
+            </a>
+          )}
           {props.onShift && (
             <>
               <SmallButton onClick={() => props.onShift!(-1)} disabled={props.isFirst} title="Move up">
@@ -1107,8 +1158,8 @@ function ArticleRow(props: {
               </SmallButton>
             </>
           )}
-          {!article.note && !editingNote && <SmallButton onClick={() => setEditingNote(true)} icon={FilePen} tone="blue">Add summary</SmallButton>}
-          {article.note && !editingNote && (
+          {!props.compact && !article.note && !editingNote && <SmallButton onClick={() => setEditingNote(true)} icon={FilePen} tone="blue">Add summary</SmallButton>}
+          {!props.compact && article.note && !editingNote && (
             <SmallButton
               onClick={async () => {
                 const ok = await askConfirm({
@@ -1126,7 +1177,7 @@ function ArticleRow(props: {
               Clear summary
             </SmallButton>
           )}
-          {!article.note && !editingNote && props.aiNoteStartedAt === null && (
+          {!props.compact && !article.note && !editingNote && props.aiNoteStartedAt === null && (
             <SmallButton onClick={props.onAiNote} title="Let AI read the page and write the summary" icon={Sparkles} tone="violet">
               AI summary
             </SmallButton>
@@ -1136,6 +1187,7 @@ function ArticleRow(props: {
           <span className="ml-auto pl-2">
             <MoreMenu
               items={[
+                ...(props.compact ? [{ label: "Open the original", icon: ExternalLink, onClick: () => window.open(article.url, "_blank", "noopener") }] : []),
                 { label: "Edit title", icon: PencilLine, onClick: props.onRename },
                 { label: "Tags", icon: Tag, tone: "amber", onClick: props.onEditTags },
                 { label: "Delete", icon: Trash2, danger: true, onClick: props.onDelete },

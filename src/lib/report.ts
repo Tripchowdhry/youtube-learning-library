@@ -14,6 +14,9 @@ export type Report = {
   user_id: string;
   title: string;
   body: string;
+  // Your own tags (up to 2) and the AI's (up to 3). Missing until supabase/ai-tags.sql is run.
+  tags?: string[];
+  ai_tags?: string[] | null;
   // Text read from handwritten notes, by sourceKey. Only there once supabase/report-handwriting.sql is run.
   handwriting?: Record<string, string>;
   // Set while the report is shared as a read-only link (supabase/report-share.sql).

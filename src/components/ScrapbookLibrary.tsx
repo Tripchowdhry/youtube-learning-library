@@ -6,8 +6,9 @@ import { deleteItem } from "@/lib/delete-item";
 import { friendlyError } from "@/lib/errors";
 import { fetchAll } from "@/lib/fetch-all";
 import SearchBox from "@/components/SearchBox";
-import { FoundIn, Highlight } from "@/components/SearchHighlight";
-import { matches, prepare, queryWords, whereFound, type SearchMatch, type SearchWord } from "@/lib/search";
+import { allTags } from "@/lib/ai-tags";
+import { FoundIn, Highlight, SearchBar, type SearchScope } from "@/components/SearchHighlight";
+import { bestFirst, matches, prepare, queryWords, whereFound, type SearchMatch, type SearchWord } from "@/lib/search";
 import { AskCategoryButton } from "@/components/CategoryChat";
 import { Tour, TourButton, useSectionTour } from "@/components/Tour";
 import BrandMark from "@/components/BrandMark";
@@ -80,6 +81,10 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
   const [needsSetup, setNeedsSetup] = useState(false);
   const [view, setView] = useState<View>({ kind: "all" });
   const [query, setQuery] = useState("");
+  // Clicking a tag shows every page with exactly that tag.
+  const [tag, setTag] = useState<string | null>(null);
+  // Inside a category, search can look only there or in the whole tab.
+  const [scope, setScope] = useState<SearchScope>("everywhere");
   const [period, setPeriod] = useState<Period>("any");
   const [showCategories, setShowCategories] = useState(false);
   const [draggingId, setDraggingId] = useState<string | null>(null);
@@ -100,10 +105,13 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
       fetchAll((from, to) => supabase.from("scraps").select(columns).order("created_at", { ascending: false }).order("id").range(from, to));
     const [c, withTags] = await Promise.all([
       fetchAll((from, to) => supabase.from("article_categories").select("*").eq("kind", "scrap").order("position").order("name").order("id").range(from, to)),
-      scrapRows(`${LIST_COLUMNS},tags`),
+      scrapRows(`${LIST_COLUMNS},tags,ai_tags`),
     ]);
-    // Before supabase/tags.sql has been run there is no tags column; load the pages without it.
-    const s = withTags.error && /tags/i.test(withTags.error.message) ? await scrapRows(LIST_COLUMNS) : withTags;
+    // Before supabase/ai-tags.sql (or tags.sql) has been run a tags column is missing; load the pages without it.
+    const missing = (r: typeof withTags) => r.error && /tags/i.test(r.error.message);
+    let s = withTags;
+    if (missing(s)) s = await scrapRows(`${LIST_COLUMNS},tags`);
+    if (missing(s)) s = await scrapRows(LIST_COLUMNS);
     const error = c.error ?? s.error;
     if (error) {
       // Before supabase/scrapbook.sql has been run, the table doesn't exist yet.
@@ -155,7 +163,8 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
 
   // ---------- Which pages to show ----------
 
-  const searching = query.trim().length > 0;
+  // Searching covers typed words and a tag clicked on a card.
+  const searching = query.trim().length > 0 || tag !== null;
   // Dragging to reorder works inside a folder whatever the sort; ▲ ▼ only in your own order.
   const canReorder = !searching && view.kind !== "all";
   const canShift = canReorder && itemSort === "custom";
@@ -171,7 +180,7 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
             { label: "Title", text: s.title },
             { label: "the page", text: plainText(s.body) },
             { label: "the category", text: categoryPath(s.category_id) },
-            { label: "the tags", text: (s.tags ?? []).join(", ") },
+            { label: "the tags", text: allTags(s).join(", ") },
           ]),
         ]),
       ),
@@ -179,18 +188,22 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
   );
 
   const visibleScraps = useMemo(() => {
-    const q = words.length > 0;
     const days = PERIODS.find((p) => p.value === period)!.days;
     const since = days ? Date.now() - days * 86_400_000 : 0;
+    const tagKey = tag?.toLowerCase();
     const shown = scraps.filter((s) => {
       if (since && new Date(s.created_at).getTime() < since) return false;
-      if (q) return matches(searchIndex.get(s.id) ?? [], words);
+      if (tagKey && !allTags(s).some((t) => t.toLowerCase() === tagKey)) return false;
+      if (words.length && !matches(searchIndex.get(s.id) ?? [], words)) return false;
+      // A search looks in the whole tab unless you chose only the category you're in.
+      if (searching && scope === "everywhere") return true;
       if (view.kind === "uncategorized") return !s.category_id;
       if (view.kind === "category") return inCategory(s, view.id);
       return true;
     });
-    return shown.sort(compareItems<ScrapSummary>(itemSort, (s) => s.title, !searching && view.kind !== "all"));
-  }, [scraps, words, searchIndex, period, view, inCategory, searching, itemSort]);
+    const order = compareItems<ScrapSummary>(searching ? "newest" : itemSort, (s) => s.title, !searching && view.kind !== "all");
+    return shown.sort(bestFirst(words, (s) => searchIndex.get(s.id) ?? [], order));
+  }, [scraps, words, tag, scope, searchIndex, period, view, inCategory, searching, itemSort]);
 
   const countIn = (id: string) => scraps.filter((s) => inCategory(s, id)).length;
 
@@ -273,6 +286,11 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
   async function editScrapTags(scrap: ScrapSummary) {
     const tags = await askTags(scrap.tags ?? [], notify);
     if (tags) updateScrap(scrap.id, { tags });
+  }
+
+  // Removing an AI tag keeps it removed: the AI doesn't tag the page again.
+  function removeAiTag(scrap: ScrapSummary, tag: string) {
+    updateScrap(scrap.id, { ai_tags: (scrap.ai_tags ?? []).filter((t) => t !== tag) });
   }
 
   function removeScrapTag(scrap: ScrapSummary, tag: string) {
@@ -498,6 +516,7 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
   function openView(next: View) {
     setView(next);
     setQuery("");
+    setTag(null);
     setShowCategories(false);
   }
 
@@ -526,7 +545,9 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
   // ---------- Render ----------
 
   const title = searching
-    ? `Search results for "${query.trim()}"`
+    ? query.trim()
+      ? `Search results for "${query.trim()}"`
+      : `Tagged #${tag}`
     : view.kind === "all"
       ? "All pages"
       : view.kind === "uncategorized"
@@ -668,8 +689,20 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
                   </>
                 )}
                 <FilterMenu groups={[{ label: "Created", value: period, options: PERIODS.map((p) => ({ value: p.value, label: p.label })), onChange: (v) => setPeriod(v as Period) }]} />
-                <ItemSortSelect sort={itemSort} onChange={setItemSort} />
+                {/* Search results come best match first, so the sort only shows outside a search. */}
+                {!searching && <ItemSortSelect sort={itemSort} onChange={setItemSort} />}
               </div>
+              {searching && (
+                <SearchBar
+                  count={visibleScraps.length}
+                  ranked={words.length > 0}
+                  tag={tag}
+                  onClearTag={() => setTag(null)}
+                  categoryName={view.kind === "all" ? null : view.kind === "uncategorized" ? "Uncategorized" : categoryPath(view.id)}
+                  scope={scope}
+                  onScope={setScope}
+                />
+              )}
 
 
               {!searching && (
@@ -702,11 +735,11 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
                 </div>
               ) : (
                 <>
-                  {visibleScraps.length > 1 && (
+                  {!searching && visibleScraps.length > 1 && (
                     <p className="mb-3 text-xs text-slate-500">
                       {canReorder
                         ? "Tip: drag a page onto another, or use ▲ ▼, to change the order. Drop it on a category to move it."
-                        : `${searching ? "Search results" : "All pages"} show the newest first. To change the order, open a category on the left.`}
+                        : `All pages show the newest first. To change the order, open a category on the left.`}
                     </p>
                   )}
                   <ul className="flex flex-col gap-2">
@@ -732,8 +765,12 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
                         isLast={index === visibleScraps.length - 1}
                         onRename={() => renameScrap(scrap)}
                         onEditTags={() => editScrapTags(scrap)}
-                        onTagClick={(tag) => setQuery(tag)}
+                        onTagClick={(t) => {
+                          setTag(t);
+                          setQuery("");
+                        }}
                         onRemoveTag={(tag) => removeScrapTag(scrap, tag)}
+                        onRemoveAiTag={(tag) => removeAiTag(scrap, tag)}
                         onDelete={() => deleteScrap(scrap)}
                       />
                     ))}
@@ -784,6 +821,7 @@ function ScrapRow(props: {
   onEditTags: () => void;
   onTagClick: (tag: string) => void;
   onRemoveTag: (tag: string) => void;
+  onRemoveAiTag: (tag: string) => void;
   onDelete: () => void;
 }) {
   const { scrap } = props;
@@ -823,7 +861,7 @@ function ScrapRow(props: {
             </p>
           )
         )}
-        <TagPills tags={scrap.tags} onTagClick={props.onTagClick} onRemove={props.onRemoveTag} />
+        <TagPills tags={scrap.tags} aiTags={scrap.ai_tags} onTagClick={props.onTagClick} onRemove={props.onRemoveTag} onRemoveAi={props.onRemoveAiTag} />
         <div className="mt-1 flex flex-wrap items-center gap-1">
           <Link
             href={`/scrap/${scrap.id}`}
