@@ -1,12 +1,13 @@
 "use client";
 
 import { Clock, Search, X } from "lucide-react";
+import { openAppSearch, useShortcutLabel } from "@/lib/app-search";
 import { useEffect, useRef, useState } from "react";
 
 const RECENT_MAX = 5;
 
 // The last few searches in a tab, kept on this device only.
-function readRecent(key: string): string[] {
+export function readRecent(key: string): string[] {
   try {
     const list = JSON.parse(localStorage.getItem(key) ?? "[]");
     return Array.isArray(list) ? list.filter((s) => typeof s === "string").slice(0, RECENT_MAX) : [];
@@ -15,7 +16,7 @@ function readRecent(key: string): string[] {
   }
 }
 
-function writeRecent(key: string, list: string[]) {
+export function writeRecent(key: string, list: string[]) {
   try {
     localStorage.setItem(key, JSON.stringify(list));
   } catch {
@@ -51,6 +52,7 @@ export default function SearchBox({
   const [focused, setFocused] = useState(false);
   const [recent, setRecent] = useState<string[]>([]);
   const storageKey = recentKey ? `recent-searches:${recentKey}` : null;
+  const shortcut = useShortcutLabel();
 
   useEffect(() => {
     if (storageKey) setRecent(readRecent(storageKey));
@@ -126,33 +128,53 @@ export default function SearchBox({
       <X size={14} aria-hidden />
     </button>
   );
-  // Recent searches, under the empty box while it has the focus.
-  const recentList = focused && !value && recent.length > 0 && (
-    <div className="absolute top-full right-0 left-0 z-40 mt-1 rounded-md bg-white py-1 text-sm shadow-lg ring-1 ring-slate-200">
-      <div className="flex items-center justify-between px-3 pt-0.5 pb-1 text-xs text-slate-500">
-        <span>Recent searches</span>
+  // Under the empty box while it has the focus: recent searches, and (in a tab's main search)
+  // the way to search every tab at once.
+  const recentList = focused && !value && (recent.length > 0 || collapse) && (
+    <div className="absolute top-full right-0 left-0 z-40 mt-1 rounded-md bg-white py-1 text-sm shadow-lg ring-1 ring-slate-200 sm:left-auto sm:w-full sm:min-w-60">
+      {recent.length > 0 && (
+        <>
+          <div className="flex items-center justify-between px-3 pt-0.5 pb-1 text-xs text-slate-500">
+            <span>Recent searches</span>
+            <button
+              type="button"
+              // Keep the focus in the box, so the list doesn't close before the click lands.
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={forget}
+              className="rounded px-1 hover:bg-slate-100 hover:text-slate-800"
+            >
+              Clear
+            </button>
+          </div>
+          {recent.map((r) => (
+            <button
+              key={r}
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => onChange(r)}
+              className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-slate-700 hover:bg-slate-100"
+            >
+              <Clock size={14} aria-hidden className="shrink-0 text-slate-400" />
+              <span className="truncate">{r}</span>
+            </button>
+          ))}
+        </>
+      )}
+      {collapse && (
         <button
           type="button"
-          // Keep the focus in the box, so the list doesn't close before the click lands.
           onMouseDown={(e) => e.preventDefault()}
-          onClick={forget}
-          className="rounded px-1 hover:bg-slate-100 hover:text-slate-800"
+          onClick={() => {
+            setOpen(false);
+            openAppSearch();
+          }}
+          className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-slate-700 hover:bg-slate-100 ${recent.length ? "mt-1 border-t border-slate-100 pt-2" : ""}`}
         >
-          Clear
+          <Search size={14} aria-hidden className="shrink-0 text-slate-400" />
+          <span className="flex-1 whitespace-nowrap">Search all tabs</span>
+          <kbd className="hidden rounded border border-slate-200 px-1.5 font-sans text-[11px] whitespace-nowrap text-slate-400 sm:block">{shortcut}</kbd>
         </button>
-      </div>
-      {recent.map((r) => (
-        <button
-          key={r}
-          type="button"
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={() => onChange(r)}
-          className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-slate-700 hover:bg-slate-100"
-        >
-          <Clock size={14} aria-hidden className="shrink-0 text-slate-400" />
-          <span className="truncate">{r}</span>
-        </button>
-      ))}
+      )}
     </div>
   );
 

@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import AiJobsBadge from "@/components/AiJobsBadge";
+import AppSearch from "@/components/AppSearch";
 import BandwidthCounter from "@/components/BandwidthCounter";
 import { ConfirmHost } from "@/components/ConfirmDialog";
 import { BRAND } from "@/lib/brand";
@@ -40,6 +41,7 @@ export default function RootLayout({
       <body className="antialiased">
         {children}
         <ConfirmHost />
+        <AppSearch />
         <AiJobsBadge />
         <BandwidthCounter />
       </body>
