@@ -43,7 +43,7 @@ import {
 import { SectionWelcome } from "@/components/GettingStarted";
 import { createClient } from "@/lib/supabase/client";
 import type { ArticleCategory, Scrap } from "@/lib/types";
-import { Images, ArrowUp, Copy, Eye, FileText, Link2, Link2Off, Inbox, NotebookPen, Pencil, PencilLine, Tag, Trash2 } from "lucide-react";
+import { ArrowUp, Copy, Eye, FileText, Link2, Link2Off, Inbox, NotebookPen, Pencil, PencilLine, Tag, Trash2 } from "lucide-react";
 import MoreMenu from "@/components/MoreMenu";
 import TagPills from "@/components/TagPills";
 import { askTags } from "@/lib/tags";
@@ -570,15 +570,6 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
         <BrandMark />
         <SectionSwitch active="scrap" />
         <SearchBox value={query} onChange={setQuery} placeholder="Search titles and text…" className="ml-auto w-auto sm:w-full sm:max-w-xs" collapse recentKey="scrapbook" />
-        <Link
-          data-tour="clips"
-          href="/clips"
-          className="flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1 text-sm text-slate-600 hover:bg-slate-100"
-          title="See and delete your clips to free up space"
-        >
-          <Ico icon={Images} tone="violet" />
-          <span className="hidden sm:inline">Clips</span>
-        </Link>
         <AiUsageLink />
         <div className="hidden items-center gap-2 text-sm text-slate-500 sm:flex">
           <span className="hidden max-w-40 truncate lg:inline">{userEmail}</span>
