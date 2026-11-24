@@ -76,3 +76,24 @@ describe("cleanAiTags", () => {
     expect(cleanAiTags("a, b, c, d")).toEqual(["a", "b", "c"]);
   });
 });
+
+describe("tags in search", () => {
+  it("ranks a whole-tag match above a word in the notes", async () => {
+    const { rank, TAGS_LABEL } = await import("@/lib/search");
+    const words = queryWords("react");
+    const tagged = prepare([{ label: "Title", text: "Hooks explained" }, { label: TAGS_LABEL, text: "react, hooks" }]);
+    const inNotes = prepare([{ label: "Title", text: "Web speed" }, { label: "the summary", text: "x" }, { label: "the y", text: "x" }, { label: "your notes", text: "react apps" }]);
+    expect(rank(tagged, words)).toBeGreaterThan(rank(inNotes, words));
+  });
+
+  it("reads #tag searches and filters as you type", async () => {
+    const { hashTag, tagTest } = await import("@/lib/search");
+    expect(hashTag("#Machine  Le")).toBe("machine le");
+    expect(hashTag("react")).toBeNull();
+    const typed = tagTest(null, hashTag("#mach"))!;
+    expect(typed(["Machine learning"])).toBe(true);
+    expect(typed(["ai"])).toBe(false);
+    expect(tagTest("React", null)!(["react"])).toBe(true);
+    expect(tagTest(null, null)).toBeNull();
+  });
+});

@@ -175,11 +175,17 @@ export type { Word as SearchWord };
 // How well an item matches, for putting the best matches first. Each word counts for the best
 // field it's found in: the title most, then the fields in the order they were given.
 export function rank(index: SearchIndex, words: Word[]) {
+  // Tags are topic labels, so a word that is a whole tag counts nearly as much as one in the title.
+  const tags = (index.find((f) => f.label === TAGS_LABEL)?.folded ?? "").split(", ").filter(Boolean);
+  const isTag = (word: Word) => tags.some((t) => t === word.raw || stemText(t) === word.stem);
   let score = 0;
   for (const word of words) {
     const at = index.findIndex((f) => inField(f, word));
-    if (at !== -1) score += Math.max(1, 4 - at);
+    if (at !== -1) score += Math.max(1, 4 - at, isTag(word) ? 3 : 0);
   }
+  // All the words together make one tag, like "machine learning".
+  const whole = words.map((w) => w.raw).join(" ");
+  if (words.length > 1 && tags.includes(whole)) score += 3;
   // A title that holds every word, or starts with the first one, beats one that holds some.
   const title = index.find((f) => f.label === "Title");
   if (title && words.length && words.every((w) => inField(title, w))) score += 2;
@@ -199,4 +205,26 @@ export function bestFirst<T>(words: Word[], indexOf: (item: T) => SearchIndex, t
     return scores.get(item)!;
   };
   return (a: T, b: T) => score(b) - score(a) || then(a, b);
+}
+
+// The label every tab gives its tags field, so ranking can find it.
+export const TAGS_LABEL = "the tags";
+
+// A search that starts with "#" looks for a tag: "#react" or "#machine le". Returns the tag as typed
+// (lower case, no accents), or null for an ordinary search.
+export function hashTag(query: string) {
+  const q = query.trim();
+  return q.startsWith("#") ? fold(q.slice(1).trim()).replace(/\s+/g, " ") : null;
+}
+
+// Whether an item's tags pass the tag filter: a clicked tag must match exactly; a typed "#tag"
+// matches every tag that starts with it, so the list narrows as you type. Null when there's no filter.
+export function tagTest(clicked: string | null, typed: string | null) {
+  if (clicked === null && typed === null) return null;
+  const exact = clicked === null ? null : fold(clicked);
+  return (tags: string[]) =>
+    tags.some((t) => {
+      const tag = fold(t);
+      return (exact === null || tag === exact) && (typed === null || tag.startsWith(typed));
+    });
 }

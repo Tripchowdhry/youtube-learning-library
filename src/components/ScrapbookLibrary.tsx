@@ -8,7 +8,7 @@ import { fetchAll } from "@/lib/fetch-all";
 import SearchBox from "@/components/SearchBox";
 import { allTags } from "@/lib/ai-tags";
 import { FoundIn, Highlight, SearchBar, type SearchScope } from "@/components/SearchHighlight";
-import { bestFirst, matches, prepare, queryWords, whereFound, type SearchMatch, type SearchWord } from "@/lib/search";
+import { TAGS_LABEL, bestFirst, hashTag, matches, tagTest, prepare, queryWords, whereFound, type SearchMatch, type SearchWord } from "@/lib/search";
 import { AskCategoryButton } from "@/components/CategoryChat";
 import { Tour, TourButton, useSectionTour } from "@/components/Tour";
 import BrandMark from "@/components/BrandMark";
@@ -169,7 +169,9 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
   const canReorder = !searching && view.kind !== "all";
   const canShift = canReorder && itemSort === "custom";
 
-  const words = useMemo(() => queryWords(query), [query]);
+  // "#react" in the search box filters by tag instead of searching words.
+  const typedTag = useMemo(() => hashTag(query), [query]);
+  const words = useMemo(() => (typedTag === null ? queryWords(query) : []), [query, typedTag]);
   // Everything search looks at for each page, prepared once rather than on every key press.
   const searchIndex = useMemo(
     () =>
@@ -180,7 +182,7 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
             { label: "Title", text: s.title },
             { label: "the page", text: plainText(s.body) },
             { label: "the category", text: categoryPath(s.category_id) },
-            { label: "the tags", text: allTags(s).join(", ") },
+            { label: TAGS_LABEL, text: allTags(s).join(", ") },
           ]),
         ]),
       ),
@@ -190,10 +192,10 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
   const visibleScraps = useMemo(() => {
     const days = PERIODS.find((p) => p.value === period)!.days;
     const since = days ? Date.now() - days * 86_400_000 : 0;
-    const tagKey = tag?.toLowerCase();
+    const tagOk = tagTest(tag, typedTag);
     const shown = scraps.filter((s) => {
       if (since && new Date(s.created_at).getTime() < since) return false;
-      if (tagKey && !allTags(s).some((t) => t.toLowerCase() === tagKey)) return false;
+      if (tagOk && !tagOk(allTags(s))) return false;
       if (words.length && !matches(searchIndex.get(s.id) ?? [], words)) return false;
       // A search looks in the whole tab unless you chose only the category you're in.
       if (searching && scope === "everywhere") return true;
@@ -203,7 +205,7 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
     });
     const order = compareItems<ScrapSummary>(searching ? "newest" : itemSort, (s) => s.title, !searching && view.kind !== "all");
     return shown.sort(bestFirst(words, (s) => searchIndex.get(s.id) ?? [], order));
-  }, [scraps, words, tag, scope, searchIndex, period, view, inCategory, searching, itemSort]);
+  }, [scraps, words, tag, typedTag, scope, searchIndex, period, view, inCategory, searching, itemSort]);
 
   const countIn = (id: string) => scraps.filter((s) => inCategory(s, id)).length;
 
