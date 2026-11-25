@@ -5,11 +5,26 @@ import { useEffect, useMemo, useState } from "react";
 import { allTags } from "@/lib/ai-tags";
 import { ARTICLE_LABEL, loadArticleTexts } from "@/lib/article-search";
 import { htmlToText } from "@/lib/html-text";
-import { TAGS_LABEL, hashTag, matches, notesText, prepare, queryWords, tagTest, type SearchIndex } from "@/lib/search";
+import { meaningText } from "@/lib/meaning";
+import {
+  TAGS_LABEL,
+  hashTag,
+  matches,
+  notesText,
+  prepare,
+  queryWords,
+  tagTest,
+  type SearchIndex,
+} from "@/lib/search";
 import { createClient } from "@/lib/supabase/client";
 
 // The tabs search can look in, with where each one lives.
-export type Section = "videos" | "reading" | "tutorial" | "scrapbook" | "reports";
+export type Section =
+  | "videos"
+  | "reading"
+  | "tutorial"
+  | "scrapbook"
+  | "reports";
 export const SECTIONS: { key: Section; name: string; path: string }[] = [
   { key: "videos", name: "Videos", path: "/" },
   { key: "reading", name: "Reading", path: "/reading" },
@@ -19,10 +34,21 @@ export const SECTIONS: { key: Section; name: string; path: string }[] = [
 ];
 
 // One saved item, ready to search: where it lives, what to show, and the page that opens it.
-export type Entry = { section: Section; id: string; title: string; sub: string; href: string; index: SearchIndex; tags: string[] };
+// `meaning` is the text its meaning fingerprint is made from (see meaning-sync.ts).
+export type Entry = {
+  section: Section;
+  id: string;
+  title: string;
+  sub: string;
+  href: string;
+  index: SearchIndex;
+  tags: string[];
+  meaning: string;
+};
 
 // A link that opens a tab with a search already typed in.
-export const searchHref = (path: string, query: string) => `${path}?q=${encodeURIComponent(query)}`;
+export const searchHref = (path: string, query: string) =>
+  `${path}?q=${encodeURIComponent(query)}`;
 
 // Reads ?q= when a tab opens from one of those links, puts it in the search box, and tidies the address.
 export function useSearchFromLink(setQuery: (q: string) => void) {
@@ -33,15 +59,27 @@ export function useSearchFromLink(setQuery: (q: string) => void) {
     setQuery(q);
     params.delete("q");
     const rest = params.toString();
-    window.history.replaceState(null, "", window.location.pathname + (rest ? `?${rest}` : ""));
+    window.history.replaceState(
+      null,
+      "",
+      window.location.pathname + (rest ? `?${rest}` : ""),
+    );
     // Runs once, when the tab opens.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 }
 
 // Reads a table's rows for search: with AI tags if that SQL has been run, else without.
-async function rows(supabase: ReturnType<typeof createClient>, table: string, columns: string) {
-  for (const cols of [columns, columns.replace(", ai_tags", ""), columns.replace(", tags, ai_tags", "")]) {
+async function rows(
+  supabase: ReturnType<typeof createClient>,
+  table: string,
+  columns: string,
+) {
+  for (const cols of [
+    columns,
+    columns.replace(", ai_tags", ""),
+    columns.replace(", tags, ai_tags", ""),
+  ]) {
     const { data, error } = await supabase.from(table).select(cols).limit(5000);
     if (!error) return (data ?? []) as unknown as Record<string, unknown>[];
   }
@@ -56,19 +94,51 @@ export function loadEverything(fresh = false) {
   everything ??= (async () => {
     const supabase = createClient();
     const text = (v: unknown) => (typeof v === "string" ? v : "");
-    const [videos, notes, articles, scraps, reports, articleText] = await Promise.all([
-      rows(supabase, "videos", "id, title, channel, note, tags, ai_tags"),
-      rows(supabase, "notes", "video_id, text"),
-      rows(supabase, "articles", "id, title, url, site, author, note, notes, kind, tags, ai_tags"),
-      rows(supabase, "scraps", "id, title, body, tags, ai_tags"),
-      rows(supabase, "reports", "id, title, body, tags, ai_tags"),
-      loadArticleTexts(supabase, fresh),
-    ]);
-    const noteOf = new Map(notes.map((n) => [n.video_id, notesText(text(n.text))]));
-    const entry = (section: Section, row: Record<string, unknown>, href: string, sub: string, fields: { label: string; text: string }[]): Entry => {
+    const [videos, notes, articles, scraps, reports, articleText] =
+      await Promise.all([
+        rows(supabase, "videos", "id, title, channel, note, tags, ai_tags"),
+        rows(supabase, "notes", "video_id, text"),
+        rows(
+          supabase,
+          "articles",
+          "id, title, url, site, author, note, notes, kind, tags, ai_tags",
+        ),
+        rows(supabase, "scraps", "id, title, body, tags, ai_tags"),
+        rows(supabase, "reports", "id, title, body, tags, ai_tags"),
+        loadArticleTexts(supabase, fresh),
+      ]);
+    const noteOf = new Map(
+      notes.map((n) => [n.video_id, notesText(text(n.text))]),
+    );
+    const entry = (
+      section: Section,
+      row: Record<string, unknown>,
+      href: string,
+      sub: string,
+      fields: { label: string; text: string }[],
+    ): Entry => {
       const tags = allTags(row as { tags?: string[]; ai_tags?: string[] });
       const title = fields[0].text || "Untitled";
-      return { section, id: text(row.id), title, sub, href, tags, index: prepare([...fields, { label: TAGS_LABEL, text: tags.join(", ") }]) };
+      const about = meaningText([
+        ...fields
+          .slice(1)
+          .filter((f) => f.label !== "the link")
+          .map((f) => f.text),
+        tags.length ? `Tags: ${tags.join(", ")}` : "",
+      ]);
+      return {
+        section,
+        id: text(row.id),
+        title,
+        sub,
+        href,
+        tags,
+        meaning: about,
+        index: prepare([
+          ...fields,
+          { label: TAGS_LABEL, text: tags.join(", ") },
+        ]),
+      };
     };
     return [
       ...videos.map((v) =>
@@ -80,14 +150,23 @@ export function loadEverything(fresh = false) {
         ]),
       ),
       ...articles.map((a) =>
-        entry(a.kind === "tutorial" ? "tutorial" : "reading", a, `/read/${text(a.id)}`, [text(a.site), text(a.author)].filter(Boolean).join(" · "), [
-          { label: "Title", text: text(a.title) || text(a.url) },
-          { label: "the site", text: [text(a.site), text(a.author)].filter(Boolean).join(" · ") },
-          { label: "the summary", text: text(a.note) },
-          { label: "your notes", text: notesText(text(a.notes)) },
-          { label: "the link", text: text(a.url) },
-          { label: ARTICLE_LABEL, text: articleText.get(text(a.url)) ?? "" },
-        ]),
+        entry(
+          a.kind === "tutorial" ? "tutorial" : "reading",
+          a,
+          `/read/${text(a.id)}`,
+          [text(a.site), text(a.author)].filter(Boolean).join(" · "),
+          [
+            { label: "Title", text: text(a.title) || text(a.url) },
+            {
+              label: "the site",
+              text: [text(a.site), text(a.author)].filter(Boolean).join(" · "),
+            },
+            { label: "the summary", text: text(a.note) },
+            { label: "your notes", text: notesText(text(a.notes)) },
+            { label: "the link", text: text(a.url) },
+            { label: ARTICLE_LABEL, text: articleText.get(text(a.url)) ?? "" },
+          ],
+        ),
       ),
       ...scraps.map((s) =>
         entry("scrapbook", s, `/scrap/${text(s.id)}`, "", [
@@ -111,7 +190,13 @@ export function loadEverything(fresh = false) {
 
 // Under "Nothing matches": how many matches the other tabs have, each a link that opens that
 // tab with the same search. Shows nothing when the other tabs have none either.
-export default function FoundElsewhere({ query, here }: { query: string; here: Section }) {
+export default function FoundElsewhere({
+  query,
+  here,
+}: {
+  query: string;
+  here: Section;
+}) {
   const [entries, setEntries] = useState<Entry[] | null>(null);
   const q = query.trim();
 
@@ -132,9 +217,13 @@ export default function FoundElsewhere({ query, here }: { query: string; here: S
     const found = new Map<Section, number>();
     for (const e of entries) {
       if (e.section === here) continue;
-      if (tagOk ? tagOk(e.tags) : matches(e.index, words)) found.set(e.section, (found.get(e.section) ?? 0) + 1);
+      if (tagOk ? tagOk(e.tags) : matches(e.index, words))
+        found.set(e.section, (found.get(e.section) ?? 0) + 1);
     }
-    return SECTIONS.filter((s) => found.has(s.key)).map((s) => ({ ...s, count: found.get(s.key)! }));
+    return SECTIONS.filter((s) => found.has(s.key)).map((s) => ({
+      ...s,
+      count: found.get(s.key)!,
+    }));
   }, [entries, q, here]);
 
   if (!counts.length) return null;
@@ -143,7 +232,10 @@ export default function FoundElsewhere({ query, here }: { query: string; here: S
       <span>Found elsewhere:</span>
       {counts.map((c, i) => (
         <span key={c.key}>
-          <Link href={searchHref(c.path, q)} className="font-medium text-blue-700 hover:underline">
+          <Link
+            href={searchHref(c.path, q)}
+            className="font-medium text-blue-700 hover:underline"
+          >
             {c.count} in {c.name}
           </Link>
           {i < counts.length - 1 && <span className="text-slate-400"> · </span>}
