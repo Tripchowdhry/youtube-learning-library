@@ -64,11 +64,14 @@ export default function Landing({ error }: { error?: string }) {
 
       <footer className="border-t border-slate-200">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-4 px-4 py-6 text-sm text-slate-500">
-          <span className="flex items-center gap-1.5 font-semibold text-slate-700">
-            <BrandLogo size={18} />
-            {BRAND.name}
+          {/* Same spacing and size as the tagline at the top of the page. */}
+          <span className="flex items-center gap-3">
+            <span className="flex items-center gap-1.5 font-semibold text-slate-700">
+              <BrandLogo size={18} />
+              {BRAND.name}
+            </span>
+            <span className="text-xs">{BRAND.tagline}</span>
           </span>
-          <span>{BRAND.tagline}</span>
           <Link href="/privacy" className="ml-auto underline">
             Privacy policy
           </Link>
