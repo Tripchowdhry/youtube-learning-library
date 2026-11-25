@@ -186,7 +186,16 @@ export default function AppSearch() {
           <button type="button" onClick={() => setOpen(false)} className="shrink-0 rounded-md px-1.5 py-1 text-sm text-slate-600 hover:bg-slate-100 sm:hidden">
             Cancel
           </button>
-          <kbd className="hidden shrink-0 rounded border border-slate-200 px-1.5 text-[11px] text-slate-400 sm:block">Esc</kbd>
+          {/* Esc closes it from the keyboard; clicking the label does the same. */}
+          <button
+            type="button"
+            onClick={() => setOpen(false)}
+            title="Close (Esc)"
+            aria-label="Close search"
+            className="hidden shrink-0 rounded border border-slate-200 px-1.5 text-[11px] text-slate-400 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700 sm:block"
+          >
+            Esc
+          </button>
         </div>
 
         <div ref={list} className="min-h-0 flex-1 overflow-y-auto p-2">
