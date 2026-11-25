@@ -29,6 +29,7 @@ import { pictureUrl } from "@/lib/report";
 import { Ico } from "@/components/Icon";
 import { HIGHLIGHT_COLORS, InkTools, PEN_COLORS, SIZES, emptyPage, withPicture } from "@/components/Handwriting";
 import { CategoryCrumb } from "@/components/CategoryTag";
+import MoreLikeThis from "@/components/MoreLikeThis";
 import { treePath } from "@/lib/category-tree";
 
 
@@ -649,6 +650,7 @@ export default function ScrapEditor({ scrapId }: { scrapId: string }) {
             )}
           </>
         )}
+        <MoreLikeThis kinds={["scrapbook"]} id={scrapId} className="mt-4" />
       </main>
 
       {notice && (

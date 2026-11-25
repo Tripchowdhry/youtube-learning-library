@@ -51,6 +51,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import ReportRichEditor, { type ImproveHow } from "@/components/ReportRichEditor";
+import MoreLikeThis from "@/components/MoreLikeThis";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 type Chosen = { kind: SourceKind; id: string };
@@ -898,6 +899,7 @@ export default function ReportEditor({ reportId }: { reportId: string }) {
 
         <ReportRichEditor body={body} onChange={setBody} resolve={resolve} onImprove={improvePart} />
       </section>
+      <MoreLikeThis kinds={["reports"]} id={reportId} className="mt-6" />
 
       {toast && (
         <div
