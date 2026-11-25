@@ -687,7 +687,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
         <span data-tour="sections" className="shrink-0">
           <SectionSwitch active="videos" />
         </span>
-        <SearchBox value={query} onChange={setQuery} placeholder="Search titles, summaries, notes…" className="ml-auto w-auto sm:w-full sm:max-w-xs" collapse recentKey="videos" tour="search" />
+        <SearchBox value={query} onChange={setQuery} placeholder="Search titles, summaries, notes…" className="ml-auto w-auto sm:w-full sm:max-w-xs lg:max-w-xl" collapse recentKey="videos" tour="search" />
         <AiUsageLink />
         <div className="hidden items-center gap-2 text-sm text-slate-500 sm:flex">
           <span className="hidden max-w-40 truncate lg:inline">{userEmail}</span>

@@ -505,7 +505,7 @@ export default function ReportsList({ userEmail }: { userEmail: string }) {
           value={query}
           onChange={setQuery}
           placeholder="Search titles and report text…"
-          className="ml-auto w-auto sm:w-full sm:max-w-xs"
+          className="ml-auto w-auto sm:w-full sm:max-w-xs lg:max-w-xl"
           collapse
           recentKey="reports"
         />

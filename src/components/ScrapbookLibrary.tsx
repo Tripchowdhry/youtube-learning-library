@@ -569,7 +569,7 @@ export default function ScrapbookLibrary({ userEmail }: { userEmail: string }) {
         </button>
         <BrandMark />
         <SectionSwitch active="scrap" />
-        <SearchBox value={query} onChange={setQuery} placeholder="Search titles and text…" className="ml-auto w-auto sm:w-full sm:max-w-xs" collapse recentKey="scrapbook" />
+        <SearchBox value={query} onChange={setQuery} placeholder="Search titles and text…" className="ml-auto w-auto sm:w-full sm:max-w-xs lg:max-w-xl" collapse recentKey="scrapbook" />
         <AiUsageLink />
         <div className="hidden items-center gap-2 text-sm text-slate-500 sm:flex">
           <span className="hidden max-w-40 truncate lg:inline">{userEmail}</span>
