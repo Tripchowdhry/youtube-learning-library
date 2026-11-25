@@ -27,7 +27,7 @@ const ICONS: Record<Exclude<Section, "reports">, { Icon: LucideIcon; tone: Tone 
   tutorial: { Icon: GraduationCap, tone: "green" },
   scrapbook: { Icon: NotebookPen, tone: "amber" },
 };
-const SectionIcon = ({ section }: { section: Section }) =>
+export const SectionIcon = ({ section }: { section: Section }) =>
   section === "reports" ? <ReportIcon size={16} /> : <Ico icon={ICONS[section].Icon} tone={ICONS[section].tone} />;
 
 // Each tab's colour from the BrainShelf logo's books (Reports keep their lavender): a thin line

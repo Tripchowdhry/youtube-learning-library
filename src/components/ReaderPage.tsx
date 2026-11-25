@@ -15,6 +15,7 @@ import { ExternalLink, FilePen, NotebookText, Pencil } from "lucide-react";
 import { CategoryCrumb } from "@/components/CategoryTag";
 import { treePath, type TreeNode } from "@/lib/category-tree";
 import { Ico } from "@/components/Icon";
+import MoreLikeThis from "@/components/MoreLikeThis";
 
 // How long the end of the article must stay on screen before it counts as read.
 const END_SEEN_MS = 1500;
@@ -314,6 +315,7 @@ export default function ReaderPage({ articleId }: { articleId: string }) {
           </div>
         )}
 
+        {ready && article && <MoreLikeThis kinds={["reading", "tutorial"]} id={articleId} className="mt-10" />}
         {ready && (
           <div ref={endRef} className="mt-10 border-t border-slate-200 pt-4 pb-16 text-center text-sm text-slate-400">
             {article?.read_at ? "✓ You've read this" : "End"}

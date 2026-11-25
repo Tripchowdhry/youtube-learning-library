@@ -33,6 +33,7 @@ import { answerHeading, boldPrompts, notesDocument } from "@/lib/notes-format";
 import { pictureUrl } from "@/lib/report";
 import { Brush, Camera, ClipboardPaste, FileText, Footprints, Keyboard, Lightbulb, List, PenLine, Sparkles, Timer, Trash2, TriangleAlert, type LucideIcon } from "lucide-react";
 import { Ico, type Tone } from "@/components/Icon";
+import MoreLikeThis from "@/components/MoreLikeThis";
 
 const PEN_COLORS = ["#111827", "#2563eb", "#dc2626", "#16a34a"];
 const HIGHLIGHT_COLORS = ["#facc15", "#4ade80", "#f472b6", "#60a5fa"];
@@ -659,6 +660,8 @@ export default function StudyPage({ videoId }: { videoId: string }) {
                 Open on YouTube
               </a>
             )}
+            {/* Beside the notes on a laptop; under them on smaller screens (below). */}
+            <MoreLikeThis kinds={["videos"]} id={videoId} className="mt-4" />
           </div>
           <div className={notesHidden ? "hidden" : "mt-2 lg:hidden"}>{toolbar}</div>
         </div>
@@ -718,6 +721,9 @@ export default function StudyPage({ videoId }: { videoId: string }) {
               </button>
             </>
           )}
+          <div className="lg:hidden">
+            <MoreLikeThis kinds={["videos"]} id={videoId} />
+          </div>
         </div>
       </div>
 
