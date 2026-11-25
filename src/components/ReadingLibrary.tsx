@@ -7,6 +7,7 @@ import { friendlyError } from "@/lib/errors";
 import { fetchAll } from "@/lib/fetch-all";
 import SearchBox from "@/components/SearchBox";
 import FoundElsewhere, { useSearchFromLink } from "@/components/FoundElsewhere";
+import { ARTICLE_LABEL, loadArticleTexts } from "@/lib/article-search";
 import { allTags, tagWithAi } from "@/lib/ai-tags";
 import { FoundIn, Highlight, SearchBar, type SearchScope } from "@/components/SearchHighlight";
 import { TAGS_LABEL, bestFirst, hashTag, matches, tagTest, notesText, prepare, queryWords, whereFound, type SearchMatch, type SearchWord } from "@/lib/search";
@@ -105,6 +106,17 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
   const [view, setView] = useState<View>({ kind: "all" });
   const [query, setQuery] = useState("");
   useSearchFromLink(setQuery);
+  // The articles' own text, read the first time something is searched.
+  const [articleText, setArticleText] = useState<Map<string, string> | null>(null);
+  const searchingText = query.trim().length > 1;
+  useEffect(() => {
+    if (!searchingText || articleText) return;
+    let live = true;
+    loadArticleTexts(supabase).then((m) => live && setArticleText(m));
+    return () => {
+      live = false;
+    };
+  }, [searchingText, articleText, supabase]);
   // Clicking a tag shows every link with exactly that tag.
   const [tag, setTag] = useState<string | null>(null);
   // Inside a category, search can look only there or in the whole tab.
@@ -210,10 +222,11 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
             { label: "the category", text: categoryPath(a.category_id) },
             { label: TAGS_LABEL, text: allTags(a).join(", ") },
             { label: "the link", text: a.url },
+            { label: ARTICLE_LABEL, text: articleText?.get(a.url) },
           ]),
         ]),
       ),
-    [articles, categoryPath],
+    [articles, categoryPath, articleText],
   );
 
   const visibleArticles = useMemo(() => {

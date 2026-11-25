@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { allTags } from "@/lib/ai-tags";
+import { ARTICLE_LABEL, loadArticleTexts } from "@/lib/article-search";
 import { htmlToText } from "@/lib/html-text";
 import { TAGS_LABEL, hashTag, matches, notesText, prepare, queryWords, tagTest, type SearchIndex } from "@/lib/search";
 import { createClient } from "@/lib/supabase/client";
@@ -55,12 +56,13 @@ export function loadEverything(fresh = false) {
   everything ??= (async () => {
     const supabase = createClient();
     const text = (v: unknown) => (typeof v === "string" ? v : "");
-    const [videos, notes, articles, scraps, reports] = await Promise.all([
+    const [videos, notes, articles, scraps, reports, articleText] = await Promise.all([
       rows(supabase, "videos", "id, title, channel, note, tags, ai_tags"),
       rows(supabase, "notes", "video_id, text"),
       rows(supabase, "articles", "id, title, url, site, author, note, notes, kind, tags, ai_tags"),
       rows(supabase, "scraps", "id, title, body, tags, ai_tags"),
       rows(supabase, "reports", "id, title, body, tags, ai_tags"),
+      loadArticleTexts(supabase, fresh),
     ]);
     const noteOf = new Map(notes.map((n) => [n.video_id, notesText(text(n.text))]));
     const entry = (section: Section, row: Record<string, unknown>, href: string, sub: string, fields: { label: string; text: string }[]): Entry => {
@@ -84,6 +86,7 @@ export function loadEverything(fresh = false) {
           { label: "the summary", text: text(a.note) },
           { label: "your notes", text: notesText(text(a.notes)) },
           { label: "the link", text: text(a.url) },
+          { label: ARTICLE_LABEL, text: articleText.get(text(a.url)) ?? "" },
         ]),
       ),
       ...scraps.map((s) =>
