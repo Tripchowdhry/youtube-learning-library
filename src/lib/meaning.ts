@@ -3,13 +3,7 @@
 // it was made from, so an item only gets a new one when its text changes.
 
 // The tabs, as named in item_meanings.kind (the same names as search's sections).
-export const MEANING_KINDS = [
-  "videos",
-  "reading",
-  "tutorial",
-  "scrapbook",
-  "reports",
-];
+export const MEANING_KINDS = ["videos", "reading", "tutorial", "scrapbook", "reports"];
 
 // How much of an item's text goes into its fingerprint, and how many items go to Google at once.
 export const MEANING_TEXT_MAX = 3_000;

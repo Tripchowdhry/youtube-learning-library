@@ -6,9 +6,11 @@ describe("meaning fingerprints", () => {
   afterEach(() => vi.unstubAllGlobals());
 
   it("asks Gemini with the task in the text, and scales the numbers to length 1", async () => {
-    const fetch = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify({ embeddings: [{ values: Array(EMBEDDING_SIZE).fill(2) }, { values: Array(3072).fill(1) }] }), { status: 200 }),
-    );
+    const fetch = vi
+      .fn()
+      .mockResolvedValue(
+        new Response(JSON.stringify({ embeddings: [{ values: Array(EMBEDDING_SIZE).fill(2) }, { values: Array(3072).fill(1) }] }), { status: 200 }),
+      );
     vi.stubGlobal("fetch", fetch);
     const usage: UsageRow[] = [];
     const out = await withModelAttempt(undefined, () => embedTexts([{ text: "black holes", title: "Space" }, { text: "caching" }], "item"), usage, "meaning");

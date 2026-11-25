@@ -40,27 +40,17 @@ export async function syncMeanings(entries: Entry[]) {
   lastSync = Date.now();
   try {
     const supabase = createClient();
-    const { data, error } = await supabase
-      .from("item_meanings")
-      .select("kind, item_id, source_hash")
-      .limit(10_000);
+    const { data, error } = await supabase.from("item_meanings").select("kind, item_id, source_hash").limit(10_000);
     if (error) {
       // The table isn't there yet: search by meaning is off until the SQL is run.
       off = true;
       return;
     }
-    const have = new Map(
-      (data ?? []).map((r) => [
-        keyOf(r.kind, r.item_id),
-        r.source_hash as string,
-      ]),
-    );
+    const have = new Map((data ?? []).map((r) => [keyOf(r.kind, r.item_id), r.source_hash as string]));
 
     // Fingerprints of items that were deleted (or moved tab) aren't needed any more.
     const live = new Set(entries.map((e) => keyOf(e.section, e.id)));
-    const gone = (data ?? []).filter(
-      (r) => !live.has(keyOf(r.kind, r.item_id)),
-    );
+    const gone = (data ?? []).filter((r) => !live.has(keyOf(r.kind, r.item_id)));
     for (const kind of new Set(gone.map((r) => r.kind))) {
       const ids = gone.filter((r) => r.kind === kind).map((r) => r.item_id);
       for (let i = 0; i < ids.length; i += 200)
@@ -99,16 +89,12 @@ export async function syncMeanings(entries: Entry[]) {
 
 // The saved items closest in meaning to a search, best first, from the entries given.
 // Only items clearly about the search: a floor on the score, and near the best one.
-export async function searchMeaning(
-  query: string,
-  entries: Entry[],
-): Promise<Entry[]> {
+export async function searchMeaning(query: string, entries: Entry[]): Promise<Entry[]> {
   if (off) return [];
   try {
     const { ok, data } = await post({ action: "search", query });
     if (!ok) return [];
-    const found: { kind: string; item_id: string; score: number }[] =
-      Array.isArray(data?.matches) ? data.matches : [];
+    const found: { kind: string; item_id: string; score: number }[] = Array.isArray(data?.matches) ? data.matches : [];
     const best = found[0]?.score ?? 0;
     const byKey = new Map(entries.map((e) => [keyOf(e.section, e.id), e]));
     return found
