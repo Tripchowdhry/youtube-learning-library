@@ -106,9 +106,14 @@ export default function SearchBox({
         remember(value);
       }}
       onKeyDown={(e) => {
+        // Escape clears the search; on an empty box it closes the list under it (and the phone search).
         if (e.key === "Escape" && value) {
           e.preventDefault();
           onChange("");
+        } else if (e.key === "Escape") {
+          e.preventDefault();
+          e.currentTarget.blur();
+          setOpen(false);
         }
         if (e.key === "Enter") remember(value);
       }}
