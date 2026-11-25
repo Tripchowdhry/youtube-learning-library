@@ -43,7 +43,7 @@ import { askArticleAi } from "@/lib/video-ai";
 import { askConfirm, askText } from "./ConfirmDialog";
 import FilterMenu from "@/components/FilterMenu";
 import { Ico, type Tone } from "./Icon";
-import { Images, Brush, FilePen, ExternalLink, FileText, GraduationCap, Inbox, LockKeyhole, NotebookPen, NotebookText, Pencil, PencilLine, Clapperboard, Sparkles, Tag, Trash2, TriangleAlert, type LucideIcon, ArrowUp, Copy, Eye, Link2, Link2Off } from "lucide-react";
+import { Brush, FilePen, ExternalLink, FileText, GraduationCap, Inbox, LockKeyhole, NotebookPen, NotebookText, Pencil, PencilLine, Clapperboard, Sparkles, Tag, Trash2, TriangleAlert, type LucideIcon, ArrowUp, Copy, Eye, Link2, Link2Off } from "lucide-react";
 import MoreMenu from "@/components/MoreMenu";
 import TagPills from "@/components/TagPills";
 import { askTags } from "@/lib/tags";
@@ -747,16 +747,7 @@ export default function ReadingLibrary({ userEmail, kind }: { userEmail: string;
         </button>
         <BrandMark />
         <SectionSwitch active={kind} />
-        <SearchBox value={query} onChange={setQuery} placeholder="Search titles, summaries, notes…" className="ml-auto w-auto sm:w-full sm:max-w-xs" collapse recentKey={kind} />
-        <Link
-          data-tour="clips"
-          href="/clips"
-          className="flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1 text-sm text-slate-600 hover:bg-slate-100"
-          title="See and delete your clips to free up space"
-        >
-          <Ico icon={Images} tone="violet" />
-          <span className="hidden sm:inline">Clips</span>
-        </Link>
+        <SearchBox value={query} onChange={setQuery} placeholder="Search titles, summaries, notes…" className="ml-auto w-auto sm:w-full sm:max-w-xs lg:max-w-xl" collapse recentKey={kind} />
         <AiUsageLink />
         <div className="hidden items-center gap-2 text-sm text-slate-500 sm:flex">
           <span className="hidden max-w-40 truncate lg:inline">{userEmail}</span>

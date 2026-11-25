@@ -14,11 +14,10 @@ import BrandMark from "@/components/BrandMark";
 import { WelcomePanel } from "@/components/GettingStarted";
 import { Tour, TourButton, useSectionTour } from "@/components/Tour";
 import { SAMPLE_VIDEO } from "@/lib/onboarding";
-import { Brush, Clapperboard, ExternalLink, FilePen, Folder as FolderIcon, ArrowUp, Copy, Eye, FolderPlus, Images, Inbox, Link2, Link2Off, NotebookText, Pencil, PencilLine, Sparkles, Tag, Trash2, TriangleAlert, type LucideIcon } from "lucide-react";
+import { Brush, Clapperboard, ExternalLink, FilePen, Folder as FolderIcon, ArrowUp, Copy, Eye, FolderPlus, Inbox, Link2, Link2Off, NotebookText, Pencil, PencilLine, Sparkles, Tag, Trash2, TriangleAlert, type LucideIcon } from "lucide-react";
 import FilterMenu from "@/components/FilterMenu";
 import { Ico, type Tone } from "@/components/Icon";
 import MoreMenu from "@/components/MoreMenu";
-import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePointerDrag } from "@/lib/pointer-drag";
 import { useRouter } from "next/navigation";
@@ -688,16 +687,7 @@ export default function Library({ userEmail }: { userEmail: string }) {
         <span data-tour="sections" className="shrink-0">
           <SectionSwitch active="videos" />
         </span>
-        <SearchBox value={query} onChange={setQuery} placeholder="Search titles, summaries, notes…" className="ml-auto w-auto sm:w-full sm:max-w-xs" collapse recentKey="videos" tour="search" />
-        <Link
-          data-tour="clips"
-          href="/clips"
-          className="flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1 text-sm text-slate-600 hover:bg-slate-100"
-          title="See and delete your clips to free up space"
-        >
-          <Ico icon={Images} tone="violet" />
-          <span className="hidden sm:inline">Clips</span>
-        </Link>
+        <SearchBox value={query} onChange={setQuery} placeholder="Search titles, summaries, notes…" className="ml-auto w-auto sm:w-full sm:max-w-xs lg:max-w-xl" collapse recentKey="videos" tour="search" />
         <AiUsageLink />
         <div className="hidden items-center gap-2 text-sm text-slate-500 sm:flex">
           <span className="hidden max-w-40 truncate lg:inline">{userEmail}</span>

@@ -1,7 +1,6 @@
 "use client";
 
 import AiUsageLink from "@/components/AiUsageLink";
-import { Ico } from "@/components/Icon";
 import SearchBox from "@/components/SearchBox";
 import FoundElsewhere, { useSearchFromLink } from "@/components/FoundElsewhere";
 import TagPills from "@/components/TagPills";
@@ -37,7 +36,6 @@ import { ReportIcon } from "@/components/ReportWriterLink";
 import {
   ArrowUp,
   Files,
-  Images,
   Inbox,
   Pencil,
   Tag,
@@ -507,18 +505,10 @@ export default function ReportsList({ userEmail }: { userEmail: string }) {
           value={query}
           onChange={setQuery}
           placeholder="Search titles and report text…"
-          className="ml-auto w-auto sm:w-full sm:max-w-xs"
+          className="ml-auto w-auto sm:w-full sm:max-w-xs lg:max-w-xl"
           collapse
           recentKey="reports"
         />
-        <Link
-          href="/clips"
-          className="flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1 text-sm text-slate-600 hover:bg-slate-100"
-          title="See and delete your clips to free up space"
-        >
-          <Ico icon={Images} tone="violet" />
-          <span className="hidden sm:inline">Clips</span>
-        </Link>
         <AiUsageLink />
         <div className="hidden items-center gap-2 text-sm text-slate-500 sm:flex">
           <span className="hidden max-w-40 truncate lg:inline">
