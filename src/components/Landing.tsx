@@ -68,6 +68,7 @@ export default function Landing({ error }: { error?: string }) {
             <BrandLogo size={18} />
             {BRAND.name}
           </span>
+          <span>{BRAND.tagline}</span>
           <Link href="/privacy" className="ml-auto underline">
             Privacy policy
           </Link>
