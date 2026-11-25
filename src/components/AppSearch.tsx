@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, Clapperboard, Clock, CornerDownLeft, FileText, GraduationCap, NotebookPen, Search, X, type LucideIcon } from "lucide-react";
+import { ArrowRight, Clapperboard, Clock, CornerDownLeft, FileText, GraduationCap, NotebookPen, Search, Sparkles, X, type LucideIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { SECTIONS, loadEverything, searchHref, type Entry, type Section } from "@/components/FoundElsewhere";
@@ -10,12 +10,16 @@ import { ReportIcon } from "@/components/ReportWriterLink";
 import { readRecent, writeRecent } from "@/components/SearchBox";
 import { Highlight } from "@/components/SearchHighlight";
 import { bestFirst, hashTag, matches, queryWords, tagTest, whereFound } from "@/lib/search";
+import { searchMeaning, syncMeanings, type Related } from "@/lib/meaning-sync";
 import { createClient } from "@/lib/supabase/client";
 
 // How many results each tab shows before "See all".
 const PER_SECTION = 5;
 const RECENT_KEY = "recent-searches:everywhere";
 const RECENT_MAX = 5;
+// Search by meaning: how many "Related" items to show, and how long typing pauses before asking.
+const RELATED_MAX = 3;
+const RELATED_WAIT_MS = 450;
 
 const ICONS: Record<Exclude<Section, "reports">, { Icon: LucideIcon; tone: Tone }> = {
   videos: { Icon: Clapperboard, tone: "red" },
@@ -36,7 +40,7 @@ const SHELF: Record<Section, { line: string; tint: string }> = {
   reports: { line: "border-violet-400", tint: "bg-violet-50" },
 };
 
-type Row = { kind: "item"; entry: Entry } | { kind: "all"; section: Section; count: number; path: string; name: string };
+type Row = { kind: "item"; entry: Entry; section: Section | "related" } | { kind: "all"; section: Section; count: number; path: string; name: string };
 
 // One search box for the whole app: ⌘K (Ctrl K) anywhere opens it. Results are grouped by tab,
 // the best matches first, and each opens the item where it lives. Vault is never searched here.
@@ -47,6 +51,8 @@ export default function AppSearch() {
   const [entries, setEntries] = useState<Entry[] | null>(null);
   const [active, setActive] = useState(0);
   const [recent, setRecent] = useState<string[]>([]);
+  // Items close in meaning to the search, for the search they were found for.
+  const [related, setRelated] = useState<{ q: string; items: Related[] } | null>(null);
   const input = useRef<HTMLInputElement>(null);
   const list = useRef<HTMLDivElement>(null);
 
@@ -59,7 +65,11 @@ export default function AppSearch() {
     setRecent(readRecent(RECENT_KEY));
     setOpen(true);
     // Read again each time, so something saved a moment ago is found; the last copy shows meanwhile.
-    loadEverything(true).then(setEntries);
+    loadEverything(true).then((list) => {
+      setEntries(list);
+      // Keeps meaning fingerprints up to date in the background, for "Related" results.
+      syncMeanings(list);
+    });
   }
 
   useEffect(() => {
@@ -102,14 +112,34 @@ export default function AppSearch() {
     return SECTIONS.map((s) => ({ ...s, items: found.filter((e) => e.section === s.key) })).filter((g) => g.items.length);
   }, [entries, q, typed, words]);
 
+  // Search by meaning, once typing pauses: items about the same idea, even with none of the words.
+  const meaningQuery = typed === null && q.length >= 3 ? q : "";
+  useEffect(() => {
+    if (!meaningQuery || !entries) return;
+    let live = true;
+    const wait = setTimeout(() => searchMeaning(meaningQuery, entries).then((items) => live && setRelated({ q: meaningQuery, items })), RELATED_WAIT_MS);
+    return () => {
+      live = false;
+      clearTimeout(wait);
+    };
+  }, [meaningQuery, entries]);
+  const relatedItems = useMemo(() => {
+    if (!related || related.q !== meaningQuery) return [];
+    const shown = new Set(groups.flatMap((g) => g.items.slice(0, PER_SECTION)).map((e) => e.href));
+    return related.items.filter((e) => !shown.has(e.href)).slice(0, RELATED_MAX);
+  }, [related, meaningQuery, groups]);
+  const relatedPending = !!meaningQuery && related?.q !== meaningQuery;
+
   // Everything the arrow keys move through, in the order shown.
   const rows: Row[] = useMemo(
-    () =>
-      groups.flatMap((g) => [
-        ...g.items.slice(0, PER_SECTION).map((entry) => ({ kind: "item" as const, entry })),
+    () => [
+      ...groups.flatMap((g) => [
+        ...g.items.slice(0, PER_SECTION).map((entry) => ({ kind: "item" as const, entry, section: g.key })),
         ...(g.items.length > PER_SECTION ? [{ kind: "all" as const, section: g.key, count: g.items.length, path: g.path, name: g.name }] : []),
       ]),
-    [groups],
+      ...relatedItems.map((entry) => ({ kind: "item" as const, entry, section: "related" as const })),
+    ],
+    [groups, relatedItems],
   );
   const total = groups.reduce((n, g) => n + g.items.length, 0);
 
@@ -136,11 +166,12 @@ export default function AppSearch() {
 
   const loading = entries === null;
   let at = -1;
-  const rowProps = (i: number, section: Section) => ({
+  const rowProps = (i: number, section: Section | "related") => ({
     "data-row": i,
     onMouseMove: () => setActive(i),
-    className: `flex w-full items-start gap-2.5 rounded-md px-2.5 py-2 text-left ${i === active ? SHELF[section].tint : ""}`,
+    className: `flex w-full items-start gap-2.5 rounded-md px-2.5 py-2 text-left ${i === active ? (section === "related" ? "bg-slate-100" : SHELF[section].tint) : ""}`,
   });
+  const sectionName = (s: Section) => SECTIONS.find((x) => x.key === s)?.name ?? "";
 
   return (
     <div
@@ -236,10 +267,14 @@ export default function AppSearch() {
             </div>
           ) : loading ? (
             <p className="px-2.5 py-6 text-center text-sm text-slate-500">Searching…</p>
-          ) : !groups.length ? (
-            <p className="px-2.5 py-6 text-center text-sm text-slate-500">Nothing matches &ldquo;{q}&rdquo; in any tab.</p>
+          ) : !groups.length && !relatedItems.length ? (
+            <p className="px-2.5 py-6 text-center text-sm text-slate-500">
+              {relatedPending ? "Searching…" : <>Nothing matches &ldquo;{q}&rdquo; in any tab.</>}
+            </p>
           ) : (
-            groups.map((g) => (
+            <>
+              {!groups.length && <p className="px-2.5 pt-2 pb-1 text-xs text-slate-500">No item has these words, but these are about the same idea.</p>}
+              {groups.map((g) => (
               <section key={g.key} className={`mb-2 border-l-2 pl-1 ${SHELF[g.key].line}`}>
                 <h3 className="flex items-center gap-1.5 px-2.5 pt-2 pb-1 text-xs font-semibold text-slate-500">
                   <SectionIcon section={g.key} />
@@ -281,14 +316,48 @@ export default function AppSearch() {
                     );
                   })()}
               </section>
-            ))
+              ))}
+              {relatedItems.length > 0 && (
+                <section className="mb-2 border-l-2 border-slate-300 pl-1">
+                  <h3
+                    className="flex items-center gap-1.5 px-2.5 pt-2 pb-1 text-xs font-semibold text-slate-500"
+                    title="Found by meaning: about the same idea, even without the same words"
+                  >
+                    <Sparkles size={14} aria-hidden className="text-slate-400" />
+                    Related
+                    <span className="font-normal text-slate-400">by meaning</span>
+                  </h3>
+                  {relatedItems.map((entry) => {
+                    const i = ++at;
+                    return (
+                      <button
+                        key={entry.href}
+                        type="button"
+                        onClick={() => go(rows[i])}
+                        title={`How close in meaning: ${Math.round(entry.score * 100)}%`}
+                        {...rowProps(i, "related")}
+                      >
+                        <span className="mt-0.5 shrink-0">
+                          <SectionIcon section={entry.section} />
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-medium text-slate-900">{entry.title}</span>
+                          <span className="block truncate text-xs text-slate-500">{[sectionName(entry.section), entry.sub].filter(Boolean).join(" · ")}</span>
+                        </span>
+                        {i === active && <CornerDownLeft size={14} aria-hidden className="mt-0.5 hidden shrink-0 text-slate-400 sm:block" />}
+                      </button>
+                    );
+                  })}
+                </section>
+              )}
+            </>
           )}
         </div>
 
-        {q && !loading && total > 0 && (
+        {q && !loading && total + relatedItems.length > 0 && (
           <div className="hidden items-center justify-between border-t border-slate-200 px-3 py-1.5 text-[11px] text-slate-400 sm:flex">
             <span>
-              {total} result{total === 1 ? "" : "s"}
+              {[total > 0 && `${total} result${total === 1 ? "" : "s"}`, relatedItems.length > 0 && `${relatedItems.length} related`].filter(Boolean).join(" · ")}
             </span>
             <span>↑↓ to move · Enter to open · Esc to close</span>
           </div>

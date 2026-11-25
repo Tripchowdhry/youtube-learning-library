@@ -437,3 +437,69 @@ export function askAboutSources(parts: SourcePart[], instructions: string, reque
     "answer from this category",
   );
 }
+
+// Search by meaning: turns text into a "meaning fingerprint" of 768 numbers, so texts about the
+// same idea land close together even when they share no words. Free on Gemini's free tier.
+// gemini-embedding-2 takes the job as a prefix on the text, not as a setting.
+export const EMBEDDING_MODEL = "gemini-embedding-2";
+export const EMBEDDING_SIZE = 768;
+
+// Keeps the first 768 numbers and scales them back to length 1, in case a longer one comes back.
+function fitEmbedding(values: unknown): number[] | null {
+  if (!Array.isArray(values) || values.length < EMBEDDING_SIZE) return null;
+  const v = values.slice(0, EMBEDDING_SIZE).map(Number);
+  if (v.some((n) => !Number.isFinite(n))) return null;
+  const length = Math.hypot(...v) || 1;
+  return v.map((n) => n / length);
+}
+
+// `as` says what the text is: a search someone typed, or a saved item to be found.
+export async function embedTexts(texts: { text: string; title?: string }[], as: "query" | "item"): Promise<number[][]> {
+  if (!texts.length) return [];
+  const store = requestStore.getStore();
+  const started = Date.now();
+  const model = EMBEDDING_MODEL;
+  const requests = texts.map(({ text, title }) => ({
+    model: `models/${model}`,
+    content: {
+      parts: [
+        {
+          text: as === "query" ? `task: search result | query: ${text}` : `title: ${title?.trim() || "none"} | text: ${text}`,
+        },
+      ],
+    },
+    outputDimensionality: EMBEDDING_SIZE,
+  }));
+  let status = 502;
+  try {
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:batchEmbedContents`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": process.env.GEMINI_API_KEY ?? "",
+      },
+      body: JSON.stringify({ requests }),
+      signal: AbortSignal.timeout(30_000),
+    });
+    status = res.status;
+    const data = await res.json().catch(() => null);
+    if (!res.ok) throw new GeminiError(`The AI couldn't read the meaning (${data?.error?.message ?? res.status}).`, res.status === 429 ? 429 : 502);
+    const out = (data?.embeddings ?? []).map((e: { values?: unknown }) => fitEmbedding(e?.values));
+    if (out.length !== texts.length || out.some((e: number[] | null) => !e)) {
+      status = 502;
+      throw new GeminiError("The AI sent back an unexpected answer.", 502);
+    }
+    return out as number[][];
+  } catch (error) {
+    if (error instanceof GeminiError) throw error;
+    status = 504;
+    throw new GeminiError("The AI took too long to answer.", 504);
+  } finally {
+    // Google doesn't report tokens for embeddings; about 4 characters make a token.
+    const chars = texts.reduce((n, t) => n + t.text.length + (t.title?.length ?? 0), 0);
+    store?.usage.push({
+      ...usageRow(store.feature, model, status, started),
+      input_tokens: Math.ceil(chars / 4),
+    });
+  }
+}

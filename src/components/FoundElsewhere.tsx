@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { allTags } from "@/lib/ai-tags";
 import { ARTICLE_LABEL, loadArticleTexts } from "@/lib/article-search";
 import { htmlToText } from "@/lib/html-text";
+import { meaningText } from "@/lib/meaning";
 import { TAGS_LABEL, hashTag, matches, notesText, prepare, queryWords, tagTest, type SearchIndex } from "@/lib/search";
 import { createClient } from "@/lib/supabase/client";
 
@@ -19,7 +20,8 @@ export const SECTIONS: { key: Section; name: string; path: string }[] = [
 ];
 
 // One saved item, ready to search: where it lives, what to show, and the page that opens it.
-export type Entry = { section: Section; id: string; title: string; sub: string; href: string; index: SearchIndex; tags: string[] };
+// `meaning` is the text its meaning fingerprint is made from (see meaning-sync.ts).
+export type Entry = { section: Section; id: string; title: string; sub: string; href: string; index: SearchIndex; tags: string[]; meaning: string };
 
 // A link that opens a tab with a search already typed in.
 export const searchHref = (path: string, query: string) => `${path}?q=${encodeURIComponent(query)}`;
@@ -68,7 +70,8 @@ export function loadEverything(fresh = false) {
     const entry = (section: Section, row: Record<string, unknown>, href: string, sub: string, fields: { label: string; text: string }[]): Entry => {
       const tags = allTags(row as { tags?: string[]; ai_tags?: string[] });
       const title = fields[0].text || "Untitled";
-      return { section, id: text(row.id), title, sub, href, tags, index: prepare([...fields, { label: TAGS_LABEL, text: tags.join(", ") }]) };
+      const about = meaningText([...fields.slice(1).filter((f) => f.label !== "the link").map((f) => f.text), tags.length ? `Tags: ${tags.join(", ")}` : ""]);
+      return { section, id: text(row.id), title, sub, href, tags, meaning: about, index: prepare([...fields, { label: TAGS_LABEL, text: tags.join(", ") }]) };
     };
     return [
       ...videos.map((v) =>

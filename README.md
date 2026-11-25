@@ -32,6 +32,7 @@ Built with Next.js, Tailwind CSS and Supabase. Hosted on Vercel.
    For Reports (Report Writer), run [`supabase/reports.sql`](supabase/reports.sql). It only adds its own two tables.
    To keep each article's text after its first read (less server time on Vercel), also run [`supabase/article-texts.sql`](supabase/article-texts.sql).
    For the Bandwidth tab on the AI usage page (this month's Supabase and Vercel data use against the free limits, starting again on the 1st), run [`supabase/bandwidth.sql`](supabase/bandwidth.sql).
+   For "Related" results in the ⌘K search (items about the same idea, even without the same words), run [`supabase/meaning-search.sql`](supabase/meaning-search.sql). It uses pgvector, which the free plan includes.
 3. Open **Project Settings → API** (or **Data API**) and copy the **Project URL** and the **anon public** key.
 
 Supabase pauses a free project after about a week with no activity. The app's `vercel.json` has Vercel call `/api/keep-awake` once a day to prevent that; nothing to set up.

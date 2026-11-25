@@ -22,6 +22,7 @@ export const FEATURES: Record<string, string> = {
   improve: "Improve writing",
   handwriting: "Reading handwriting",
   tags: "AI tags",
+  meaning: "Search by meaning",
 };
 
 export const featureName = (feature: string) => FEATURES[feature] ?? feature;
