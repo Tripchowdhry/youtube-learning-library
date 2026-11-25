@@ -10,7 +10,7 @@ import { ReportIcon } from "@/components/ReportWriterLink";
 import { readRecent, writeRecent } from "@/components/SearchBox";
 import { Highlight } from "@/components/SearchHighlight";
 import { bestFirst, hashTag, matches, queryWords, tagTest, whereFound } from "@/lib/search";
-import { searchMeaning, syncMeanings } from "@/lib/meaning-sync";
+import { searchMeaning, syncMeanings, type Related } from "@/lib/meaning-sync";
 import { createClient } from "@/lib/supabase/client";
 
 // How many results each tab shows before "See all".
@@ -18,7 +18,7 @@ const PER_SECTION = 5;
 const RECENT_KEY = "recent-searches:everywhere";
 const RECENT_MAX = 5;
 // Search by meaning: how many "Related" items to show, and how long typing pauses before asking.
-const RELATED_MAX = 5;
+const RELATED_MAX = 3;
 const RELATED_WAIT_MS = 450;
 
 const ICONS: Record<Exclude<Section, "reports">, { Icon: LucideIcon; tone: Tone }> = {
@@ -52,7 +52,7 @@ export default function AppSearch() {
   const [active, setActive] = useState(0);
   const [recent, setRecent] = useState<string[]>([]);
   // Items close in meaning to the search, for the search they were found for.
-  const [related, setRelated] = useState<{ q: string; items: Entry[] } | null>(null);
+  const [related, setRelated] = useState<{ q: string; items: Related[] } | null>(null);
   const input = useRef<HTMLInputElement>(null);
   const list = useRef<HTMLDivElement>(null);
 
@@ -330,7 +330,13 @@ export default function AppSearch() {
                   {relatedItems.map((entry) => {
                     const i = ++at;
                     return (
-                      <button key={entry.href} type="button" onClick={() => go(rows[i])} {...rowProps(i, "related")}>
+                      <button
+                        key={entry.href}
+                        type="button"
+                        onClick={() => go(rows[i])}
+                        title={`How close in meaning: ${Math.round(entry.score * 100)}%`}
+                        {...rowProps(i, "related")}
+                      >
                         <span className="mt-0.5 shrink-0">
                           <SectionIcon section={entry.section} />
                         </span>

@@ -88,8 +88,14 @@ export async function syncMeanings(entries: Entry[]) {
 }
 
 // The saved items closest in meaning to a search, best first, from the entries given.
-// Only items clearly about the search: a floor on the score, and near the best one.
-export async function searchMeaning(query: string, entries: Entry[]): Promise<Entry[]> {
+// Only close matches: a high floor on the score (0 to 1), and close to the best one, so loosely
+// related items stay out.
+const CLOSE_ENOUGH = 0.6;
+const NEAR_BEST = 0.06;
+
+export type Related = Entry & { score: number };
+
+export async function searchMeaning(query: string, entries: Entry[]): Promise<Related[]> {
   if (off) return [];
   try {
     const { ok, data } = await post({ action: "search", query });
@@ -98,9 +104,11 @@ export async function searchMeaning(query: string, entries: Entry[]): Promise<En
     const best = found[0]?.score ?? 0;
     const byKey = new Map(entries.map((e) => [keyOf(e.section, e.id), e]));
     return found
-      .filter((m) => m.score >= 0.4 && m.score >= best - 0.12)
-      .map((m) => byKey.get(keyOf(m.kind, m.item_id)))
-      .filter((e): e is Entry => !!e);
+      .filter((m) => m.score >= CLOSE_ENOUGH && m.score >= best - NEAR_BEST)
+      .flatMap((m) => {
+        const e = byKey.get(keyOf(m.kind, m.item_id));
+        return e ? [{ ...e, score: m.score }] : [];
+      });
   } catch {
     return [];
   }
