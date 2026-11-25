@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { SECTIONS, loadEverything, searchHref, type Entry, type Section } from "@/components/FoundElsewhere";
 import { Ico, type Tone } from "@/components/Icon";
+import BrandStripe from "@/components/BrandStripe";
 import { ReportIcon } from "@/components/ReportWriterLink";
 import { readRecent, writeRecent } from "@/components/SearchBox";
 import { Highlight } from "@/components/SearchHighlight";
@@ -24,6 +25,16 @@ const ICONS: Record<Exclude<Section, "reports">, { Icon: LucideIcon; tone: Tone 
 };
 const SectionIcon = ({ section }: { section: Section }) =>
   section === "reports" ? <ReportIcon size={16} /> : <Ico icon={ICONS[section].Icon} tone={ICONS[section].tone} />;
+
+// Each tab's colour from the BrainShelf logo's books (Reports keep their lavender): a thin line
+// down the side of its group of results, and a soft tint on the result you're on.
+const SHELF: Record<Section, { line: string; tint: string }> = {
+  videos: { line: "border-red-400", tint: "bg-red-50" },
+  reading: { line: "border-blue-400", tint: "bg-blue-50" },
+  tutorial: { line: "border-green-500", tint: "bg-green-50" },
+  scrapbook: { line: "border-amber-400", tint: "bg-amber-50" },
+  reports: { line: "border-violet-400", tint: "bg-violet-50" },
+};
 
 type Row = { kind: "item"; entry: Entry } | { kind: "all"; section: Section; count: number; path: string; name: string };
 
@@ -125,10 +136,10 @@ export default function AppSearch() {
 
   const loading = entries === null;
   let at = -1;
-  const rowProps = (i: number) => ({
+  const rowProps = (i: number, section: Section) => ({
     "data-row": i,
     onMouseMove: () => setActive(i),
-    className: `flex w-full items-start gap-2.5 rounded-md px-2.5 py-2 text-left ${i === active ? "bg-slate-100" : ""}`,
+    className: `flex w-full items-start gap-2.5 rounded-md px-2.5 py-2 text-left ${i === active ? SHELF[section].tint : ""}`,
   });
 
   return (
@@ -139,9 +150,11 @@ export default function AppSearch() {
       <div
         role="dialog"
         aria-modal="true"
-        aria-label="Search everything"
-        className="flex h-full w-full flex-col bg-white shadow-2xl sm:h-auto sm:max-h-[70vh] sm:max-w-xl sm:rounded-xl sm:ring-1 sm:ring-slate-200"
+        aria-label="Search your BrainShelf"
+        className="flex h-full w-full flex-col overflow-hidden bg-white shadow-2xl sm:h-auto sm:max-h-[70vh] sm:max-w-xl sm:rounded-xl sm:ring-1 sm:ring-slate-200"
       >
+        {/* The logo's four book colours, like spines on a shelf. */}
+        <BrandStripe />
         <div className="flex items-center gap-2 border-b border-slate-200 px-3 py-2.5">
           <Search size={18} aria-hidden className="shrink-0 text-slate-400" />
           <input
@@ -165,8 +178,8 @@ export default function AppSearch() {
                 go(rows[active]);
               }
             }}
-            placeholder="Search videos, reading, tutorials, ScrapBook, reports…"
-            aria-label="Search everything"
+            placeholder="Search your BrainShelf…"
+            aria-label="Search your BrainShelf"
             className="min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-slate-400 sm:text-sm [&::-webkit-search-cancel-button]:appearance-none"
           />
           {query && (
@@ -227,7 +240,7 @@ export default function AppSearch() {
             <p className="px-2.5 py-6 text-center text-sm text-slate-500">Nothing matches &ldquo;{q}&rdquo; in any tab.</p>
           ) : (
             groups.map((g) => (
-              <section key={g.key} className="mb-1">
+              <section key={g.key} className={`mb-2 border-l-2 pl-1 ${SHELF[g.key].line}`}>
                 <h3 className="flex items-center gap-1.5 px-2.5 pt-2 pb-1 text-xs font-semibold text-slate-500">
                   <SectionIcon section={g.key} />
                   {g.name}
@@ -237,7 +250,7 @@ export default function AppSearch() {
                   const i = ++at;
                   const found = words.length ? whereFound(entry.index, words) : null;
                   return (
-                    <button key={entry.href} type="button" onClick={() => go(rows[i])} {...rowProps(i)}>
+                    <button key={entry.href} type="button" onClick={() => go(rows[i])} {...rowProps(i, g.key)}>
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-sm font-medium text-slate-900">
                           <Highlight text={entry.title} words={words} />
@@ -259,7 +272,7 @@ export default function AppSearch() {
                   (() => {
                     const i = ++at;
                     return (
-                      <button type="button" onClick={() => go(rows[i])} {...rowProps(i)}>
+                      <button type="button" onClick={() => go(rows[i])} {...rowProps(i, g.key)}>
                         <span className="flex items-center gap-1 text-xs font-medium text-blue-700">
                           See all {g.items.length} in {g.name}
                           <ArrowRight size={12} aria-hidden />
