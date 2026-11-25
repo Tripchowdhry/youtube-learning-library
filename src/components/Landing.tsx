@@ -16,6 +16,7 @@ export default function Landing({ error }: { error?: string }) {
             <BrandLogo size={24} />
             {BRAND.name}
           </span>
+          <span className="hidden text-xs text-slate-500 sm:inline">{BRAND.tagline}</span>
           <nav className="ml-auto hidden items-center gap-5 text-sm text-slate-600 sm:flex">
             <a href="#faq" className="hover:text-slate-900">
               Tour and FAQ
