@@ -72,10 +72,10 @@ export default function AiTagsSwitch() {
       <div className="flex items-center gap-3">
         <Ico icon={Sparkles} tone="violet" size={20} />
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold">AI tags</p>
+          <p className="text-sm font-semibold">Add topic tags automatically</p>
           <p className="text-xs text-slate-500">
-            When you save something new, the AI adds up to 3 tags in <span className="rounded-full bg-violet-100 px-1.5 text-violet-800">purple</span>.
-            You can add 2 of your own.
+            When you save something, the AI adds up to 3 topic tags in <span className="rounded-full bg-violet-100 px-1.5 text-violet-800">purple</span>,
+            so you can find related items by clicking a tag or typing #tag in search. You can add 2 of your own.
           </p>
           {failed && <p className="text-xs text-red-700">Couldn&apos;t save that. Try again.</p>}
         </div>
@@ -83,7 +83,7 @@ export default function AiTagsSwitch() {
           type="button"
           role="switch"
           aria-checked={on === true}
-          aria-label="AI tags"
+          aria-label="Add topic tags automatically"
           disabled={on === null}
           onClick={toggle}
           className={`relative h-6 w-11 shrink-0 rounded-full transition ${on ? "bg-violet-600" : "bg-slate-300"} disabled:opacity-50`}
@@ -113,14 +113,14 @@ export default function AiTagsSwitch() {
           ) : (
             <>
               <span>
-                {untagged!.length} older item{untagged!.length === 1 ? " has" : "s have"} no AI tags yet.
+                {untagged!.length} item{untagged!.length === 1 ? "" : "s"} saved before this was on {untagged!.length === 1 ? "has" : "have"} no topic tags.
               </span>
               <button
                 type="button"
                 onClick={tagAll}
-                className="rounded-md bg-violet-600 px-2.5 py-1 font-semibold text-white hover:bg-violet-700"
+                className="rounded-md px-2 py-1 font-medium text-violet-700 ring-1 ring-violet-200 hover:bg-violet-50"
               >
-                Tag {untagged!.length === 1 ? "it" : "them"}
+                Tag {untagged!.length === 1 ? "it" : "them"} too
               </button>
               <span className="text-slate-400">Keep this page open; about {Math.max(1, Math.ceil((untagged!.length * GAP_MS) / 60_000))} min.</span>
             </>

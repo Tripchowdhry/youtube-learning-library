@@ -3,7 +3,7 @@
 import AiTagsSwitch from "@/components/AiTagsSwitch";
 import BackLink from "@/components/BackLink";
 import HomeLink from "@/components/HomeLink";
-import { Activity, ArrowDownUp, CircleCheck, Clock, Coins, Database, LayoutGrid, ListOrdered, Repeat, Sparkles } from "lucide-react";
+import { Activity, ArrowDownUp, CircleCheck, Clock, Coins, Database, LayoutGrid, ListOrdered, Repeat, SlidersHorizontal, Sparkles } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Ico } from "@/components/Icon";
 import BrandStripe from "@/components/BrandStripe";
@@ -20,7 +20,7 @@ const RANGES = [
   { key: "month", label: "Last 30 days" },
 ] as const;
 type Range = (typeof RANGES)[number]["key"];
-type View = "ai" | "storage" | "bandwidth";
+type View = "ai" | "storage" | "bandwidth" | "settings";
 // The logo's colours, used for each stat's book-spine edge and the bars in the tables.
 const SPINE: Record<"blue" | "green" | "red" | "amber", string> = {
   blue: "border-l-[#2563eb]",
@@ -45,12 +45,13 @@ function since(range: Range) {
 export default function AiUsage() {
   const supabase = useMemo(() => createClient(), []);
   const [range, setRange] = useState<Range>("today");
-  // Three views instead of one long page; /ai-usage#storage and #bandwidth open on those.
+  // Four views instead of one long page; /ai-usage#storage, #bandwidth and #settings open on those.
   const [view, setView] = useState<View>("ai");
   const [showAllLatest, setShowAllLatest] = useState(false);
   useEffect(() => {
     if (window.location.hash === "#storage") setView("storage");
     if (window.location.hash === "#bandwidth") setView("bandwidth");
+    if (window.location.hash === "#settings") setView("settings");
   }, []);
   function chooseView(next: View) {
     setView(next);
@@ -101,28 +102,33 @@ export default function AiUsage() {
       </header>
 
       <main className="mx-auto flex max-w-4xl flex-col gap-4 p-4">
-        <nav className="flex w-fit rounded-lg bg-slate-100 p-0.5" aria-label="Show">
+        <nav className="flex w-full rounded-lg bg-slate-100 p-0.5 sm:w-fit" aria-label="Show">
           {(
             [
               ["ai", "AI requests", Sparkles, "blue"],
               ["storage", "Storage", Database, "green"],
               ["bandwidth", "Bandwidth", ArrowDownUp, "amber"],
+              ["settings", "AI settings", SlidersHorizontal, "violet"],
             ] as const
           ).map(([key, label, icon, tone]) => (
             <button
               key={key}
               onClick={() => chooseView(key)}
               aria-pressed={view === key}
-              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium ${view === key ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:text-slate-900"}`}
+              className={`flex flex-1 items-center justify-center gap-1.5 rounded-md px-1.5 py-1.5 text-[13px] font-medium whitespace-nowrap sm:flex-none sm:px-3 sm:text-sm ${view === key ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:text-slate-900"}`}
             >
-              <Ico icon={icon} tone={tone} size={15} />
+              {/* Phones show just the names, so all four tabs fit across. */}
+              <span className="hidden sm:contents">
+                <Ico icon={icon} tone={tone} size={15} />
+              </span>
               {label}
             </button>
           ))}
         </nav>
-        {view === "ai" && <AiTagsSwitch />}
-
-        {view === "storage" ? (
+        {view === "settings" ? (
+          // Choices for how the AI works; the other tabs only show numbers.
+          <AiTagsSwitch />
+        ) : view === "storage" ? (
           <StorageUsage supabase={supabase} />
         ) : view === "bandwidth" ? (
           <BandwidthUsage supabase={supabase} />
