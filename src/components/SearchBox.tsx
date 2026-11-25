@@ -6,6 +6,19 @@ import { useEffect, useRef, useState } from "react";
 
 const RECENT_MAX = 5;
 
+// Each tab's colour from the logo's books, for the box's focus ring. Written out in full so
+// Tailwind keeps the classes.
+export type SearchTone = "red" | "blue" | "green" | "amber" | "violet" | "navy" | "slate";
+const FOCUS: Record<SearchTone, string> = {
+  red: "focus:border-red-400 focus:ring-red-100",
+  blue: "focus:border-blue-400 focus:ring-blue-100",
+  green: "focus:border-green-500 focus:ring-green-100",
+  amber: "focus:border-amber-400 focus:ring-amber-100",
+  violet: "focus:border-violet-400 focus:ring-violet-100",
+  navy: "focus:border-[#2b3b5e] focus:ring-[#ece6ff]",
+  slate: "focus:border-slate-400 focus:ring-slate-100",
+};
+
 // The last few searches in a tab, kept on this device only.
 export function readRecent(key: string): string[] {
   try {
@@ -29,6 +42,7 @@ export function writeRecent(key: string, list: string[]) {
 // header (the nearest positioned parent), with Cancel to close it. Larger screens are unchanged.
 // With `collapse`, pressing / anywhere on the page (outside a text box) jumps to the search.
 // With `recentKey`, the last few searches show under the empty box, to run again with one tap.
+// With `tone`, the box lights up in that tab's colour from the BrainShelf logo while you type.
 export default function SearchBox({
   value,
   onChange,
@@ -37,6 +51,7 @@ export default function SearchBox({
   tour,
   collapse,
   recentKey,
+  tone = "slate",
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -45,6 +60,7 @@ export default function SearchBox({
   tour?: string;
   collapse?: boolean;
   recentKey?: string;
+  tone?: SearchTone;
 }) {
   const input = useRef<HTMLInputElement>(null);
   const phoneInput = useRef<HTMLInputElement>(null);
@@ -119,7 +135,7 @@ export default function SearchBox({
       }}
       placeholder={placeholder}
       title={collapse ? "Search (press / to jump here)" : undefined}
-      className={`w-full rounded-md border border-slate-300 py-1.5 pr-8 text-sm [&::-webkit-search-cancel-button]:appearance-none ${extra || "pl-3"}`}
+      className={`w-full rounded-md border border-slate-300 py-1.5 text-sm outline-none focus:ring-2 [&::-webkit-search-cancel-button]:appearance-none ${FOCUS[tone]} ${extra || "pr-8 pl-3"}`}
     />
   );
   const clearButton = value && (
@@ -176,7 +192,7 @@ export default function SearchBox({
           className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-slate-700 hover:bg-slate-100 ${recent.length ? "mt-1 border-t border-slate-100 pt-2" : ""}`}
         >
           <Search size={14} aria-hidden className="shrink-0 text-slate-400" />
-          <span className="flex-1 whitespace-nowrap">Search all tabs</span>
+          <span className="flex-1 whitespace-nowrap">Search your BrainShelf</span>
           <kbd className="hidden rounded border border-slate-200 px-1.5 font-sans text-[11px] whitespace-nowrap text-slate-400 sm:block">{shortcut}</kbd>
         </button>
       )}
@@ -202,8 +218,22 @@ export default function SearchBox({
   return (
     <div data-tour={tour} className={`sm:relative ${className ?? ""}`}>
       <div className="relative hidden sm:block">
-        {field(input)}
+        <Search size={16} aria-hidden className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-slate-400" />
+        {field(input, `pl-8 ${value ? "pr-8" : "pr-16"}`)}
         {clearButton}
+        {/* The shortcut for searching every tab, while the box is empty (the list below shows it once you're in the box). */}
+        {!value && !focused && (
+          <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => openAppSearch()}
+            title="Search your BrainShelf: every tab at once"
+            aria-label="Search your BrainShelf"
+            className="absolute top-1/2 right-1.5 -translate-y-1/2 rounded border border-slate-200 bg-white px-1.5 font-sans text-[11px] whitespace-nowrap text-slate-400 hover:border-slate-300 hover:text-slate-700"
+          >
+            {shortcut}
+          </button>
+        )}
         {recentList}
       </div>
       <button
@@ -221,7 +251,7 @@ export default function SearchBox({
         <div className="absolute inset-0 z-30 flex items-center gap-2 bg-white px-4 sm:hidden">
           <div className="relative flex-1">
             <Search size={16} aria-hidden className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-slate-400" />
-            {field(phoneInput, "pl-8", open)}
+            {field(phoneInput, "pr-8 pl-8", open)}
             {value && (
               <button
                 type="button"

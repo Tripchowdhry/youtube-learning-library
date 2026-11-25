@@ -508,6 +508,7 @@ export default function ReportsList({ userEmail }: { userEmail: string }) {
           className="ml-auto w-auto sm:w-full sm:max-w-xs lg:max-w-xl"
           collapse
           recentKey="reports"
+          tone="violet"
         />
         <AiUsageLink />
         <div className="hidden items-center gap-2 text-sm text-slate-500 sm:flex">

@@ -523,7 +523,7 @@ export default function VaultLibrary({ userEmail }: { userEmail: string }) {
         </button>
         <BrandMark />
         <SectionSwitch active="vault" />
-        <SearchBox value={query} onChange={setQuery} placeholder="Search names, web addresses, user IDs…" className="ml-auto w-auto sm:w-full sm:max-w-xs lg:max-w-xl" collapse />
+        <SearchBox value={query} onChange={setQuery} placeholder="Search names, web addresses, user IDs…" className="ml-auto w-auto sm:w-full sm:max-w-xs lg:max-w-xl" collapse tone="navy" />
         <AiUsageLink />
         <div className="hidden items-center gap-2 text-sm text-slate-500 sm:flex">
           <span className="hidden max-w-40 truncate lg:inline">{userEmail}</span>
