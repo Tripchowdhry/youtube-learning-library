@@ -63,10 +63,17 @@ export function ConfirmHost() {
     };
   }, []);
 
+  // When the dialog opens (not on every key typed, which would select the text and overwrite it
+  // with the next letter): select the text to replace, or put the focus on Cancel.
   useEffect(() => {
     if (!request) return;
     if (request.field) textBox.current?.select();
     else cancelButton.current?.focus();
+  }, [request]);
+
+  // Escape cancels.
+  useEffect(() => {
+    if (!request) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") close(false);
     };
